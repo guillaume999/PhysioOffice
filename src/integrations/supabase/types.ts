@@ -225,34 +225,43 @@ export type Database = {
       videos: {
         Row: {
           category: string | null
+          category_pathology: string | null
           created_at: string
           description: string | null
           duration: number | null
           id: string
+          most_used_patho: string | null
           thumbnail_url: string | null
           title: string
+          type_renfo: string | null
           user_id: string
           video_url: string
         }
         Insert: {
           category?: string | null
+          category_pathology?: string | null
           created_at?: string
           description?: string | null
           duration?: number | null
           id?: string
+          most_used_patho?: string | null
           thumbnail_url?: string | null
           title: string
+          type_renfo?: string | null
           user_id: string
           video_url: string
         }
         Update: {
           category?: string | null
+          category_pathology?: string | null
           created_at?: string
           description?: string | null
           duration?: number | null
           id?: string
+          most_used_patho?: string | null
           thumbnail_url?: string | null
           title?: string
+          type_renfo?: string | null
           user_id?: string
           video_url?: string
         }
