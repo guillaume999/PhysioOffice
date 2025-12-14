@@ -22,7 +22,16 @@ interface Patient {
   phone: string | null;
   city: string | null;
   status: string;
+  mutual_number: string | null;
+  remaining_sessions: number | null;
+  prescription: string | null;
 }
+
+const prescriptionLabels: Record<string, string> = {
+  oui: "Oui",
+  none: "Non",
+  renouv_kine: "Renouv. kiné",
+};
 
 type StatusFilter = "all" | "active" | "in_treatment" | "waiting" | "inactive";
 
@@ -47,7 +56,7 @@ export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     first_name: "", 
@@ -56,7 +65,10 @@ export default function Patients() {
     phone: "", 
     date_of_birth: "", 
     city: "",
-    status: "active" 
+    status: "active",
+    mutual_number: "",
+    remaining_sessions: 0,
+    prescription: "none"
   });
 
   useEffect(() => {
@@ -70,11 +82,23 @@ export default function Patients() {
   const fetchPatients = async () => {
     const { data, error } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, date_of_birth, email, phone, city, status")
+      .select("id, first_name, last_name, date_of_birth, email, phone, city, status, mutual_number, remaining_sessions, prescription")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
     else setPatients(data || []);
     setLoading(false);
+  };
+
+  const updatePatientStatus = async (patientId: string, newStatus: string) => {
+    const { error } = await supabase
+      .from("patients")
+      .update({ status: newStatus })
+      .eq("id", patientId);
+    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    else {
+      setPatients(patients.map(p => p.id === patientId ? { ...p, status: newStatus } : p));
+      toast({ title: "Statut mis à jour" });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,7 +108,7 @@ export default function Patients() {
     else { 
       toast({ title: "Patient ajouté" }); 
       setIsDialogOpen(false); 
-      setFormData({ first_name: "", last_name: "", email: "", phone: "", date_of_birth: "", city: "", status: "active" }); 
+      setFormData({ first_name: "", last_name: "", email: "", phone: "", date_of_birth: "", city: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
       fetchPatients(); 
     }
   };
@@ -129,17 +153,40 @@ export default function Patients() {
                     <div><Label>Date de naissance</Label><Input type="date" value={formData.date_of_birth} onChange={e => setFormData({...formData, date_of_birth: e.target.value})} /></div>
                     <div><Label>Ville</Label><Input value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} /></div>
                   </div>
-                  <div>
-                    <Label>Statut</Label>
-                    <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Actif</SelectItem>
-                        <SelectItem value="in_treatment">En traitement</SelectItem>
-                        <SelectItem value="waiting">En attente</SelectItem>
-                        <SelectItem value="inactive">Inactif</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Statut</Label>
+                      <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Actif</SelectItem>
+                          <SelectItem value="in_treatment">En traitement</SelectItem>
+                          <SelectItem value="waiting">En attente</SelectItem>
+                          <SelectItem value="inactive">Inactif</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>N° Mutuelle</Label>
+                      <Input value={formData.mutual_number} onChange={e => setFormData({...formData, mutual_number: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Séances restantes</Label>
+                      <Input type="number" min="0" value={formData.remaining_sessions} onChange={e => setFormData({...formData, remaining_sessions: parseInt(e.target.value) || 0})} />
+                    </div>
+                    <div>
+                      <Label>Prescription</Label>
+                      <Select value={formData.prescription} onValueChange={(value) => setFormData({...formData, prescription: value})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="oui">Oui</SelectItem>
+                          <SelectItem value="none">Non</SelectItem>
+                          <SelectItem value="renouv_kine">Renouv. kiné</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full gradient-primary text-primary-foreground">Enregistrer</Button>
                 </form>
@@ -197,29 +244,47 @@ export default function Patients() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
+                  <TableHead>Prénom</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Téléphone</TableHead>
-                  <TableHead>Ville</TableHead>
+                  <TableHead>N° Mutuelle</TableHead>
+                  <TableHead>Séances restantes</TableHead>
+                  <TableHead>Prescription</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.first_name} {p.last_name}</TableCell>
+                    <TableCell className="font-medium">{p.last_name}</TableCell>
+                    <TableCell>{p.first_name}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[p.status] || ""}`}>
-                        {statusLabels[p.status] || p.status}
+                      <Select value={p.status} onValueChange={(value) => updatePatientStatus(p.id, value)}>
+                        <SelectTrigger className={`w-32 h-8 text-xs ${statusColors[p.status] || ""}`}>
+                          <SelectValue>{statusLabels[p.status] || p.status}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Actif</SelectItem>
+                          <SelectItem value="in_treatment">En traitement</SelectItem>
+                          <SelectItem value="waiting">En attente</SelectItem>
+                          <SelectItem value="inactive">Inactif</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>{p.mutual_number || "-"}</TableCell>
+                    <TableCell>{p.remaining_sessions ?? 0}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        p.prescription === "oui" ? "bg-green-500/10 text-green-600" :
+                        p.prescription === "renouv_kine" ? "bg-orange-500/10 text-orange-600" :
+                        "bg-muted text-muted-foreground"
+                      }`}>
+                        {prescriptionLabels[p.prescription || "none"] || "Non"}
                       </span>
                     </TableCell>
-                    <TableCell>{p.email || "-"}</TableCell>
-                    <TableCell>{p.phone || "-"}</TableCell>
-                    <TableCell>{p.city || "-"}</TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Aucun patient trouvé
                     </TableCell>
                   </TableRow>

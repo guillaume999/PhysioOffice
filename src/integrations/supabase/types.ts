@@ -145,8 +145,11 @@ export type Database = {
           id: string
           last_name: string
           medical_notes: string | null
+          mutual_number: string | null
           phone: string | null
           postal_code: string | null
+          prescription: string | null
+          remaining_sessions: number | null
           status: string
           updated_at: string
           user_id: string
@@ -163,8 +166,11 @@ export type Database = {
           id?: string
           last_name: string
           medical_notes?: string | null
+          mutual_number?: string | null
           phone?: string | null
           postal_code?: string | null
+          prescription?: string | null
+          remaining_sessions?: number | null
           status?: string
           updated_at?: string
           user_id: string
@@ -181,8 +187,11 @@ export type Database = {
           id?: string
           last_name?: string
           medical_notes?: string | null
+          mutual_number?: string | null
           phone?: string | null
           postal_code?: string | null
+          prescription?: string | null
+          remaining_sessions?: number | null
           status?: string
           updated_at?: string
           user_id?: string
