@@ -80,10 +80,13 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
                   <User className="w-4 h-4" />
                   <span>{user.email}</span>
-                </div>
+                </Link>
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Déconnexion
@@ -155,10 +158,19 @@ export function Navbar() {
                 </>
               )}
               {user ? (
-                <Button variant="outline" onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Déconnexion
-                </Button>
+                <>
+                  <Link
+                    to="/profile"
+                    className="font-medium text-foreground hover:text-primary transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Mon Profil
+                  </Link>
+                  <Button variant="outline" onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Déconnexion
+                  </Button>
+                </>
               ) : (
                 <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
                   <Button className="w-full gradient-primary text-primary-foreground">

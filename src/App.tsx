@@ -10,6 +10,7 @@ import Patients from "./pages/Patients";
 import Videos from "./pages/Videos";
 import IADiagnostic from "./pages/IADiagnostic";
 import Notes from "./pages/Notes";
+import Profile from "./pages/Profile";
 import Contact from "./pages/Contact";
 import MentionsLegales from "./pages/MentionsLegales";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/videos" element={<Videos />} />
             <Route path="/ia-diagnostic" element={<IADiagnostic />} />
             <Route path="/notes" element={<Notes />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
             <Route path="*" element={<NotFound />} />
