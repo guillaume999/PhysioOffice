@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Heart, MessageCircle, Trash2, Video, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar, Plus, Heart, MessageCircle, Trash2, Video, X, Search, Users, User, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -19,6 +20,9 @@ interface SeanceType {
   pathologie: string;
   objectif_principal: string;
   objectif_secondaire: string | null;
+  author_name: string | null;
+  is_shared: boolean;
+  user_id: string;
   created_at: string;
   exercices?: SeanceExercice[];
   likes_count?: number;
@@ -44,9 +48,12 @@ interface VideoOption {
   thumbnail_url: string | null;
 }
 
+type FilterType = "all" | "mine" | "shared";
+
 export default function SeanceType() {
   const { user } = useAuth();
   const [seances, setSeances] = useState<SeanceType[]>([]);
+  const [filteredSeances, setFilteredSeances] = useState<SeanceType[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
   const [objectifs, setObjectifs] = useState<{ principal: string[]; secondaire: string[] }>({ principal: [], secondaire: [] });
   const [videos, setVideos] = useState<VideoOption[]>([]);
@@ -56,6 +63,10 @@ export default function SeanceType() {
   const [selectedSeance, setSelectedSeance] = useState<SeanceType | null>(null);
   const [comments, setComments] = useState<{ id: string; content: string; created_at: string }[]>([]);
   const [newComment, setNewComment] = useState("");
+  
+  // Filter and search state
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
     pathologie: "",
@@ -64,6 +75,7 @@ export default function SeanceType() {
     newObjectifPrincipal: "",
     objectif_secondaire: "",
     newObjectifSecondaire: "",
+    author_name: "",
     exercices: [] as { video_id: string; description: string }[]
   });
 
@@ -72,6 +84,34 @@ export default function SeanceType() {
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [seances, filter, searchQuery, user]);
+
+  const applyFilters = () => {
+    let result = [...seances];
+
+    // Apply filter type
+    if (filter === "mine") {
+      result = result.filter((s) => s.user_id === user?.id);
+    } else if (filter === "shared") {
+      result = result.filter((s) => s.is_shared && s.user_id !== user?.id);
+    }
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.author_name?.toLowerCase().includes(query) ||
+          s.pathologie.toLowerCase().includes(query) ||
+          s.objectif_principal.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredSeances(result);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -173,7 +213,9 @@ export default function SeanceType() {
           user_id: user.id,
           pathologie,
           objectif_principal,
-          objectif_secondaire: objectif_secondaire || null
+          objectif_secondaire: objectif_secondaire || null,
+          author_name: formData.author_name || null,
+          is_shared: false
         })
         .select()
         .single();
@@ -213,12 +255,28 @@ export default function SeanceType() {
         newObjectifPrincipal: "",
         objectif_secondaire: "",
         newObjectifSecondaire: "",
+        author_name: "",
         exercices: []
       });
       fetchData();
     } catch (error) {
       console.error("Error creating seance:", error);
       toast.error("Erreur lors de la création");
+    }
+  };
+
+  const toggleShare = async (seanceId: string, currentlyShared: boolean) => {
+    try {
+      await supabase
+        .from("seance_types")
+        .update({ is_shared: !currentlyShared })
+        .eq("id", seanceId);
+      
+      toast.success(currentlyShared ? "Séance non partagée" : "Séance partagée");
+      fetchData();
+    } catch (error) {
+      console.error("Error toggling share:", error);
+      toast.error("Erreur lors du partage");
     }
   };
 
@@ -338,6 +396,16 @@ export default function SeanceType() {
                 <DialogTitle>Créer une séance type</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Author Name */}
+                <div className="space-y-2">
+                  <Label>Nom de l'auteur</Label>
+                  <Input
+                    placeholder="Votre nom"
+                    value={formData.author_name}
+                    onChange={(e) => setFormData({ ...formData, author_name: e.target.value })}
+                  />
+                </div>
+
                 {/* Pathologie */}
                 <div className="space-y-2">
                   <Label>Pathologie</Label>
@@ -448,107 +516,177 @@ export default function SeanceType() {
           </Dialog>
         </div>
 
+        {/* Filters and Search */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Filter Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={filter === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("all")}
+                  className="gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  Toutes
+                </Button>
+                <Button
+                  variant={filter === "mine" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("mine")}
+                  className="gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  Mes séances
+                </Button>
+                <Button
+                  variant={filter === "shared" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("shared")}
+                  className="gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  Partagées
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par auteur, pathologie ou objectif..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle>Modèles de séances</CardTitle>
+            <CardTitle>Modèles de séances ({filteredSeances.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-muted-foreground">Chargement...</p>
-            ) : seances.length === 0 ? (
-              <p className="text-muted-foreground">Aucune séance type créée.</p>
+            ) : filteredSeances.length === 0 ? (
+              <p className="text-muted-foreground">Aucune séance type trouvée.</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pathologie</TableHead>
-                    <TableHead>Objectif Principal</TableHead>
-                    <TableHead>Objectif Secondaire</TableHead>
-                    <TableHead>Exercices</TableHead>
-                    <TableHead>Interactions</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {seances.map((seance) => (
-                    <TableRow key={seance.id}>
-                      <TableCell>
-                        <Badge variant="outline">{seance.pathologie}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{seance.objectif_principal}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {seance.objectif_secondaire ? (
-                          <Badge variant="outline">{seance.objectif_secondaire}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-2 max-w-xs">
-                          {seance.exercices?.map((ex, i) => (
-                            <div key={ex.id} className="flex items-start gap-2 text-sm">
-                              {ex.video?.thumbnail_url ? (
-                                <img
-                                  src={ex.video.thumbnail_url}
-                                  alt={ex.video.title}
-                                  className="w-12 h-8 object-cover rounded"
-                                />
-                              ) : (
-                                <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
-                                  <Video className="w-4 h-4 text-muted-foreground" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{ex.video?.title || `Exercice ${i + 1}`}</p>
-                                {ex.description && (
-                                  <p className="text-muted-foreground text-xs truncate">{ex.description}</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {(!seance.exercices || seance.exercices.length === 0) && (
-                            <span className="text-muted-foreground text-sm">Aucun exercice</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
-                            onClick={() => handleLike(seance.id, seance.user_liked || false)}
-                          >
-                            <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
-                            {seance.likes_count}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => openComments(seance)}
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            {seance.comments_count}
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => deleteSeance(seance.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Auteur</TableHead>
+                      <TableHead>Partagée</TableHead>
+                      <TableHead>Pathologie</TableHead>
+                      <TableHead>Objectif Principal</TableHead>
+                      <TableHead>Objectif Secondaire</TableHead>
+                      <TableHead>Exercices</TableHead>
+                      <TableHead>Interactions</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSeances.map((seance) => (
+                      <TableRow key={seance.id}>
+                        <TableCell>
+                          <span className="font-medium">{seance.author_name || "Anonyme"}</span>
+                        </TableCell>
+                        <TableCell>
+                          {seance.user_id === user?.id ? (
+                            <Checkbox
+                              checked={seance.is_shared}
+                              onCheckedChange={() => toggleShare(seance.id, seance.is_shared)}
+                            />
+                          ) : (
+                            <Badge variant={seance.is_shared ? "default" : "outline"}>
+                              {seance.is_shared ? "Oui" : "Non"}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{seance.pathologie}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{seance.objectif_principal}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {seance.objectif_secondaire ? (
+                            <Badge variant="outline">{seance.objectif_secondaire}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2 max-w-xs">
+                            {seance.exercices?.map((ex, i) => (
+                              <div key={ex.id} className="flex items-start gap-2 text-sm">
+                                {ex.video?.thumbnail_url ? (
+                                  <img
+                                    src={ex.video.thumbnail_url}
+                                    alt={ex.video.title}
+                                    className="w-12 h-8 object-cover rounded"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
+                                    <Video className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">{ex.video?.title || `Exercice ${i + 1}`}</p>
+                                  {ex.description && (
+                                    <p className="text-muted-foreground text-xs truncate">{ex.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {(!seance.exercices || seance.exercices.length === 0) && (
+                              <span className="text-muted-foreground text-sm">Aucun exercice</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
+                              onClick={() => handleLike(seance.id, seance.user_liked || false)}
+                            >
+                              <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
+                              {seance.likes_count}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => openComments(seance)}
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              {seance.comments_count}
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {seance.user_id === user?.id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => deleteSeance(seance.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
