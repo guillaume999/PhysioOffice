@@ -23,6 +23,7 @@ interface SeanceType {
   author_name: string | null;
   is_shared: boolean;
   is_copy: boolean;
+  is_validated: boolean;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -55,6 +56,7 @@ type FilterType = "all" | "mine" | "shared";
 export default function SeanceType() {
   const { user } = useAuth();
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
+  const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [filteredSeances, setFilteredSeances] = useState<SeanceType[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
@@ -121,11 +123,12 @@ export default function SeanceType() {
       // Fetch user pseudo
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("pseudo")
+        .select("pseudo, can_share")
         .eq("user_id", user!.id)
         .single();
       
       setUserPseudo(profileData?.pseudo || null);
+      setUserCanShare(profileData?.can_share !== false);
 
       // Fetch seance types
       const { data: seancesData, error: seancesError } = await supabase
@@ -275,18 +278,26 @@ export default function SeanceType() {
     }
   };
 
-  const toggleShare = async (seanceId: string, currentlyShared: boolean, isCopy: boolean) => {
+  const toggleShare = async (seanceId: string, currentlyShared: boolean, isCopy: boolean, isValidated: boolean) => {
     if (isCopy) {
       toast.error("Les copies ne peuvent pas être partagées");
+      return;
+    }
+    if (!userCanShare) {
+      toast.error("Vous n'avez pas la permission de partager du contenu");
+      return;
+    }
+    if (isValidated && currentlyShared) {
+      toast.error("Cette séance a été validée et ne peut plus être modifiée");
       return;
     }
     try {
       await supabase
         .from("seance_types")
-        .update({ is_shared: !currentlyShared })
+        .update({ is_shared: !currentlyShared, is_validated: false })
         .eq("id", seanceId);
       
-      toast.success(currentlyShared ? "Séance non partagée" : "Séance partagée");
+      toast.success(currentlyShared ? "Séance non partagée" : "Séance partagée (en attente de validation)");
       fetchData();
     } catch (error) {
       console.error("Error toggling share:", error);
@@ -654,16 +665,30 @@ export default function SeanceType() {
                         </TableCell>
                         <TableCell>
                           {canShare ? (
-                            <Checkbox
-                              checked={seance.is_shared}
-                              onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy)}
-                            />
+                            <>
+                              <Checkbox
+                                checked={seance.is_shared}
+                                onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
+                                disabled={seance.is_validated && seance.is_shared}
+                              />
+                              {seance.is_shared && seance.is_validated && (
+                                <Badge className="ml-2 text-xs bg-green-500">Validé</Badge>
+                              )}
+                              {seance.is_shared && !seance.is_validated && (
+                                <Badge variant="secondary" className="ml-2 text-xs bg-orange-500">En attente</Badge>
+                              )}
+                            </>
                           ) : isOwner && seance.is_copy ? (
                             <span className="text-xs text-muted-foreground">Non partageable</span>
                           ) : (
-                            <Badge variant={seance.is_shared ? "default" : "outline"}>
-                              {seance.is_shared ? "Oui" : "Non"}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge variant={seance.is_shared ? "default" : "outline"}>
+                                {seance.is_shared ? "Oui" : "Non"}
+                              </Badge>
+                              {seance.is_shared && seance.is_validated && (
+                                <Badge className="text-xs bg-green-500">Validé</Badge>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell>

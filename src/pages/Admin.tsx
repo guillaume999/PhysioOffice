@@ -20,7 +20,12 @@ import {
   Clock, 
   Star,
   Trash2,
-  Shield
+  Shield,
+  Ban,
+  Share2,
+  CheckCircle,
+  XCircle,
+  ClipboardList
 } from "lucide-react";
 
 interface UserProfile {
@@ -29,8 +34,11 @@ interface UserProfile {
   email: string | null;
   first_name: string | null;
   last_name: string | null;
+  pseudo: string | null;
   trial_end_date: string | null;
   is_premium: boolean | null;
+  is_banned: boolean | null;
+  can_share: boolean | null;
   created_at: string;
 }
 
@@ -40,6 +48,17 @@ interface SeanceType {
   objectif_principal: string;
   author_name: string | null;
   is_shared: boolean;
+  is_validated: boolean;
+  user_id: string;
+  created_at: string;
+}
+
+interface TraitementType {
+  id: string;
+  pathologie: string;
+  author_name: string | null;
+  is_shared: boolean;
+  is_validated: boolean;
   user_id: string;
   created_at: string;
 }
@@ -50,6 +69,9 @@ interface Stats {
   trialUsers: number;
   totalSeances: number;
   sharedSeances: number;
+  pendingSeances: number;
+  totalTraitements: number;
+  pendingTraitements: number;
   totalPatients: number;
 }
 
@@ -61,6 +83,7 @@ export default function Admin() {
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [seances, setSeances] = useState<SeanceType[]>([]);
+  const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [featuredSeances, setFeaturedSeances] = useState<string[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
@@ -68,10 +91,14 @@ export default function Admin() {
     trialUsers: 0,
     totalSeances: 0,
     sharedSeances: 0,
+    pendingSeances: 0,
+    totalTraitements: 0,
+    pendingTraitements: 0,
     totalPatients: 0,
   });
   const [userSearch, setUserSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
+  const [traitementSearch, setTraitementSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -118,6 +145,15 @@ export default function Admin() {
       if (seancesError) throw seancesError;
       setSeances(seancesData || []);
 
+      // Fetch traitements
+      const { data: traitementsData, error: traitementsError } = await supabase
+        .from("traitement_types")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (traitementsError) throw traitementsError;
+      setTraitements(traitementsData || []);
+
       // Fetch featured seances
       const { data: featuredData, error: featuredError } = await supabase
         .from("featured_seances")
@@ -133,6 +169,8 @@ export default function Admin() {
         !u.is_premium && u.trial_end_date && new Date(u.trial_end_date) > now
       ).length || 0;
       const sharedCount = seancesData?.filter(s => s.is_shared).length || 0;
+      const pendingSeancesCount = seancesData?.filter(s => s.is_shared && !s.is_validated).length || 0;
+      const pendingTraitementsCount = traitementsData?.filter(t => t.is_shared && !t.is_validated).length || 0;
 
       // Fetch patients count
       const { count: patientsCount } = await supabase
@@ -145,6 +183,9 @@ export default function Admin() {
         trialUsers: trialCount,
         totalSeances: seancesData?.length || 0,
         sharedSeances: sharedCount,
+        pendingSeances: pendingSeancesCount,
+        totalTraitements: traitementsData?.length || 0,
+        pendingTraitements: pendingTraitementsCount,
         totalPatients: patientsCount || 0,
       });
     } catch (error) {
@@ -181,6 +222,60 @@ export default function Admin() {
       toast({
         title: "Erreur",
         description: "Impossible de mettre à jour le statut.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleBan = async (userId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_banned: !currentStatus })
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setUsers(users.map(u => 
+        u.user_id === userId ? { ...u, is_banned: !currentStatus } : u
+      ));
+
+      toast({
+        title: "Succès",
+        description: `Utilisateur ${!currentStatus ? "banni" : "débanni"}.`,
+      });
+    } catch (error) {
+      console.error("Error updating ban status:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le statut.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleCanShare = async (userId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ can_share: !currentStatus })
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setUsers(users.map(u => 
+        u.user_id === userId ? { ...u, can_share: !currentStatus } : u
+      ));
+
+      toast({
+        title: "Succès",
+        description: `Partage ${!currentStatus ? "autorisé" : "interdit"} pour cet utilisateur.`,
+      });
+    } catch (error) {
+      console.error("Error updating share permission:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la permission.",
         variant: "destructive",
       });
     }
@@ -254,6 +349,60 @@ export default function Admin() {
     }
   };
 
+  const toggleSeanceValidation = async (seanceId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("seance_types")
+        .update({ is_validated: !currentStatus })
+        .eq("id", seanceId);
+
+      if (error) throw error;
+
+      setSeances(seances.map(s => 
+        s.id === seanceId ? { ...s, is_validated: !currentStatus } : s
+      ));
+
+      toast({
+        title: "Succès",
+        description: `Séance ${!currentStatus ? "validée" : "invalidée"}.`,
+      });
+    } catch (error) {
+      console.error("Error validating seance:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider la séance.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleTraitementValidation = async (traitementId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("traitement_types")
+        .update({ is_validated: !currentStatus })
+        .eq("id", traitementId);
+
+      if (error) throw error;
+
+      setTraitements(traitements.map(t => 
+        t.id === traitementId ? { ...t, is_validated: !currentStatus } : t
+      ));
+
+      toast({
+        title: "Succès",
+        description: `Traitement ${!currentStatus ? "validé" : "invalidé"}.`,
+      });
+    } catch (error) {
+      console.error("Error validating traitement:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider le traitement.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const deleteSeance = async (seanceId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette séance ?")) return;
 
@@ -277,10 +426,34 @@ export default function Admin() {
     }
   };
 
+  const deleteTraitement = async (traitementId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce traitement ?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("traitement_types")
+        .delete()
+        .eq("id", traitementId);
+
+      if (error) throw error;
+
+      setTraitements(traitements.filter(t => t.id !== traitementId));
+      toast({ title: "Traitement supprimé" });
+    } catch (error) {
+      console.error("Error deleting traitement:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le traitement.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     (u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
     u.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.last_name?.toLowerCase().includes(userSearch.toLowerCase()))
+    u.last_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.pseudo?.toLowerCase().includes(userSearch.toLowerCase()))
   );
 
   const filteredSeances = seances.filter(s =>
@@ -288,6 +461,14 @@ export default function Admin() {
     s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
     s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
   );
+
+  const filteredTraitements = traitements.filter(t =>
+    t.pathologie.toLowerCase().includes(traitementSearch.toLowerCase()) ||
+    t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
+  );
+
+  const pendingSeances = filteredSeances.filter(s => s.is_shared && !s.is_validated);
+  const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
 
   if (authLoading || adminLoading || loading) {
     return (
@@ -312,7 +493,7 @@ export default function Admin() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="p-4 text-center">
               <Users className="w-6 h-6 mx-auto text-primary mb-2" />
@@ -334,25 +515,18 @@ export default function Admin() {
               <p className="text-xs text-muted-foreground">En essai</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className={stats.pendingSeances > 0 ? "border-orange-500" : ""}>
             <CardContent className="p-4 text-center">
-              <FileText className="w-6 h-6 mx-auto text-green-500 mb-2" />
-              <p className="text-2xl font-bold">{stats.totalSeances}</p>
-              <p className="text-xs text-muted-foreground">Séances</p>
+              <FileText className="w-6 h-6 mx-auto text-orange-500 mb-2" />
+              <p className="text-2xl font-bold">{stats.pendingSeances}</p>
+              <p className="text-xs text-muted-foreground">Séances en attente</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className={stats.pendingTraitements > 0 ? "border-orange-500" : ""}>
             <CardContent className="p-4 text-center">
-              <Star className="w-6 h-6 mx-auto text-orange-500 mb-2" />
-              <p className="text-2xl font-bold">{stats.sharedSeances}</p>
-              <p className="text-xs text-muted-foreground">Partagées</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <BarChart3 className="w-6 h-6 mx-auto text-purple-500 mb-2" />
-              <p className="text-2xl font-bold">{stats.totalPatients}</p>
-              <p className="text-xs text-muted-foreground">Patients</p>
+              <ClipboardList className="w-6 h-6 mx-auto text-orange-500 mb-2" />
+              <p className="text-2xl font-bold">{stats.pendingTraitements}</p>
+              <p className="text-xs text-muted-foreground">TTT en attente</p>
             </CardContent>
           </Card>
         </div>
@@ -365,7 +539,17 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="seances" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
-              Modération Séances
+              Séances
+              {pendingSeances.length > 0 && (
+                <Badge variant="destructive" className="ml-1">{pendingSeances.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="traitements" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Traitements
+              {pendingTraitements.length > 0 && (
+                <Badge variant="destructive" className="ml-1">{pendingTraitements.length}</Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -376,7 +560,7 @@ export default function Admin() {
                 <div className="relative mt-4">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
-                    placeholder="Rechercher par nom ou email..."
+                    placeholder="Rechercher par nom, email ou pseudo..."
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     className="pl-10"
@@ -390,9 +574,11 @@ export default function Admin() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Utilisateur</th>
                         <th className="text-left py-3 px-2">Email</th>
+                        <th className="text-left py-3 px-2">Pseudo</th>
                         <th className="text-left py-3 px-2">Statut</th>
-                        <th className="text-left py-3 px-2">Fin essai</th>
                         <th className="text-left py-3 px-2">Premium</th>
+                        <th className="text-left py-3 px-2">Partage</th>
+                        <th className="text-left py-3 px-2">Banni</th>
                         <th className="text-left py-3 px-2">Admin</th>
                       </tr>
                     </thead>
@@ -404,31 +590,45 @@ export default function Admin() {
                         const trialExpired = trialEnd && trialEnd <= now && !u.is_premium;
 
                         return (
-                          <tr key={u.id} className="border-b hover:bg-muted/50">
+                          <tr key={u.id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""}`}>
                             <td className="py-3 px-2">
                               {u.first_name} {u.last_name}
                             </td>
                             <td className="py-3 px-2 text-sm text-muted-foreground">
                               {u.email}
                             </td>
+                            <td className="py-3 px-2 text-sm">
+                              {u.pseudo || "-"}
+                            </td>
                             <td className="py-3 px-2">
-                              {u.is_premium ? (
+                              {u.is_banned ? (
+                                <Badge variant="destructive">Banni</Badge>
+                              ) : u.is_premium ? (
                                 <Badge className="bg-yellow-500">Premium</Badge>
                               ) : isInTrial ? (
                                 <Badge variant="secondary">En essai</Badge>
                               ) : trialExpired ? (
-                                <Badge variant="destructive">Essai expiré</Badge>
+                                <Badge variant="outline">Essai expiré</Badge>
                               ) : (
                                 <Badge variant="outline">Standard</Badge>
                               )}
-                            </td>
-                            <td className="py-3 px-2 text-sm">
-                              {trialEnd ? trialEnd.toLocaleDateString("fr-FR") : "-"}
                             </td>
                             <td className="py-3 px-2">
                               <Switch
                                 checked={u.is_premium || false}
                                 onCheckedChange={() => togglePremium(u.user_id, u.is_premium || false)}
+                              />
+                            </td>
+                            <td className="py-3 px-2">
+                              <Switch
+                                checked={u.can_share !== false}
+                                onCheckedChange={() => toggleCanShare(u.user_id, u.can_share !== false)}
+                              />
+                            </td>
+                            <td className="py-3 px-2">
+                              <Switch
+                                checked={u.is_banned || false}
+                                onCheckedChange={() => toggleBan(u.user_id, u.is_banned || false)}
                               />
                             </td>
                             <td className="py-3 px-2">
@@ -465,6 +665,42 @@ export default function Admin() {
                 </div>
               </CardHeader>
               <CardContent>
+                {pendingSeances.length > 0 && (
+                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      En attente de validation ({pendingSeances.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingSeances.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                          <div>
+                            <p className="font-medium">{s.pathologie}</p>
+                            <p className="text-sm text-muted-foreground">{s.objectif_principal} - {s.author_name || "Anonyme"}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => toggleSeanceValidation(s.id, false)}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Valider
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteSeance(s.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -472,7 +708,8 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Pathologie</th>
                         <th className="text-left py-3 px-2">Objectif</th>
                         <th className="text-left py-3 px-2">Auteur</th>
-                        <th className="text-left py-3 px-2">Partagée</th>
+                        <th className="text-left py-3 px-2">Statut</th>
+                        <th className="text-left py-3 px-2">Validée</th>
                         <th className="text-left py-3 px-2">Mise en avant</th>
                         <th className="text-left py-3 px-2">Actions</th>
                       </tr>
@@ -487,10 +724,21 @@ export default function Admin() {
                           </td>
                           <td className="py-3 px-2">
                             {s.is_shared ? (
-                              <Badge variant="secondary">Partagée</Badge>
+                              s.is_validated ? (
+                                <Badge className="bg-green-500">Partagée & Validée</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                              )
                             ) : (
                               <Badge variant="outline">Privée</Badge>
                             )}
+                          </td>
+                          <td className="py-3 px-2">
+                            <Switch
+                              checked={s.is_validated}
+                              onCheckedChange={() => toggleSeanceValidation(s.id, s.is_validated)}
+                              disabled={!s.is_shared}
+                            />
                           </td>
                           <td className="py-3 px-2">
                             <Switch
@@ -503,6 +751,111 @@ export default function Admin() {
                               variant="destructive"
                               size="sm"
                               onClick={() => deleteSeance(s.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="traitements">
+            <Card>
+              <CardHeader>
+                <CardTitle>Modération des traitements</CardTitle>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher par pathologie ou auteur..."
+                    value={traitementSearch}
+                    onChange={(e) => setTraitementSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {pendingTraitements.length > 0 && (
+                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      En attente de validation ({pendingTraitements.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingTraitements.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                          <div>
+                            <p className="font-medium">{t.pathologie}</p>
+                            <p className="text-sm text-muted-foreground">{t.author_name || "Anonyme"}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => toggleTraitementValidation(t.id, false)}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Valider
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteTraitement(t.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2">Pathologie</th>
+                        <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">Statut</th>
+                        <th className="text-left py-3 px-2">Validé</th>
+                        <th className="text-left py-3 px-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTraitements.map((t) => (
+                        <tr key={t.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2">{t.pathologie}</td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {t.author_name || "Anonyme"}
+                          </td>
+                          <td className="py-3 px-2">
+                            {t.is_shared ? (
+                              t.is_validated ? (
+                                <Badge className="bg-green-500">Partagé & Validé</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                              )
+                            ) : (
+                              <Badge variant="outline">Privé</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
+                            <Switch
+                              checked={t.is_validated}
+                              onCheckedChange={() => toggleTraitementValidation(t.id, t.is_validated)}
+                              disabled={!t.is_shared}
+                            />
+                          </td>
+                          <td className="py-3 px-2">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteTraitement(t.id)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
