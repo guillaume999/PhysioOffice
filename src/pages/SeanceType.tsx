@@ -49,6 +49,20 @@ interface VideoOption {
   id: string;
   title: string;
   thumbnail_url: string | null;
+  description?: string | null;
+  video_url?: string;
+  duration?: number | null;
+  category?: string | null;
+}
+
+interface VideoDetail {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  description: string | null;
+  video_url: string;
+  duration: number | null;
+  category: string | null;
 }
 
 type FilterType = "all" | "mine" | "shared";
@@ -65,6 +79,8 @@ export default function SeanceType() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
+  const [videoDetailDialogOpen, setVideoDetailDialogOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<VideoDetail | null>(null);
   const [selectedSeance, setSelectedSeance] = useState<SeanceType | null>(null);
   const [comments, setComments] = useState<{ id: string; content: string; created_at: string }[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -363,6 +379,32 @@ export default function SeanceType() {
       console.error("Error deleting seance:", error);
       toast.error("Erreur lors de la suppression");
     }
+  };
+
+  const openVideoDetail = async (videoId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, title, thumbnail_url, description, video_url, duration, category")
+        .eq("id", videoId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedVideo(data);
+        setVideoDetailDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Error fetching video details:", error);
+      toast.error("Erreur lors du chargement de la vidéo");
+    }
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const copySeance = async (seance: SeanceType) => {
@@ -707,20 +749,24 @@ export default function SeanceType() {
                         <TableCell>
                           <div className="space-y-2 max-w-xs">
                             {seance.exercices?.map((ex, i) => (
-                              <div key={ex.id} className="flex items-start gap-2 text-sm">
+                              <div
+                                key={ex.id}
+                                className={`flex items-start gap-2 text-sm ${ex.video_id ? "cursor-pointer hover:bg-muted/50 rounded p-1 -m-1 transition-colors" : ""}`}
+                                onClick={() => ex.video_id && openVideoDetail(ex.video_id)}
+                              >
                                 {ex.video?.thumbnail_url ? (
                                   <img
                                     src={ex.video.thumbnail_url}
                                     alt={ex.video.title}
-                                    className="w-12 h-8 object-cover rounded"
+                                    className="w-12 h-8 object-cover rounded flex-shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center">
+                                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center flex-shrink-0">
                                     <Video className="w-4 h-4 text-muted-foreground" />
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate">{ex.video?.title || `Exercice ${i + 1}`}</p>
+                                  <p className="font-medium truncate hover:text-primary">{ex.video?.title || `Exercice ${i + 1}`}</p>
                                   {ex.description && (
                                     <p className="text-muted-foreground text-xs truncate">{ex.description}</p>
                                   )}
@@ -819,6 +865,66 @@ export default function SeanceType() {
                 )}
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Video Detail Dialog */}
+        <Dialog open={videoDetailDialogOpen} onOpenChange={setVideoDetailDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Video className="w-5 h-5" />
+                {selectedVideo?.title}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedVideo && (
+              <div className="space-y-4">
+                {/* Video Player or Thumbnail */}
+                <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                  {selectedVideo.video_url ? (
+                    <video
+                      src={selectedVideo.video_url}
+                      controls
+                      className="w-full h-full object-contain"
+                      poster={selectedVideo.thumbnail_url || undefined}
+                    >
+                      Votre navigateur ne supporte pas la lecture de vidéos.
+                    </video>
+                  ) : selectedVideo.thumbnail_url ? (
+                    <img
+                      src={selectedVideo.thumbnail_url}
+                      alt={selectedVideo.title}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video className="w-16 h-16 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Video Info */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    {selectedVideo.category && (
+                      <Badge variant="outline">{selectedVideo.category}</Badge>
+                    )}
+                    {selectedVideo.duration && (
+                      <span>Durée: {formatDuration(selectedVideo.duration)}</span>
+                    )}
+                  </div>
+
+                  {selectedVideo.description && (
+                    <div>
+                      <h4 className="font-medium mb-1">Description</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {selectedVideo.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
