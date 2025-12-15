@@ -49,6 +49,8 @@ interface SeanceType {
   author_name: string | null;
   is_shared: boolean;
   is_validated: boolean;
+  is_copy: boolean | null;
+  original_id: string | null;
   user_id: string;
   created_at: string;
 }
@@ -59,6 +61,8 @@ interface TraitementType {
   author_name: string | null;
   is_shared: boolean;
   is_validated: boolean;
+  is_copy: boolean | null;
+  original_id: string | null;
   user_id: string;
   created_at: string;
 }
@@ -456,16 +460,38 @@ export default function Admin() {
     u.pseudo?.toLowerCase().includes(userSearch.toLowerCase()))
   );
 
-  const filteredSeances = seances.filter(s =>
-    s.pathologie.toLowerCase().includes(seanceSearch.toLowerCase()) ||
-    s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
-    s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
-  );
+  // Calculate copy counts for each original seance
+  const seanceCopyCounts = seances.reduce((acc, s) => {
+    if (s.is_copy && s.original_id) {
+      acc[s.original_id] = (acc[s.original_id] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
 
-  const filteredTraitements = traitements.filter(t =>
-    t.pathologie.toLowerCase().includes(traitementSearch.toLowerCase()) ||
-    t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
-  );
+  // Calculate copy counts for each original traitement
+  const traitementCopyCounts = traitements.reduce((acc, t) => {
+    if (t.is_copy && t.original_id) {
+      acc[t.original_id] = (acc[t.original_id] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Filter out copies from seances (only show originals)
+  const filteredSeances = seances
+    .filter(s => !s.is_copy)
+    .filter(s =>
+      s.pathologie.toLowerCase().includes(seanceSearch.toLowerCase()) ||
+      s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
+      s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
+    );
+
+  // Filter out copies from traitements (only show originals)
+  const filteredTraitements = traitements
+    .filter(t => !t.is_copy)
+    .filter(t =>
+      t.pathologie.toLowerCase().includes(traitementSearch.toLowerCase()) ||
+      t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
+    );
 
   const pendingSeances = filteredSeances.filter(s => s.is_shared && !s.is_validated);
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
@@ -674,9 +700,14 @@ export default function Admin() {
                     <div className="space-y-2">
                       {pendingSeances.map((s) => (
                         <div key={s.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
-                          <div>
-                            <p className="font-medium">{s.pathologie}</p>
-                            <p className="text-sm text-muted-foreground">{s.objectif_principal} - {s.author_name || "Anonyme"}</p>
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium">{s.pathologie}</p>
+                              <p className="text-sm text-muted-foreground">{s.objectif_principal} - {s.author_name || "Anonyme"}</p>
+                            </div>
+                            {seanceCopyCounts[s.id] > 0 && (
+                              <Badge variant="secondary" className="text-xs">{seanceCopyCounts[s.id]} copies</Badge>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             <Button
@@ -708,6 +739,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Pathologie</th>
                         <th className="text-left py-3 px-2">Objectif</th>
                         <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Validée</th>
                         <th className="text-left py-3 px-2">Mise en avant</th>
@@ -721,6 +753,13 @@ export default function Admin() {
                           <td className="py-3 px-2">{s.objectif_principal}</td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {s.author_name || "Anonyme"}
+                          </td>
+                          <td className="py-3 px-2">
+                            {seanceCopyCounts[s.id] ? (
+                              <Badge variant="secondary">{seanceCopyCounts[s.id]}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
                           </td>
                           <td className="py-3 px-2">
                             {s.is_shared ? (
@@ -788,9 +827,14 @@ export default function Admin() {
                     <div className="space-y-2">
                       {pendingTraitements.map((t) => (
                         <div key={t.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
-                          <div>
-                            <p className="font-medium">{t.pathologie}</p>
-                            <p className="text-sm text-muted-foreground">{t.author_name || "Anonyme"}</p>
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium">{t.pathologie}</p>
+                              <p className="text-sm text-muted-foreground">{t.author_name || "Anonyme"}</p>
+                            </div>
+                            {traitementCopyCounts[t.id] > 0 && (
+                              <Badge variant="secondary" className="text-xs">{traitementCopyCounts[t.id]} copies</Badge>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             <Button
@@ -821,6 +865,7 @@ export default function Admin() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Pathologie</th>
                         <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Validé</th>
                         <th className="text-left py-3 px-2">Actions</th>
@@ -832,6 +877,13 @@ export default function Admin() {
                           <td className="py-3 px-2">{t.pathologie}</td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {t.author_name || "Anonyme"}
+                          </td>
+                          <td className="py-3 px-2">
+                            {traitementCopyCounts[t.id] ? (
+                              <Badge variant="secondary">{traitementCopyCounts[t.id]}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
                           </td>
                           <td className="py-3 px-2">
                             {t.is_shared ? (
