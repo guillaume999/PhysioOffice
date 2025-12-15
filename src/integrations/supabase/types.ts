@@ -482,6 +482,7 @@ export type Database = {
           description: string | null
           duration: number | null
           id: string
+          is_shared: boolean | null
           most_used_patho: string | null
           thumbnail_url: string | null
           title: string
@@ -496,6 +497,7 @@ export type Database = {
           description?: string | null
           duration?: number | null
           id?: string
+          is_shared?: boolean | null
           most_used_patho?: string | null
           thumbnail_url?: string | null
           title: string
@@ -510,6 +512,7 @@ export type Database = {
           description?: string | null
           duration?: number | null
           id?: string
+          is_shared?: boolean | null
           most_used_patho?: string | null
           thumbnail_url?: string | null
           title?: string
