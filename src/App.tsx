@@ -13,6 +13,8 @@ import Notes from "./pages/Notes";
 import Profile from "./pages/Profile";
 import Contact from "./pages/Contact";
 import MentionsLegales from "./pages/MentionsLegales";
+import TraitementType from "./pages/TraitementType";
+import SeanceType from "./pages/SeanceType";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
+            <Route path="/traitement-type" element={<TraitementType />} />
+            <Route path="/seance-type" element={<SeanceType />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
