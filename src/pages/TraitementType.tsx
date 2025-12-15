@@ -21,6 +21,7 @@ interface TraitementType {
   author_name: string | null;
   is_shared: boolean;
   is_copy: boolean;
+  is_validated: boolean;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -70,6 +71,7 @@ type FilterType = "all" | "mine" | "shared";
 export default function TraitementType() {
   const { user } = useAuth();
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
+  const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [filteredTraitements, setFilteredTraitements] = useState<TraitementType[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
@@ -127,11 +129,12 @@ export default function TraitementType() {
       // Fetch user pseudo
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("pseudo")
+        .select("pseudo, can_share")
         .eq("user_id", user!.id)
         .single();
       
       setUserPseudo(profileData?.pseudo || null);
+      setUserCanShare(profileData?.can_share !== false);
 
       const { data: traitementsData, error: traitementsError } = await supabase
         .from("traitement_types")
@@ -251,18 +254,26 @@ export default function TraitementType() {
     }
   };
 
-  const toggleShare = async (traitementId: string, currentlyShared: boolean, isCopy: boolean) => {
+  const toggleShare = async (traitementId: string, currentlyShared: boolean, isCopy: boolean, isValidated: boolean) => {
     if (isCopy) {
       toast.error("Les copies ne peuvent pas être partagées");
+      return;
+    }
+    if (!userCanShare) {
+      toast.error("Vous n'avez pas la permission de partager du contenu");
+      return;
+    }
+    if (isValidated && currentlyShared) {
+      toast.error("Ce traitement a été validé et ne peut plus être modifié");
       return;
     }
     try {
       await supabase
         .from("traitement_types")
-        .update({ is_shared: !currentlyShared })
+        .update({ is_shared: !currentlyShared, is_validated: false })
         .eq("id", traitementId);
 
-      toast.success(currentlyShared ? "Traitement non partagé" : "Traitement partagé");
+      toast.success(currentlyShared ? "Traitement non partagé" : "Traitement partagé (en attente de validation)");
       fetchData();
     } catch (error) {
       console.error("Error toggling share:", error);
@@ -590,12 +601,15 @@ export default function TraitementType() {
                       </TableCell>
                       <TableCell>{traitement.author_name || "-"}</TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap">
                           {traitement.is_copy && (
                             <Badge variant="outline" className="text-xs">Copie</Badge>
                           )}
-                          {traitement.is_shared && (
-                            <Badge variant="secondary" className="text-xs">Partagé</Badge>
+                          {traitement.is_shared && traitement.is_validated && (
+                            <Badge className="text-xs bg-green-500">Validé</Badge>
+                          )}
+                          {traitement.is_shared && !traitement.is_validated && (
+                            <Badge variant="secondary" className="text-xs bg-orange-500">En attente</Badge>
                           )}
                           {traitement.user_id === user?.id && (
                             <Badge className="text-xs">Propriétaire</Badge>
@@ -609,9 +623,9 @@ export default function TraitementType() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false)}
-                                title={traitement.is_copy ? "Les copies ne peuvent pas être partagées" : (traitement.is_shared ? "Retirer du partage" : "Partager")}
-                                disabled={traitement.is_copy || false}
+                                onClick={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
+                                title={traitement.is_copy ? "Les copies ne peuvent pas être partagées" : traitement.is_validated && traitement.is_shared ? "Validé - non modifiable" : (traitement.is_shared ? "Retirer du partage" : "Partager")}
+                                disabled={(traitement.is_copy || false) || (traitement.is_validated && traitement.is_shared)}
                               >
                                 <Users className={`w-4 h-4 ${traitement.is_shared ? "text-primary" : ""}`} />
                               </Button>

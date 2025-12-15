@@ -275,10 +275,12 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          can_share: boolean | null
           created_at: string
           email: string | null
           first_name: string | null
           id: string
+          is_banned: boolean | null
           is_premium: boolean | null
           last_name: string | null
           pseudo: string | null
@@ -289,10 +291,12 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          can_share?: boolean | null
           created_at?: string
           email?: string | null
           first_name?: string | null
           id?: string
+          is_banned?: boolean | null
           is_premium?: boolean | null
           last_name?: string | null
           pseudo?: string | null
@@ -303,10 +307,12 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          can_share?: boolean | null
           created_at?: string
           email?: string | null
           first_name?: string | null
           id?: string
+          is_banned?: boolean | null
           is_premium?: boolean | null
           last_name?: string | null
           pseudo?: string | null
@@ -427,6 +433,7 @@ export type Database = {
           id: string
           is_copy: boolean | null
           is_shared: boolean
+          is_validated: boolean | null
           objectif_principal: string
           objectif_secondaire: string | null
           original_id: string | null
@@ -440,6 +447,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
+          is_validated?: boolean | null
           objectif_principal: string
           objectif_secondaire?: string | null
           original_id?: string | null
@@ -453,6 +461,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
+          is_validated?: boolean | null
           objectif_principal?: string
           objectif_secondaire?: string | null
           original_id?: string | null
@@ -558,6 +567,7 @@ export type Database = {
           id: string
           is_copy: boolean | null
           is_shared: boolean
+          is_validated: boolean | null
           original_id: string | null
           pathologie: string
           updated_at: string
@@ -569,6 +579,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
+          is_validated?: boolean | null
           original_id?: string | null
           pathologie: string
           updated_at?: string
@@ -580,6 +591,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
+          is_validated?: boolean | null
           original_id?: string | null
           pathologie?: string
           updated_at?: string
