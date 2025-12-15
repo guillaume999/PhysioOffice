@@ -422,9 +422,11 @@ export type Database = {
           author_name: string | null
           created_at: string
           id: string
+          is_copy: boolean | null
           is_shared: boolean
           objectif_principal: string
           objectif_secondaire: string | null
+          original_id: string | null
           pathologie: string
           updated_at: string
           user_id: string
@@ -433,9 +435,11 @@ export type Database = {
           author_name?: string | null
           created_at?: string
           id?: string
+          is_copy?: boolean | null
           is_shared?: boolean
           objectif_principal: string
           objectif_secondaire?: string | null
+          original_id?: string | null
           pathologie: string
           updated_at?: string
           user_id: string
@@ -444,14 +448,24 @@ export type Database = {
           author_name?: string | null
           created_at?: string
           id?: string
+          is_copy?: boolean | null
           is_shared?: boolean
           objectif_principal?: string
           objectif_secondaire?: string | null
+          original_id?: string | null
           pathologie?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "seance_types_original_id_fkey"
+            columns: ["original_id"]
+            isOneToOne: false
+            referencedRelation: "seance_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -482,8 +496,10 @@ export type Database = {
           description: string | null
           duration: number | null
           id: string
+          is_copy: boolean | null
           is_shared: boolean | null
           most_used_patho: string | null
+          original_id: string | null
           thumbnail_url: string | null
           title: string
           type_renfo: string | null
@@ -497,8 +513,10 @@ export type Database = {
           description?: string | null
           duration?: number | null
           id?: string
+          is_copy?: boolean | null
           is_shared?: boolean | null
           most_used_patho?: string | null
+          original_id?: string | null
           thumbnail_url?: string | null
           title: string
           type_renfo?: string | null
@@ -512,15 +530,25 @@ export type Database = {
           description?: string | null
           duration?: number | null
           id?: string
+          is_copy?: boolean | null
           is_shared?: boolean | null
           most_used_patho?: string | null
+          original_id?: string | null
           thumbnail_url?: string | null
           title?: string
           type_renfo?: string | null
           user_id?: string
           video_url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "videos_original_id_fkey"
+            columns: ["original_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

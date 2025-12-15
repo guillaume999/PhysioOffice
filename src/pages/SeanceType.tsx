@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Plus, Heart, MessageCircle, Trash2, Video, X, Search, Users, User, Shield } from "lucide-react";
+import { Calendar, Plus, Heart, MessageCircle, Trash2, Video, X, Search, Users, User, Shield, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ interface SeanceType {
   objectif_secondaire: string | null;
   author_name: string | null;
   is_shared: boolean;
+  is_copy: boolean;
+  original_id: string | null;
   user_id: string;
   created_at: string;
   exercices?: SeanceExercice[];
@@ -265,7 +267,11 @@ export default function SeanceType() {
     }
   };
 
-  const toggleShare = async (seanceId: string, currentlyShared: boolean) => {
+  const toggleShare = async (seanceId: string, currentlyShared: boolean, isCopy: boolean) => {
+    if (isCopy) {
+      toast.error("Les copies ne peuvent pas être partagées");
+      return;
+    }
     try {
       await supabase
         .from("seance_types")
@@ -340,6 +346,47 @@ export default function SeanceType() {
     }
   };
 
+  const copySeance = async (seance: SeanceType) => {
+    if (!user) return;
+
+    try {
+      // Create the seance copy
+      const { data: newSeance, error: seanceError } = await supabase
+        .from("seance_types")
+        .insert({
+          user_id: user.id,
+          pathologie: seance.pathologie,
+          objectif_principal: seance.objectif_principal,
+          objectif_secondaire: seance.objectif_secondaire,
+          author_name: seance.author_name,
+          is_shared: false,
+          is_copy: true,
+          original_id: seance.id,
+        })
+        .select()
+        .single();
+
+      if (seanceError) throw seanceError;
+
+      // Copy exercices
+      if (seance.exercices && seance.exercices.length > 0) {
+        for (const ex of seance.exercices) {
+          await supabase.from("seance_exercices").insert({
+            seance_type_id: newSeance.id,
+            video_id: ex.video_id,
+            description: ex.description,
+            ordre: ex.ordre,
+          });
+        }
+      }
+
+      toast.success("Séance copiée dans votre bibliothèque");
+      fetchData();
+    } catch (error) {
+      console.error("Error copying seance:", error);
+      toast.error("Erreur lors de la copie");
+    }
+  };
   const addExercice = () => {
     setFormData({
       ...formData,
@@ -590,17 +637,25 @@ export default function SeanceType() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredSeances.map((seance) => (
+                    {filteredSeances.map((seance) => {
+                      const isOwner = seance.user_id === user?.id;
+                      const canShare = isOwner && !seance.is_copy;
+                      return (
                       <TableRow key={seance.id}>
                         <TableCell>
                           <span className="font-medium">{seance.author_name || "Anonyme"}</span>
+                          {seance.is_copy && (
+                            <Badge variant="outline" className="ml-2 text-xs">Copie</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
-                          {seance.user_id === user?.id ? (
+                          {canShare ? (
                             <Checkbox
                               checked={seance.is_shared}
-                              onCheckedChange={() => toggleShare(seance.id, seance.is_shared)}
+                              onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy)}
                             />
+                          ) : isOwner && seance.is_copy ? (
+                            <span className="text-xs text-muted-foreground">Non partageable</span>
                           ) : (
                             <Badge variant={seance.is_shared ? "default" : "outline"}>
                               {seance.is_shared ? "Oui" : "Non"}
@@ -671,19 +726,32 @@ export default function SeanceType() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {seance.user_id === user?.id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => deleteSeance(seance.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex gap-1">
+                            {!isOwner && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copySeance(seance)}
+                                title="Copier dans ma bibliothèque"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {isOwner && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => deleteSeance(seance.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

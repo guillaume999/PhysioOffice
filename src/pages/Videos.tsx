@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { Video, Loader2, Plus, Play, Maximize2, Trash2, Upload, Search, Share2 } from "lucide-react";
+import { Video, Loader2, Plus, Play, Maximize2, Trash2, Upload, Search, Share2, Copy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,6 +27,8 @@ interface VideoItem {
   most_used_patho: string | null;
   duration: number | null;
   is_shared: boolean;
+  is_copy: boolean;
+  original_id: string | null;
   user_id: string;
   created_at: string;
 }
@@ -153,6 +155,36 @@ export default function Videos() {
     } catch (error) {
       console.error("Error toggling share:", error);
       toast.error("Erreur lors du partage");
+    }
+  };
+
+  const copyVideo = async (video: VideoItem) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from("videos").insert({
+        user_id: user.id,
+        title: video.title,
+        description: video.description,
+        video_url: video.video_url,
+        thumbnail_url: video.thumbnail_url,
+        category: video.category,
+        category_pathology: video.category_pathology,
+        type_renfo: video.type_renfo,
+        most_used_patho: video.most_used_patho,
+        duration: video.duration,
+        is_shared: false,
+        is_copy: true,
+        original_id: video.id,
+      });
+
+      if (error) throw error;
+
+      toast.success("Vidéo copiée dans votre bibliothèque");
+      fetchVideos();
+    } catch (error) {
+      console.error("Error copying video:", error);
+      toast.error("Erreur lors de la copie");
     }
   };
 
@@ -366,11 +398,17 @@ export default function Videos() {
                   <TableBody>
                     {filteredVideos.map((video, index) => {
                       const isOwner = video.user_id === user?.id;
+                      const canShare = isOwner && !video.is_copy;
                       return (
                         <TableRow key={video.id}>
                           <TableCell className="font-medium">{index + 1}</TableCell>
                           <TableCell className="font-medium">
                             {video.title}
+                            {video.is_copy && (
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                Copie
+                              </Badge>
+                            )}
                             {!isOwner && (
                               <Badge variant="secondary" className="ml-2 text-xs">
                                 Partagée
@@ -381,11 +419,13 @@ export default function Videos() {
                           <TableCell>{video.type_renfo || "-"}</TableCell>
                           <TableCell>{video.most_used_patho || "-"}</TableCell>
                           <TableCell>
-                            {isOwner ? (
+                            {canShare ? (
                               <Checkbox
                                 checked={video.is_shared}
                                 onCheckedChange={() => toggleShare(video.id, video.is_shared)}
                               />
+                            ) : isOwner && video.is_copy ? (
+                              <span className="text-xs text-muted-foreground">Non partageable</span>
                             ) : (
                               <Share2 className="w-4 h-4 text-muted-foreground" />
                             )}
@@ -444,6 +484,16 @@ export default function Videos() {
                                   )}
                                 </DialogContent>
                               </Dialog>
+                              {!isOwner && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => copyVideo(video)}
+                                  title="Copier dans ma bibliothèque"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              )}
                               {isOwner && (
                                 <Button
                                   variant="ghost"
