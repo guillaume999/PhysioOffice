@@ -113,6 +113,16 @@ export default function TraitementType() {
     // Filter out originals that user has already copied
     result = result.filter((t) => !userCopiedOriginalIds.includes(t.id));
 
+    // Filter out copies from other users
+    result = result.filter((t) => {
+      // Keep if not a copy
+      if (!t.is_copy) return true;
+      // Keep if it's the user's own copy
+      if (t.user_id === user?.id) return true;
+      // Hide copies from other users
+      return false;
+    });
+
     if (filter === "mine") {
       result = result.filter((t) => t.user_id === user?.id);
     } else if (filter === "shared") {

@@ -73,6 +73,7 @@ export default function SeanceType() {
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [filteredSeances, setFilteredSeances] = useState<SeanceType[]>([]);
+  const [featuredSeanceIds, setFeaturedSeanceIds] = useState<string[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
   const [objectifs, setObjectifs] = useState<{ principal: string[]; secondaire: string[] }>({ principal: [], secondaire: [] });
   const [videos, setVideos] = useState<VideoOption[]>([]);
@@ -107,7 +108,7 @@ export default function SeanceType() {
 
   useEffect(() => {
     applyFilters();
-  }, [seances, filter, searchQuery, user]);
+  }, [seances, filter, searchQuery, user, featuredSeanceIds]);
 
   const applyFilters = () => {
     let result = [...seances];
@@ -119,6 +120,18 @@ export default function SeanceType() {
 
     // Filter out originals that user has already copied
     result = result.filter((s) => !userCopiedOriginalIds.includes(s.id));
+
+    // Filter out copies from other users (except featured ones)
+    result = result.filter((s) => {
+      // Keep if not a copy
+      if (!s.is_copy) return true;
+      // Keep if it's the user's own copy
+      if (s.user_id === user?.id) return true;
+      // Keep if it's featured by admin
+      if (featuredSeanceIds.includes(s.id)) return true;
+      // Otherwise hide copies from other users
+      return false;
+    });
 
     // Apply filter type
     if (filter === "mine") {
@@ -153,6 +166,12 @@ export default function SeanceType() {
       
       setUserPseudo(profileData?.pseudo || null);
       setUserCanShare(profileData?.can_share !== false);
+
+      // Fetch featured seances
+      const { data: featuredData } = await supabase
+        .from("featured_seances")
+        .select("seance_type_id");
+      setFeaturedSeanceIds(featuredData?.map((f) => f.seance_type_id) || []);
 
       // Fetch seance types
       const { data: seancesData, error: seancesError } = await supabase
