@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Video, Brain, FileText, ArrowRight, Sparkles } from "lucide-react";
+import { Users, Video, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
@@ -36,6 +36,22 @@ const features = [
     href: "/notes",
     color: "from-orange-500 to-amber-500",
     bgColor: "bg-orange-500/10",
+  },
+  {
+    title: "Traitement Type",
+    description: "Modèles de traitements standardisés",
+    icon: ClipboardList,
+    href: "/traitement-type",
+    color: "from-rose-500 to-red-500",
+    bgColor: "bg-rose-500/10",
+  },
+  {
+    title: "Séance Type",
+    description: "Modèles de séances prédéfinies",
+    icon: Calendar,
+    href: "/seance-type",
+    color: "from-indigo-500 to-violet-500",
+    bgColor: "bg-indigo-500/10",
   },
 ];
 
