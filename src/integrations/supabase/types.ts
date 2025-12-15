@@ -467,6 +467,123 @@ export type Database = {
           },
         ]
       }
+      traitement_seances: {
+        Row: {
+          created_at: string
+          id: string
+          ordre: number
+          seance_type_id: string
+          traitement_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordre?: number
+          seance_type_id: string
+          traitement_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordre?: number
+          seance_type_id?: string
+          traitement_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traitement_seances_seance_type_id_fkey"
+            columns: ["seance_type_id"]
+            isOneToOne: false
+            referencedRelation: "seance_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traitement_seances_traitement_type_id_fkey"
+            columns: ["traitement_type_id"]
+            isOneToOne: false
+            referencedRelation: "traitement_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      traitement_tests: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          ordre: number
+          traitement_type_id: string
+          video_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          ordre?: number
+          traitement_type_id: string
+          video_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          ordre?: number
+          traitement_type_id?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traitement_tests_traitement_type_id_fkey"
+            columns: ["traitement_type_id"]
+            isOneToOne: false
+            referencedRelation: "traitement_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traitement_tests_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      traitement_types: {
+        Row: {
+          author_name: string | null
+          created_at: string
+          id: string
+          is_copy: boolean | null
+          is_shared: boolean
+          original_id: string | null
+          pathologie: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_name?: string | null
+          created_at?: string
+          id?: string
+          is_copy?: boolean | null
+          is_shared?: boolean
+          original_id?: string | null
+          pathologie: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_name?: string | null
+          created_at?: string
+          id?: string
+          is_copy?: boolean | null
+          is_shared?: boolean
+          original_id?: string | null
+          pathologie?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
