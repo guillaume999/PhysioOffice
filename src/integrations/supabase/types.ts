@@ -384,8 +384,10 @@ export type Database = {
       }
       seance_types: {
         Row: {
+          author_name: string | null
           created_at: string
           id: string
+          is_shared: boolean
           objectif_principal: string
           objectif_secondaire: string | null
           pathologie: string
@@ -393,8 +395,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          author_name?: string | null
           created_at?: string
           id?: string
+          is_shared?: boolean
           objectif_principal: string
           objectif_secondaire?: string | null
           pathologie: string
@@ -402,8 +406,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          author_name?: string | null
           created_at?: string
           id?: string
+          is_shared?: boolean
           objectif_principal?: string
           objectif_secondaire?: string | null
           pathologie?: string
