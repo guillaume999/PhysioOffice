@@ -14,17 +14,12 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Users, 
   FileText, 
-  BarChart3, 
   Search, 
   Crown, 
   Clock, 
-  Star,
   Trash2,
   Shield,
-  Ban,
-  Share2,
   CheckCircle,
-  XCircle,
   ClipboardList
 } from "lucide-react";
 
@@ -72,8 +67,6 @@ interface Stats {
   premiumUsers: number;
   trialUsers: number;
   totalSeances: number;
-  sharedSeances: number;
-  pendingSeances: number;
   totalTraitements: number;
   pendingTraitements: number;
   totalPatients: number;
@@ -88,14 +81,11 @@ export default function Admin() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
-  const [featuredSeances, setFeaturedSeances] = useState<string[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     premiumUsers: 0,
     trialUsers: 0,
     totalSeances: 0,
-    sharedSeances: 0,
-    pendingSeances: 0,
     totalTraitements: 0,
     pendingTraitements: 0,
     totalPatients: 0,
@@ -158,22 +148,12 @@ export default function Admin() {
       if (traitementsError) throw traitementsError;
       setTraitements(traitementsData || []);
 
-      // Fetch featured seances
-      const { data: featuredData, error: featuredError } = await supabase
-        .from("featured_seances")
-        .select("seance_type_id");
-
-      if (featuredError) throw featuredError;
-      setFeaturedSeances(featuredData?.map(f => f.seance_type_id) || []);
-
       // Calculate stats
       const now = new Date();
       const premiumCount = usersData?.filter(u => u.is_premium).length || 0;
       const trialCount = usersData?.filter(u => 
         !u.is_premium && u.trial_end_date && new Date(u.trial_end_date) > now
       ).length || 0;
-      const sharedCount = seancesData?.filter(s => s.is_shared).length || 0;
-      const pendingSeancesCount = seancesData?.filter(s => s.is_shared && !s.is_validated).length || 0;
       const pendingTraitementsCount = traitementsData?.filter(t => t.is_shared && !t.is_validated).length || 0;
 
       // Fetch patients count
@@ -186,8 +166,6 @@ export default function Admin() {
         premiumUsers: premiumCount,
         trialUsers: trialCount,
         totalSeances: seancesData?.length || 0,
-        sharedSeances: sharedCount,
-        pendingSeances: pendingSeancesCount,
         totalTraitements: traitementsData?.length || 0,
         pendingTraitements: pendingTraitementsCount,
         totalPatients: patientsCount || 0,
@@ -321,65 +299,6 @@ export default function Admin() {
     }
   };
 
-  const toggleFeatured = async (seanceId: string) => {
-    try {
-      if (featuredSeances.includes(seanceId)) {
-        const { error } = await supabase
-          .from("featured_seances")
-          .delete()
-          .eq("seance_type_id", seanceId);
-
-        if (error) throw error;
-
-        setFeaturedSeances(featuredSeances.filter(id => id !== seanceId));
-        toast({ title: "Séance retirée des mises en avant" });
-      } else {
-        const { error } = await supabase
-          .from("featured_seances")
-          .insert({ seance_type_id: seanceId, added_by: user!.id });
-
-        if (error) throw error;
-
-        setFeaturedSeances([...featuredSeances, seanceId]);
-        toast({ title: "Séance mise en avant pour les utilisateurs en essai" });
-      }
-    } catch (error) {
-      console.error("Error toggling featured:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de modifier le statut.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleSeanceValidation = async (seanceId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("seance_types")
-        .update({ is_validated: !currentStatus })
-        .eq("id", seanceId);
-
-      if (error) throw error;
-
-      setSeances(seances.map(s => 
-        s.id === seanceId ? { ...s, is_validated: !currentStatus } : s
-      ));
-
-      toast({
-        title: "Succès",
-        description: `Séance ${!currentStatus ? "validée" : "invalidée"}.`,
-      });
-    } catch (error) {
-      console.error("Error validating seance:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de valider la séance.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const toggleTraitementValidation = async (traitementId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
@@ -493,7 +412,6 @@ export default function Admin() {
       t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
     );
 
-  const pendingSeances = filteredSeances.filter(s => s.is_shared && !s.is_validated);
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
 
   if (authLoading || adminLoading || loading) {
@@ -541,11 +459,11 @@ export default function Admin() {
               <p className="text-xs text-muted-foreground">En essai</p>
             </CardContent>
           </Card>
-          <Card className={stats.pendingSeances > 0 ? "border-orange-500" : ""}>
+          <Card>
             <CardContent className="p-4 text-center">
-              <FileText className="w-6 h-6 mx-auto text-orange-500 mb-2" />
-              <p className="text-2xl font-bold">{stats.pendingSeances}</p>
-              <p className="text-xs text-muted-foreground">Séances en attente</p>
+              <FileText className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-2xl font-bold">{stats.totalSeances}</p>
+              <p className="text-xs text-muted-foreground">Séances</p>
             </CardContent>
           </Card>
           <Card className={stats.pendingTraitements > 0 ? "border-orange-500" : ""}>
@@ -566,9 +484,6 @@ export default function Admin() {
             <TabsTrigger value="seances" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Séances
-              {pendingSeances.length > 0 && (
-                <Badge variant="destructive" className="ml-1">{pendingSeances.length}</Badge>
-              )}
             </TabsTrigger>
             <TabsTrigger value="traitements" className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
@@ -691,47 +606,6 @@ export default function Admin() {
                 </div>
               </CardHeader>
               <CardContent>
-                {pendingSeances.length > 0 && (
-                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      En attente de validation ({pendingSeances.length})
-                    </h3>
-                    <div className="space-y-2">
-                      {pendingSeances.map((s) => (
-                        <div key={s.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium">{s.pathologie}</p>
-                              <p className="text-sm text-muted-foreground">{s.objectif_principal} - {s.author_name || "Anonyme"}</p>
-                            </div>
-                            {seanceCopyCounts[s.id] > 0 && (
-                              <Badge variant="secondary" className="text-xs">{seanceCopyCounts[s.id]} copies</Badge>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => toggleSeanceValidation(s.id, false)}
-                              className="gap-1"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Valider
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteSeance(s.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -740,9 +614,6 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Objectif</th>
                         <th className="text-left py-3 px-2">Auteur</th>
                         <th className="text-left py-3 px-2">Copies</th>
-                        <th className="text-left py-3 px-2">Statut</th>
-                        <th className="text-left py-3 px-2">Validée</th>
-                        <th className="text-left py-3 px-2">Mise en avant</th>
                         <th className="text-left py-3 px-2">Actions</th>
                       </tr>
                     </thead>
@@ -760,30 +631,6 @@ export default function Admin() {
                             ) : (
                               <span className="text-muted-foreground">0</span>
                             )}
-                          </td>
-                          <td className="py-3 px-2">
-                            {s.is_shared ? (
-                              s.is_validated ? (
-                                <Badge className="bg-green-500">Partagée & Validée</Badge>
-                              ) : (
-                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
-                              )
-                            ) : (
-                              <Badge variant="outline">Privée</Badge>
-                            )}
-                          </td>
-                          <td className="py-3 px-2">
-                            <Switch
-                              checked={s.is_validated}
-                              onCheckedChange={() => toggleSeanceValidation(s.id, s.is_validated)}
-                              disabled={!s.is_shared}
-                            />
-                          </td>
-                          <td className="py-3 px-2">
-                            <Switch
-                              checked={featuredSeances.includes(s.id)}
-                              onCheckedChange={() => toggleFeatured(s.id)}
-                            />
                           </td>
                           <td className="py-3 px-2">
                             <Button
