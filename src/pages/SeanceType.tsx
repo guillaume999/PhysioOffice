@@ -423,7 +423,7 @@ export default function SeanceType() {
       }
     } catch (error) {
       console.error("Error fetching video details:", error);
-      toast.error("Erreur lors du chargement de la vidéo");
+      toast.error("Erreur lors du chargement de l'exercice");
     }
   };
 
@@ -624,7 +624,7 @@ export default function SeanceType() {
                       </div>
                       <Select value={ex.video_id} onValueChange={(v) => updateExercice(index, "video_id", v)}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner une vidéo" />
+                          <SelectValue placeholder="Sélectionner un exercice" />
                         </SelectTrigger>
                         <SelectContent>
                           {videos.map((v) => (
@@ -895,13 +895,13 @@ export default function SeanceType() {
           </DialogContent>
         </Dialog>
 
-        {/* Video Detail Dialog */}
+        {/* Exercice Detail Dialog */}
         <Dialog open={videoDetailDialogOpen} onOpenChange={setVideoDetailDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Video className="w-5 h-5" />
-                {selectedVideo?.title}
+                Détail de l'exercice
               </DialogTitle>
             </DialogHeader>
             {selectedVideo && (
