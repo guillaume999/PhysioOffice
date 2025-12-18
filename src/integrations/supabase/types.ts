@@ -717,6 +717,7 @@ export type Database = {
         Row: {
           category: string | null
           category_pathology: string | null
+          category_pathology_tags: string[] | null
           created_at: string
           description: string | null
           duration: number | null
@@ -734,6 +735,7 @@ export type Database = {
         Insert: {
           category?: string | null
           category_pathology?: string | null
+          category_pathology_tags?: string[] | null
           created_at?: string
           description?: string | null
           duration?: number | null
@@ -751,6 +753,7 @@ export type Database = {
         Update: {
           category?: string | null
           category_pathology?: string | null
+          category_pathology_tags?: string[] | null
           created_at?: string
           description?: string | null
           duration?: number | null

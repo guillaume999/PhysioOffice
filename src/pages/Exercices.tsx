@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { Dumbbell, Loader2, Plus, Play, Trash2, Upload, Search, Share2, Copy, Pencil } from "lucide-react";
+import { Dumbbell, Loader2, Plus, Play, Trash2, Upload, Search, Share2, Copy, Pencil, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,6 +23,7 @@ interface ExerciceItem {
   thumbnail_url: string | null;
   category: string | null;
   category_pathology: string | null;
+  category_pathology_tags: string[] | null;
   type_renfo: string | null;
   most_used_patho: string | null;
   duration: number | null;
@@ -51,9 +52,11 @@ export default function Exercices() {
     title: "",
     description: "",
     category_pathology: "",
+    category_pathology_tags: [] as string[],
     type_renfo: "",
     file: null as File | null,
   });
+  const [newTag, setNewTag] = useState("");
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -112,8 +115,8 @@ export default function Exercices() {
         description: formData.description || null,
         video_url: urlData.publicUrl,
         category_pathology: formData.category_pathology || null,
+        category_pathology_tags: formData.category_pathology_tags.length > 0 ? formData.category_pathology_tags : null,
         type_renfo: formData.type_renfo || null,
-        
         is_shared: false,
       });
 
@@ -124,9 +127,11 @@ export default function Exercices() {
         title: "",
         description: "",
         category_pathology: "",
+        category_pathology_tags: [],
         type_renfo: "",
         file: null,
       });
+      setNewTag("");
       setIsAddDialogOpen(false);
       fetchExercices();
     } catch (error) {
@@ -198,6 +203,7 @@ export default function Exercices() {
         thumbnail_url: exercice.thumbnail_url,
         category: exercice.category,
         category_pathology: exercice.category_pathology,
+        category_pathology_tags: exercice.category_pathology_tags,
         type_renfo: exercice.type_renfo,
         most_used_patho: exercice.most_used_patho,
         duration: exercice.duration,
@@ -230,6 +236,7 @@ export default function Exercices() {
           title: editingExercice.title,
           description: editingExercice.description,
           category_pathology: editingExercice.category_pathology,
+          category_pathology_tags: editingExercice.category_pathology_tags,
           type_renfo: editingExercice.type_renfo,
         })
         .eq("id", editingExercice.id);
@@ -274,6 +281,7 @@ export default function Exercices() {
       return (
         exercice.title.toLowerCase().includes(query) ||
         exercice.category_pathology?.toLowerCase().includes(query) ||
+        exercice.category_pathology_tags?.some(tag => tag.toLowerCase().includes(query)) ||
         exercice.type_renfo?.toLowerCase().includes(query) ||
         exercice.most_used_patho?.toLowerCase().includes(query)
       );
@@ -334,13 +342,59 @@ export default function Exercices() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="category_pathology">Catégorie Pathologie</Label>
-                  <Input
-                    id="category_pathology"
-                    value={formData.category_pathology}
-                    onChange={(e) => setFormData({ ...formData, category_pathology: e.target.value })}
-                    placeholder="Ex: Épaule, Genou, Dos..."
-                  />
+                  <Label>Tags Pathologie</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {formData.category_pathology_tags.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({
+                            ...formData,
+                            category_pathology_tags: formData.category_pathology_tags.filter((_, i) => i !== idx)
+                          })}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ex: Épaule, Genou, Dos..."
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (newTag.trim() && !formData.category_pathology_tags.includes(newTag.trim())) {
+                            setFormData({
+                              ...formData,
+                              category_pathology_tags: [...formData.category_pathology_tags, newTag.trim()]
+                            });
+                            setNewTag("");
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (newTag.trim() && !formData.category_pathology_tags.includes(newTag.trim())) {
+                          setFormData({
+                            ...formData,
+                            category_pathology_tags: [...formData.category_pathology_tags, newTag.trim()]
+                          });
+                          setNewTag("");
+                        }
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="type_renfo">Type de Renfo</Label>
@@ -401,12 +455,43 @@ export default function Exercices() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-category_pathology">Catégorie Pathologie</Label>
-                    <Input
-                      id="edit-category_pathology"
-                      value={editingExercice.category_pathology || ""}
-                      onChange={(e) => setEditingExercice({ ...editingExercice, category_pathology: e.target.value })}
-                    />
+                    <Label>Tags Pathologie</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(editingExercice.category_pathology_tags || []).map((tag, idx) => (
+                        <Badge key={idx} variant="secondary" className="gap-1">
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => setEditingExercice({
+                              ...editingExercice,
+                              category_pathology_tags: (editingExercice.category_pathology_tags || []).filter((_, i) => i !== idx)
+                            })}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Ajouter un tag..."
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const input = e.currentTarget;
+                            const value = input.value.trim();
+                            if (value && !(editingExercice.category_pathology_tags || []).includes(value)) {
+                              setEditingExercice({
+                                ...editingExercice,
+                                category_pathology_tags: [...(editingExercice.category_pathology_tags || []), value]
+                              });
+                              input.value = "";
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor="edit-type_renfo">Type de Renfo</Label>
@@ -487,7 +572,7 @@ export default function Exercices() {
                     <TableRow>
                       <TableHead className="w-16">#</TableHead>
                       <TableHead>Titre</TableHead>
-                      <TableHead>Cat. Pathologie</TableHead>
+                      <TableHead>Tags Pathologie</TableHead>
                       <TableHead>Type Renfo</TableHead>
                       <TableHead>Partagé</TableHead>
                       <TableHead className="w-32">Aperçu</TableHead>
@@ -514,7 +599,19 @@ export default function Exercices() {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell>{exercice.category_pathology || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {(exercice.category_pathology_tags || []).length > 0 ? (
+                                exercice.category_pathology_tags?.map((tag, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))
+                              ) : (
+                                "-"
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>{exercice.type_renfo || "-"}</TableCell>
                           <TableCell>
                             {canShare ? (
