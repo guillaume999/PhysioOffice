@@ -68,7 +68,7 @@ interface TraitementType {
 interface ExerciceType {
   id: string;
   title: string;
-  category_pathology: string | null;
+  category_pathology_tags: string[] | null;
   is_shared: boolean;
   is_validated: boolean | null;
   is_copy: boolean | null;
@@ -591,7 +591,7 @@ export default function Admin() {
     .filter(e => !e.is_copy)
     .filter(e =>
       e.title.toLowerCase().includes(exerciceSearch.toLowerCase()) ||
-      e.category_pathology?.toLowerCase().includes(exerciceSearch.toLowerCase())
+      e.category_pathology_tags?.some(tag => tag.toLowerCase().includes(exerciceSearch.toLowerCase()))
     );
 
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
@@ -994,7 +994,17 @@ export default function Admin() {
                           <div className="flex items-center gap-3">
                             <div>
                               <p className="font-medium">{e.title}</p>
-                              <p className="text-sm text-muted-foreground">{e.category_pathology || "Sans catégorie"}</p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {(e.category_pathology_tags || []).length > 0 ? (
+                                  e.category_pathology_tags?.map((tag, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-xs">
+                                      {tag}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Sans tags</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -1033,7 +1043,7 @@ export default function Admin() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Titre</th>
-                        <th className="text-left py-3 px-2">Catégorie</th>
+                        <th className="text-left py-3 px-2">Tags Pathologie</th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Validé</th>
@@ -1044,8 +1054,18 @@ export default function Admin() {
                       {filteredExercices.map((e) => (
                         <tr key={e.id} className="border-b hover:bg-muted/50">
                           <td className="py-3 px-2">{e.title}</td>
-                          <td className="py-3 px-2 text-sm text-muted-foreground">
-                            {e.category_pathology || "-"}
+                          <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(e.category_pathology_tags || []).length > 0 ? (
+                                e.category_pathology_tags?.map((tag, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {formatDateTime(e.created_at)}
