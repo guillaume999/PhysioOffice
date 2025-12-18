@@ -56,7 +56,6 @@ export default function Patients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ 
     name: "", 
-    numero: "",
     status: "active",
     mutual_number: "",
     remaining_sessions: 0,
@@ -100,7 +99,7 @@ export default function Patients() {
     else { 
       toast({ title: "Patient ajouté" }); 
       setIsDialogOpen(false); 
-      setFormData({ name: "", numero: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
+      setFormData({ name: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
       fetchPatients(); 
     }
   };
@@ -133,9 +132,9 @@ export default function Patients() {
               <DialogContent>
                 <DialogHeader><DialogTitle>Nouveau patient</DialogTitle></DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Nom *</Label><Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-                    <div><Label>Numéro</Label><Input value={formData.numero} onChange={e => setFormData({...formData, numero: e.target.value})} /></div>
+                  <div>
+                    <Label>Nom *</Label>
+                    <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
