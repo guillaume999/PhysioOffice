@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Video, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar } from "lucide-react";
+import { Users, Video, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
@@ -12,6 +12,14 @@ const features = [
     href: "/patients",
     color: "from-blue-500 to-cyan-500",
     bgColor: "bg-blue-500/10",
+  },
+  {
+    title: "Exercices",
+    description: "Gérez vos exercices de rééducation",
+    icon: Dumbbell,
+    href: "/exercices",
+    color: "from-green-500 to-emerald-500",
+    bgColor: "bg-green-500/10",
   },
   {
     title: "Vidéothèque",

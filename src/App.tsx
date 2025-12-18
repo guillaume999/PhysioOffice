@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Patients from "./pages/Patients";
 import Videos from "./pages/Videos";
+import Exercices from "./pages/Exercices";
 import IADiagnostic from "./pages/IADiagnostic";
 import Notes from "./pages/Notes";
 import Profile from "./pages/Profile";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/patients" element={<Patients />} />
             <Route path="/videos" element={<Videos />} />
+            <Route path="/exercices" element={<Exercices />} />
             <Route path="/ia-diagnostic" element={<IADiagnostic />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/profile" element={<Profile />} />
