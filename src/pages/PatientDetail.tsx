@@ -509,6 +509,19 @@ export default function PatientDetail() {
         </Card>
 
         <div className="mt-6">
+          <PatientSeancesCard
+            seances={patientSeances}
+            onImportSeance={() => setImportSeanceOpen(true)}
+            onCreateSeance={handleCreateSeance}
+            onEditSeance={handleEditSeance}
+            onDeleteSeance={handleDeleteSeance}
+            onImportTraitement={() => setImportTraitementOpen(true)}
+            onCreateTraitement={handleCreateTraitement}
+            activeTraitementName={activeTraitementName}
+          />
+        </div>
+
+        <div className="mt-6">
           <PatientCommentsCard
             comments={carePlan.comments}
             onChange={(value) => handleCarePlanChange("comments", value)}
@@ -523,19 +536,6 @@ export default function PatientDetail() {
               objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
             }}
             onChange={handleCarePlanChange}
-          />
-        </div>
-
-        <div className="mt-6">
-          <PatientSeancesCard
-            seances={patientSeances}
-            onImportSeance={() => setImportSeanceOpen(true)}
-            onCreateSeance={handleCreateSeance}
-            onEditSeance={handleEditSeance}
-            onDeleteSeance={handleDeleteSeance}
-            onImportTraitement={() => setImportTraitementOpen(true)}
-            onCreateTraitement={handleCreateTraitement}
-            activeTraitementName={activeTraitementName}
           />
         </div>
 
