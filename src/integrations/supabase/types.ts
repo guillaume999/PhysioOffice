@@ -168,6 +168,35 @@ export type Database = {
           },
         ]
       }
+      featured_exercices: {
+        Row: {
+          added_by: string
+          created_at: string
+          exercice_id: string
+          id: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          exercice_id: string
+          id?: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          exercice_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_exercices_exercice_id_fkey"
+            columns: ["exercice_id"]
+            isOneToOne: true
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       featured_seances: {
         Row: {
           added_by: string

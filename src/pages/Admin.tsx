@@ -23,7 +23,8 @@ import {
   Shield,
   CheckCircle,
   ClipboardList,
-  Dumbbell
+  Dumbbell,
+  Star
 } from "lucide-react";
 
 interface UserProfile {
@@ -101,6 +102,7 @@ export default function Admin() {
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [exercices, setExercices] = useState<ExerciceType[]>([]);
+  const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     premiumUsers: 0,
@@ -202,6 +204,13 @@ export default function Admin() {
 
       if (exercicesError) throw exercicesError;
       setExercices(exercicesData || []);
+
+      // Fetch featured exercices
+      const { data: featuredExercicesData } = await supabase
+        .from("featured_exercices")
+        .select("exercice_id");
+      
+      setFeaturedExerciceIds(new Set(featuredExercicesData?.map(f => f.exercice_id) || []));
 
       // Calculate stats
       const now = new Date();
@@ -508,6 +517,46 @@ export default function Admin() {
       toast({
         title: "Erreur",
         description: "Impossible de refuser l'exercice.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleFeaturedExercice = async (exerciceId: string) => {
+    const isFeatured = featuredExerciceIds.has(exerciceId);
+    
+    try {
+      if (isFeatured) {
+        const { error } = await supabase
+          .from("featured_exercices")
+          .delete()
+          .eq("exercice_id", exerciceId);
+        
+        if (error) throw error;
+        
+        const newSet = new Set(featuredExerciceIds);
+        newSet.delete(exerciceId);
+        setFeaturedExerciceIds(newSet);
+        
+        toast({ title: "Exercice retiré de PhysioOffice" });
+      } else {
+        const { error } = await supabase
+          .from("featured_exercices")
+          .insert({ exercice_id: exerciceId, added_by: user?.id });
+        
+        if (error) throw error;
+        
+        const newSet = new Set(featuredExerciceIds);
+        newSet.add(exerciceId);
+        setFeaturedExerciceIds(newSet);
+        
+        toast({ title: "Exercice ajouté à PhysioOffice" });
+      }
+    } catch (error) {
+      console.error("Error toggling featured exercice:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le statut.",
         variant: "destructive",
       });
     }
@@ -1047,6 +1096,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Validé</th>
+                        <th className="text-left py-3 px-2">PhysioOffice</th>
                         <th className="text-left py-3 px-2">Actions</th>
                       </tr>
                     </thead>
@@ -1087,6 +1137,17 @@ export default function Admin() {
                               onCheckedChange={() => toggleExerciceValidation(e.id, e.is_validated)}
                               disabled={!e.is_shared}
                             />
+                          </td>
+                          <td className="py-3 px-2">
+                            <Button
+                              variant={featuredExerciceIds.has(e.id) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleFeaturedExercice(e.id)}
+                              disabled={!e.is_validated}
+                              title={!e.is_validated ? "L'exercice doit être validé" : featuredExerciceIds.has(e.id) ? "Retirer de PhysioOffice" : "Ajouter à PhysioOffice"}
+                            >
+                              <Star className={`w-4 h-4 ${featuredExerciceIds.has(e.id) ? "fill-current" : ""}`} />
+                            </Button>
                           </td>
                           <td className="py-3 px-2">
                             <Button

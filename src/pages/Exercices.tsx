@@ -43,6 +43,7 @@ export default function Exercices() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [exercices, setExercices] = useState<ExerciceItem[]>([]);
+  const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [loadingExercices, setLoadingExercices] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingExercice, setEditingExercice] = useState<ExerciceItem | null>(null);
@@ -77,6 +78,13 @@ export default function Exercices() {
 
       if (error) throw error;
       setExercices(data || []);
+
+      // Fetch featured exercices
+      const { data: featuredData } = await supabase
+        .from("featured_exercices")
+        .select("exercice_id");
+      
+      setFeaturedExerciceIds(new Set(featuredData?.map(f => f.exercice_id) || []));
     } catch (error) {
       console.error("Error fetching exercices:", error);
       toast.error("Erreur lors du chargement des exercices");
@@ -298,7 +306,8 @@ export default function Exercices() {
 
   const filteredExercices = exercices.filter(exercice => {
     if (filter === "mine" && exercice.user_id !== user?.id) return false;
-    if (filter === "physiooffice" && exercice.user_id === user?.id) return false;
+    // PhysioOffice filter: only show featured exercises
+    if (filter === "physiooffice" && !featuredExerciceIds.has(exercice.id)) return false;
     // Shared filter: only show validated shared exercises from other users
     if (filter === "shared" && (exercice.user_id === user?.id || !exercice.is_shared || !exercice.is_validated)) return false;
     
