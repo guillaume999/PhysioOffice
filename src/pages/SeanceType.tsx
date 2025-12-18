@@ -186,7 +186,7 @@ export default function SeanceType() {
         (seancesData || []).map(async (seance) => {
           const { data: exercicesData } = await supabase
             .from("seance_exercices")
-            .select("*, videos(id, title, thumbnail_url)")
+            .select("*, exercices(id, title, thumbnail_url)")
             .eq("seance_type_id", seance.id)
             .order("ordre");
 
@@ -211,7 +211,7 @@ export default function SeanceType() {
             ...seance,
             exercices: exercicesData?.map((ex) => ({
               ...ex,
-              video: ex.videos
+              video: ex.exercices
             })) || [],
             likes_count: likesCount || 0,
             comments_count: commentsCount || 0,
@@ -237,9 +237,9 @@ export default function SeanceType() {
         secondaire: [...new Set(objData?.filter((o) => o.type === "secondaire").map((o) => o.name) || [])]
       });
 
-      // Fetch videos
+      // Fetch exercices
       const { data: videosData } = await supabase
-        .from("videos")
+        .from("exercices")
         .select("id, title, thumbnail_url");
       setVideos(videosData || []);
     } catch (error) {
@@ -411,7 +411,7 @@ export default function SeanceType() {
   const openVideoDetail = async (videoId: string) => {
     try {
       const { data, error } = await supabase
-        .from("videos")
+        .from("exercices")
         .select("id, title, thumbnail_url, description, video_url, duration, category")
         .eq("id", videoId)
         .single();
