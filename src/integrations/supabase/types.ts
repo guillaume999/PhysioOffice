@@ -443,24 +443,33 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          duration_seconds: number | null
           id: string
+          name: string | null
           ordre: number
+          repetitions: number | null
           seance_type_id: string
           video_id: string | null
         }
         Insert: {
           created_at?: string
           description?: string | null
+          duration_seconds?: number | null
           id?: string
+          name?: string | null
           ordre?: number
+          repetitions?: number | null
           seance_type_id: string
           video_id?: string | null
         }
         Update: {
           created_at?: string
           description?: string | null
+          duration_seconds?: number | null
           id?: string
+          name?: string | null
           ordre?: number
+          repetitions?: number | null
           seance_type_id?: string
           video_id?: string | null
         }
