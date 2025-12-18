@@ -656,6 +656,9 @@ export default function Admin() {
 
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
   const pendingExercices = filteredExercices.filter(e => e.is_shared && !e.is_validated);
+  
+  // Exercices to display in table (exclude pending ones)
+  const tableExercices = filteredExercices.filter(e => !(e.is_shared && !e.is_validated));
 
   if (authLoading || adminLoading || loading) {
     return (
@@ -1121,7 +1124,7 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredExercices.map((e) => (
+                      {tableExercices.map((e) => (
                         <tr key={e.id} className="border-b hover:bg-muted/50">
                           <td className="py-3 px-2">{e.title}</td>
                           <td className="py-3 px-2">
