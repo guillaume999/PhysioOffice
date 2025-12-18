@@ -595,6 +595,17 @@ export default function Admin() {
     });
   };
 
+  const getUserDisplayName = (userId: string) => {
+    const user = users.find(u => u.user_id === userId);
+    if (!user) return "Inconnu";
+    if (user.first_name || user.last_name) {
+      return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    }
+    if (user.pseudo) return user.pseudo;
+    if (user.email) return user.email;
+    return "Inconnu";
+  };
+
   const filteredUsers = users.filter(u => 
     (u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
     u.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
@@ -856,6 +867,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Actions</th>
+                        <th className="text-left py-3 px-2">Utilisateur</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -884,6 +896,9 @@ export default function Admin() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
+                          </td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {getUserDisplayName(s.user_id)}
                           </td>
                         </tr>
                       ))}
@@ -961,6 +976,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Validé</th>
                         <th className="text-left py-3 px-2">Actions</th>
+                        <th className="text-left py-3 px-2">Utilisateur</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1006,6 +1022,9 @@ export default function Admin() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
+                          </td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {getUserDisplayName(t.user_id)}
                           </td>
                         </tr>
                       ))}
@@ -1098,6 +1117,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Validé</th>
                         <th className="text-left py-3 px-2">PhysioOffice</th>
                         <th className="text-left py-3 px-2">Actions</th>
+                        <th className="text-left py-3 px-2">Utilisateur</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1157,6 +1177,9 @@ export default function Admin() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
+                          </td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {getUserDisplayName(e.user_id)}
                           </td>
                         </tr>
                       ))}
