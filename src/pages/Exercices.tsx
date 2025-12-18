@@ -53,7 +53,6 @@ export default function Exercices() {
     description: "",
     category_pathology: "",
     category_pathology_tags: [] as string[],
-    type_renfo: "",
     file: null as File | null,
   });
   const [newTag, setNewTag] = useState("");
@@ -92,31 +91,36 @@ export default function Exercices() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.file || !user) return;
+    if (!user) return;
 
     setUploading(true);
     try {
-      const fileExt = formData.file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      let videoUrl: string | null = null;
 
-      const { error: uploadError } = await supabase.storage
-        .from("videos")
-        .upload(fileName, formData.file);
+      if (formData.file) {
+        const fileExt = formData.file.name.split(".").pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from("videos")
+          .upload(fileName, formData.file);
 
-      const { data: urlData } = supabase.storage
-        .from("videos")
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("videos")
+          .getPublicUrl(fileName);
+
+        videoUrl = urlData.publicUrl;
+      }
 
       const { error: insertError } = await supabase.from("videos").insert({
         user_id: user.id,
         title: formData.title,
         description: formData.description || null,
-        video_url: urlData.publicUrl,
+        video_url: videoUrl || "",
         category_pathology: formData.category_pathology || null,
         category_pathology_tags: formData.category_pathology_tags.length > 0 ? formData.category_pathology_tags : null,
-        type_renfo: formData.type_renfo || null,
         is_shared: false,
       });
 
@@ -128,7 +132,6 @@ export default function Exercices() {
         description: "",
         category_pathology: "",
         category_pathology_tags: [],
-        type_renfo: "",
         file: null,
       });
       setNewTag("");
@@ -237,7 +240,7 @@ export default function Exercices() {
           description: editingExercice.description,
           category_pathology: editingExercice.category_pathology,
           category_pathology_tags: editingExercice.category_pathology_tags,
-          type_renfo: editingExercice.type_renfo,
+          video_url: editingExercice.video_url,
         })
         .eq("id", editingExercice.id);
 
@@ -281,9 +284,7 @@ export default function Exercices() {
       return (
         exercice.title.toLowerCase().includes(query) ||
         exercice.category_pathology?.toLowerCase().includes(query) ||
-        exercice.category_pathology_tags?.some(tag => tag.toLowerCase().includes(query)) ||
-        exercice.type_renfo?.toLowerCase().includes(query) ||
-        exercice.most_used_patho?.toLowerCase().includes(query)
+        exercice.category_pathology_tags?.some(tag => tag.toLowerCase().includes(query))
       );
     }
     return true;
@@ -397,22 +398,12 @@ export default function Exercices() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="type_renfo">Type de Renfo</Label>
-                  <Input
-                    id="type_renfo"
-                    value={formData.type_renfo}
-                    onChange={(e) => setFormData({ ...formData, type_renfo: e.target.value })}
-                    placeholder="Ex: Isométrique, Concentrique..."
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="file">Fichier vidéo *</Label>
+                  <Label htmlFor="file">Fichier vidéo (optionnel)</Label>
                   <Input
                     id="file"
                     type="file"
                     accept="video/*"
                     onChange={handleFileChange}
-                    required
                   />
                 </div>
                 <Button type="submit" className="w-full gap-2" disabled={uploading}>
@@ -493,20 +484,27 @@ export default function Exercices() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <Label htmlFor="edit-type_renfo">Type de Renfo</Label>
-                    <Input
-                      id="edit-type_renfo"
-                      value={editingExercice.type_renfo || ""}
-                      onChange={(e) => setEditingExercice({ ...editingExercice, type_renfo: e.target.value })}
-                    />
-                  </div>
                   <div className="pt-2">
-                    <video
-                      src={editingExercice.video_url}
-                      controls
-                      className="w-full rounded-lg max-h-48"
-                    />
+                    <Label>Vidéo</Label>
+                    {editingExercice.video_url ? (
+                      <div className="space-y-2">
+                        <video
+                          src={editingExercice.video_url}
+                          controls
+                          className="w-full rounded-lg max-h-48"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-destructive"
+                          onClick={() => setEditingExercice({ ...editingExercice, video_url: "" })}
+                        >
+                          <X className="w-4 h-4 mr-2" /> Retirer la vidéo
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Aucune vidéo associée</p>
+                    )}
                   </div>
                   <Button onClick={handleEditSave} className="w-full">
                     Enregistrer
@@ -573,7 +571,6 @@ export default function Exercices() {
                       <TableHead className="w-16">#</TableHead>
                       <TableHead>Titre</TableHead>
                       <TableHead>Tags Pathologie</TableHead>
-                      <TableHead>Type Renfo</TableHead>
                       <TableHead>Partagé</TableHead>
                       <TableHead className="w-32">Aperçu</TableHead>
                       <TableHead className="w-32">Actions</TableHead>
@@ -612,7 +609,7 @@ export default function Exercices() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{exercice.type_renfo || "-"}</TableCell>
+                          
                           <TableCell>
                             {canShare ? (
                               <Checkbox
@@ -626,29 +623,33 @@ export default function Exercices() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-1"
-                                  onClick={() => setPlayingExercice(exercice)}
-                                >
-                                  <Play className="w-3 h-3" /> Mini
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-sm">
-                                <DialogHeader>
-                                  <DialogTitle>{exercice.title}</DialogTitle>
-                                </DialogHeader>
-                                <video
-                                  src={exercice.video_url}
-                                  controls
-                                  className="w-full rounded-lg"
-                                  autoPlay
-                                />
-                              </DialogContent>
-                            </Dialog>
+                            {exercice.video_url ? (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={() => setPlayingExercice(exercice)}
+                                  >
+                                    <Play className="w-3 h-3" /> Mini
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-sm">
+                                  <DialogHeader>
+                                    <DialogTitle>{exercice.title}</DialogTitle>
+                                  </DialogHeader>
+                                  <video
+                                    src={exercice.video_url}
+                                    controls
+                                    className="w-full rounded-lg"
+                                    autoPlay
+                                  />
+                                </DialogContent>
+                              </Dialog>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Pas de vidéo</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
