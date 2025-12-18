@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AdminPasswordConfirmDialog } from "@/components/admin/AdminPasswordConfirmDialog";
 import { 
   Users, 
   FileText, 
@@ -112,6 +113,14 @@ export default function Admin() {
   const [traitementSearch, setTraitementSearch] = useState("");
   const [exerciceSearch, setExerciceSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  
+  // Admin role confirmation dialog state
+  const [adminConfirmDialog, setAdminConfirmDialog] = useState<{
+    open: boolean;
+    userId: string;
+    userEmail: string | null;
+    action: "add" | "remove";
+  }>({ open: false, userId: "", userEmail: null, action: "add" });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -293,7 +302,7 @@ export default function Admin() {
     }
   };
 
-  const toggleAdmin = async (userId: string) => {
+  const openAdminConfirmDialog = async (userId: string, userEmail: string | null) => {
     try {
       const { data: existingRole } = await supabase
         .from("user_roles")
@@ -302,7 +311,27 @@ export default function Admin() {
         .eq("role", "admin")
         .maybeSingle();
 
-      if (existingRole) {
+      setAdminConfirmDialog({
+        open: true,
+        userId,
+        userEmail,
+        action: existingRole ? "remove" : "add",
+      });
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de vérifier le statut admin.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmToggleAdmin = async () => {
+    const { userId, action } = adminConfirmDialog;
+    
+    try {
+      if (action === "remove") {
         await supabase
           .from("user_roles")
           .delete()
@@ -682,7 +711,7 @@ export default function Admin() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => toggleAdmin(u.user_id)}
+                                onClick={() => openAdminConfirmDialog(u.user_id, u.email)}
                               >
                                 <Shield className="w-4 h-4" />
                               </Button>
@@ -994,6 +1023,14 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AdminPasswordConfirmDialog
+        open={adminConfirmDialog.open}
+        onOpenChange={(open) => setAdminConfirmDialog({ ...adminConfirmDialog, open })}
+        onConfirm={confirmToggleAdmin}
+        userEmail={adminConfirmDialog.userEmail}
+        action={adminConfirmDialog.action}
+      />
     </Layout>
   );
 }
