@@ -59,14 +59,6 @@ export function Navbar() {
                   Exercices
                 </Link>
                 <Link
-                  to="/videos"
-                  className={`font-medium transition-colors hover:text-primary ${
-                    isActive("/videos") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Vidéos
-                </Link>
-                <Link
                   to="/seance-type"
                   className={`font-medium transition-colors hover:text-primary ${
                     isActive("/seance-type") ? "text-primary" : "text-muted-foreground"
@@ -177,13 +169,6 @@ export function Navbar() {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Exercices
-                  </Link>
-                  <Link
-                    to="/videos"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Vidéos
                   </Link>
                   <Link
                     to="/seance-type"
