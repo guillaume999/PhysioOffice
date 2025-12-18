@@ -100,6 +100,8 @@ export type Database = {
           category_pathology: string | null
           category_pathology_tags: string[] | null
           created_at: string
+          deleted_at: string | null
+          deleted_by_owner: boolean | null
           description: string | null
           duration: number | null
           id: string
@@ -121,6 +123,8 @@ export type Database = {
           category_pathology?: string | null
           category_pathology_tags?: string[] | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_owner?: boolean | null
           description?: string | null
           duration?: number | null
           id?: string
@@ -142,6 +146,8 @@ export type Database = {
           category_pathology?: string | null
           category_pathology_tags?: string[] | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_owner?: boolean | null
           description?: string | null
           duration?: number | null
           id?: string

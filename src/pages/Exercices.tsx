@@ -288,15 +288,45 @@ export default function Exercices() {
     if (!confirm("Supprimer cet exercice ?")) return;
 
     try {
-      const path = videoUrl.split("/videos/")[1];
-      if (path) {
-        await supabase.storage.from("videos").remove([path]);
+      // Check if exercice is featured or has copies
+      const { data: featuredData } = await supabase
+        .from("featured_exercices")
+        .select("id")
+        .eq("exercice_id", id)
+        .maybeSingle();
+
+      const { data: copiesData } = await supabase
+        .from("exercices")
+        .select("id")
+        .eq("original_id", id)
+        .limit(1);
+
+      const isFeaturedOrHasCopies = !!featuredData || (copiesData && copiesData.length > 0);
+
+      if (isFeaturedOrHasCopies) {
+        // Soft delete - keep the exercice but mark as deleted by owner
+        const { error } = await supabase
+          .from("exercices")
+          .update({ 
+            deleted_at: new Date().toISOString(),
+            deleted_by_owner: true
+          })
+          .eq("id", id);
+
+        if (error) throw error;
+        toast.success("Exercice retiré de votre bibliothèque");
+      } else {
+        // Hard delete - remove completely
+        const path = videoUrl.split("/videos/")[1];
+        if (path) {
+          await supabase.storage.from("videos").remove([path]);
+        }
+
+        const { error } = await supabase.from("exercices").delete().eq("id", id);
+        if (error) throw error;
+        toast.success("Exercice supprimé");
       }
 
-      const { error } = await supabase.from("exercices").delete().eq("id", id);
-      if (error) throw error;
-
-      toast.success("Exercice supprimé");
       fetchExercices();
     } catch (error) {
       console.error("Error deleting exercice:", error);
