@@ -559,30 +559,36 @@ export default function PatientDetail() {
             <p className="text-sm text-muted-foreground mb-4">
               Un nouveau patient sera créé avec les mêmes informations. Le numéro sera attribué automatiquement.
             </p>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="keepComments" 
-                  checked={duplicateOptions.keepComments}
-                  onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepComments: !!checked})}
-                />
-                <Label htmlFor="keepComments">Conserver les commentaires</Label>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Informations générales</p>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="keepComments" 
+                    checked={duplicateOptions.keepComments}
+                    onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepComments: !!checked})}
+                  />
+                  <Label htmlFor="keepComments">Conserver les commentaires</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="keepObjectives" 
+                    checked={duplicateOptions.keepObjectives}
+                    onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepObjectives: !!checked})}
+                  />
+                  <Label htmlFor="keepObjectives">Conserver les objectifs de soins (motif, bilan, objectifs)</Label>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="keepObjectives" 
-                  checked={duplicateOptions.keepObjectives}
-                  onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepObjectives: !!checked})}
-                />
-                <Label htmlFor="keepObjectives">Conserver les objectifs de soins (motif, bilan, objectifs)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="keepTraitement" 
-                  checked={duplicateOptions.keepTraitement}
-                  onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepTraitement: !!checked})}
-                />
-                <Label htmlFor="keepTraitement">Conserver le plan de traitement actif</Label>
+              <div className="space-y-3 pt-3 border-t">
+                <p className="text-sm font-medium">Plan de traitement & séances</p>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="keepTraitement" 
+                    checked={duplicateOptions.keepTraitement}
+                    onCheckedChange={(checked) => setDuplicateOptions({...duplicateOptions, keepTraitement: !!checked})}
+                  />
+                  <Label htmlFor="keepTraitement">Conserver le plan de traitement actif</Label>
+                </div>
               </div>
             </div>
             <DialogFooter className="mt-4">
