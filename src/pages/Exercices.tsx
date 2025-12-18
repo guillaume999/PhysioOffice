@@ -34,7 +34,7 @@ interface ExerciceItem {
   created_at: string;
 }
 
-type FilterType = "all" | "mine" | "shared";
+type FilterType = "mine" | "physiooffice";
 
 export default function Exercices() {
   const { user, loading } = useAuth();
@@ -45,7 +45,7 @@ export default function Exercices() {
   const [editingExercice, setEditingExercice] = useState<ExerciceItem | null>(null);
   const [playingExercice, setPlayingExercice] = useState<ExerciceItem | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
@@ -277,7 +277,7 @@ export default function Exercices() {
 
   const filteredExercices = exercices.filter(exercice => {
     if (filter === "mine" && exercice.user_id !== user?.id) return false;
-    if (filter === "shared" && !exercice.is_shared) return false;
+    if (filter === "physiooffice" && exercice.user_id === user?.id) return false;
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -518,13 +518,6 @@ export default function Exercices() {
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex gap-2">
             <Button
-              variant={filter === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter("all")}
-            >
-              Tous
-            </Button>
-            <Button
               variant={filter === "mine" ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter("mine")}
@@ -532,11 +525,11 @@ export default function Exercices() {
               Mes exercices
             </Button>
             <Button
-              variant={filter === "shared" ? "default" : "outline"}
+              variant={filter === "physiooffice" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilter("shared")}
+              onClick={() => setFilter("physiooffice")}
             >
-              Partagés
+              PhysioOffice
             </Button>
           </div>
           <div className="relative flex-1 max-w-md">
