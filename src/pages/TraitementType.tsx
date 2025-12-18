@@ -244,7 +244,7 @@ export default function TraitementType() {
         await supabase.from("traitement_tests").insert({
           traitement_type_id: traitementData.id,
           description: test.description,
-          video_id: test.video_id || null,
+          video_id: test.video_id && test.video_id !== "none" ? test.video_id : null,
           ordre: i
         });
       }
@@ -477,7 +477,7 @@ export default function TraitementType() {
                             <SelectValue placeholder="Vidéo associée (optionnel)" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Aucune vidéo</SelectItem>
+                            <SelectItem value="none">Aucune vidéo</SelectItem>
                             {videos.map((v) => (
                               <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
                             ))}
