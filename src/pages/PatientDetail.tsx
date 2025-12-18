@@ -440,7 +440,36 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        <Card>
+        <PatientSeancesCard
+          seances={patientSeances}
+          onImportSeance={() => setImportSeanceOpen(true)}
+          onCreateSeance={handleCreateSeance}
+          onEditSeance={handleEditSeance}
+          onDeleteSeance={handleDeleteSeance}
+          onImportTraitement={() => setImportTraitementOpen(true)}
+          onCreateTraitement={handleCreateTraitement}
+          activeTraitementName={activeTraitementName}
+        />
+
+        <div className="mt-6">
+          <PatientCommentsCard
+            comments={carePlan.comments}
+            onChange={(value) => handleCarePlanChange("comments", value)}
+          />
+        </div>
+
+        <div className="mt-6">
+          <PatientCareObjectivesCard
+            carePlan={{
+              motif_consultation: carePlan.motif_consultation,
+              bilan_kine: carePlan.bilan_kine,
+              objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+            }}
+            onChange={handleCarePlanChange}
+          />
+        </div>
+
+        <Card className="mt-6">
           <CardHeader>
             <CardTitle className="text-lg">Informations du patient</CardTitle>
           </CardHeader>
@@ -507,37 +536,6 @@ export default function PatientDetail() {
             </div>
           </CardContent>
         </Card>
-
-        <div className="mt-6">
-          <PatientSeancesCard
-            seances={patientSeances}
-            onImportSeance={() => setImportSeanceOpen(true)}
-            onCreateSeance={handleCreateSeance}
-            onEditSeance={handleEditSeance}
-            onDeleteSeance={handleDeleteSeance}
-            onImportTraitement={() => setImportTraitementOpen(true)}
-            onCreateTraitement={handleCreateTraitement}
-            activeTraitementName={activeTraitementName}
-          />
-        </div>
-
-        <div className="mt-6">
-          <PatientCommentsCard
-            comments={carePlan.comments}
-            onChange={(value) => handleCarePlanChange("comments", value)}
-          />
-        </div>
-
-        <div className="mt-6">
-          <PatientCareObjectivesCard
-            carePlan={{
-              motif_consultation: carePlan.motif_consultation,
-              bilan_kine: carePlan.bilan_kine,
-              objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-            }}
-            onChange={handleCarePlanChange}
-          />
-        </div>
 
         <ImportTraitementDialog
           open={importTraitementOpen}
