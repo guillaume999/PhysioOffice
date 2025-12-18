@@ -33,6 +33,8 @@ interface ExerciceItem {
   original_id: string | null;
   user_id: string;
   created_at: string;
+  rejection_reason: string | null;
+  rejected_at: string | null;
 }
 
 type FilterType = "mine" | "physiooffice" | "shared";
@@ -243,15 +245,24 @@ export default function Exercices() {
     if (!editingExercice || !user) return;
 
     try {
+      // If the exercise was rejected and is being edited, clear rejection and allow resubmission
+      const updateData: Record<string, unknown> = {
+        title: editingExercice.title,
+        description: editingExercice.description,
+        category_pathology: editingExercice.category_pathology,
+        category_pathology_tags: editingExercice.category_pathology_tags,
+        video_url: editingExercice.video_url,
+      };
+
+      // If the exercise was previously rejected, clear the rejection to allow resubmission
+      if (editingExercice.rejection_reason) {
+        updateData.rejection_reason = null;
+        updateData.rejected_at = null;
+      }
+
       const { error } = await supabase
         .from("exercices")
-        .update({
-          title: editingExercice.title,
-          description: editingExercice.description,
-          category_pathology: editingExercice.category_pathology,
-          category_pathology_tags: editingExercice.category_pathology_tags,
-          video_url: editingExercice.video_url,
-        })
+        .update(updateData)
         .eq("id", editingExercice.id);
 
       if (error) throw error;
@@ -624,19 +635,30 @@ export default function Exercices() {
                           
                           <TableCell>
                             {canShare ? (
-                              <>
-                                <Checkbox
-                                  checked={exercice.is_shared}
-                                  onCheckedChange={() => toggleShare(exercice.id, exercice.is_shared, exercice.is_validated)}
-                                  disabled={exercice.is_validated && exercice.is_shared}
-                                />
-                                {exercice.is_shared && exercice.is_validated && (
-                                  <Badge className="ml-2 text-xs bg-green-500">Validé</Badge>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center">
+                                  <Checkbox
+                                    checked={exercice.is_shared}
+                                    onCheckedChange={() => toggleShare(exercice.id, exercice.is_shared, exercice.is_validated)}
+                                    disabled={(exercice.is_validated && exercice.is_shared) || !!exercice.rejection_reason}
+                                  />
+                                  {exercice.is_shared && exercice.is_validated && (
+                                    <Badge className="ml-2 text-xs bg-green-500">Validé</Badge>
+                                  )}
+                                  {exercice.is_shared && !exercice.is_validated && !exercice.rejection_reason && (
+                                    <Badge variant="secondary" className="ml-2 text-xs bg-orange-500">En attente</Badge>
+                                  )}
+                                </div>
+                                {exercice.rejection_reason && (
+                                  <div className="flex flex-col gap-1 mt-1">
+                                    <Badge variant="destructive" className="text-xs w-fit">Refusé</Badge>
+                                    <p className="text-xs text-muted-foreground max-w-[150px] truncate" title={exercice.rejection_reason}>
+                                      {exercice.rejection_reason}
+                                    </p>
+                                    <span className="text-xs text-muted-foreground italic">Modifiez l'exercice pour resoumettre</span>
+                                  </div>
                                 )}
-                                {exercice.is_shared && !exercice.is_validated && (
-                                  <Badge variant="secondary" className="ml-2 text-xs bg-orange-500">En attente</Badge>
-                                )}
-                              </>
+                              </div>
                             ) : isOwner && exercice.is_copy ? (
                               <span className="text-xs text-muted-foreground">Non partageable</span>
                             ) : (

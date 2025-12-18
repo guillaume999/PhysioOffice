@@ -108,6 +108,8 @@ export type Database = {
           is_validated: boolean | null
           most_used_patho: string | null
           original_id: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
           thumbnail_url: string | null
           title: string
           type_renfo: string | null
@@ -127,6 +129,8 @@ export type Database = {
           is_validated?: boolean | null
           most_used_patho?: string | null
           original_id?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
           thumbnail_url?: string | null
           title: string
           type_renfo?: string | null
@@ -146,6 +150,8 @@ export type Database = {
           is_validated?: boolean | null
           most_used_patho?: string | null
           original_id?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
           thumbnail_url?: string | null
           title?: string
           type_renfo?: string | null

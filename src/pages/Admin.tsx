@@ -12,6 +12,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPasswordConfirmDialog } from "@/components/admin/AdminPasswordConfirmDialog";
+import { ExerciceRejectDialog } from "@/components/admin/ExerciceRejectDialog";
 import { 
   Users, 
   FileText, 
@@ -73,6 +74,8 @@ interface ExerciceType {
   is_copy: boolean | null;
   user_id: string;
   created_at: string;
+  rejection_reason: string | null;
+  rejected_at: string | null;
 }
 
 interface Stats {
@@ -122,6 +125,13 @@ export default function Admin() {
     userEmail: string | null;
     action: "add" | "remove";
   }>({ open: false, userId: "", userEmail: null, action: "add" });
+
+  // Exercice rejection dialog state
+  const [rejectDialog, setRejectDialog] = useState<{
+    open: boolean;
+    exerciceId: string;
+    exerciceTitle: string;
+  }>({ open: false, exerciceId: "", exerciceTitle: "" });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -444,13 +454,17 @@ export default function Admin() {
     try {
       const { error } = await supabase
         .from("exercices")
-        .update({ is_validated: !currentStatus })
+        .update({ 
+          is_validated: !currentStatus,
+          rejection_reason: null,
+          rejected_at: null
+        })
         .eq("id", exerciceId);
 
       if (error) throw error;
 
       setExercices(exercices.map(e => 
-        e.id === exerciceId ? { ...e, is_validated: !currentStatus } : e
+        e.id === exerciceId ? { ...e, is_validated: !currentStatus, rejection_reason: null, rejected_at: null } : e
       ));
 
       toast({
@@ -462,6 +476,38 @@ export default function Admin() {
       toast({
         title: "Erreur",
         description: "Impossible de valider l'exercice.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const rejectExercice = async (exerciceId: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from("exercices")
+        .update({ 
+          is_shared: false,
+          is_validated: false,
+          rejection_reason: reason,
+          rejected_at: new Date().toISOString()
+        })
+        .eq("id", exerciceId);
+
+      if (error) throw error;
+
+      setExercices(exercices.map(e => 
+        e.id === exerciceId ? { ...e, is_shared: false, is_validated: false, rejection_reason: reason, rejected_at: new Date().toISOString() } : e
+      ));
+
+      toast({
+        title: "Exercice refusé",
+        description: "L'utilisateur a été notifié du refus.",
+      });
+    } catch (error) {
+      console.error("Error rejecting exercice:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de refuser l'exercice.",
         variant: "destructive",
       });
     }
@@ -962,6 +1008,14 @@ export default function Admin() {
                               Valider
                             </Button>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setRejectDialog({ open: true, exerciceId: e.id, exerciceTitle: e.title })}
+                              className="gap-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              Refuser
+                            </Button>
+                            <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => deleteExercice(e.id)}
@@ -1040,6 +1094,13 @@ export default function Admin() {
         onConfirm={confirmToggleAdmin}
         userEmail={adminConfirmDialog.userEmail}
         action={adminConfirmDialog.action}
+      />
+
+      <ExerciceRejectDialog
+        open={rejectDialog.open}
+        onOpenChange={(open) => setRejectDialog({ ...rejectDialog, open })}
+        onConfirm={(reason) => rejectExercice(rejectDialog.exerciceId, reason)}
+        exerciceTitle={rejectDialog.exerciceTitle}
       />
     </Layout>
   );
