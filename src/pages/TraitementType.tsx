@@ -165,7 +165,7 @@ export default function TraitementType() {
         (traitementsData || []).map(async (traitement) => {
           const { data: testsData } = await supabase
             .from("traitement_tests")
-            .select("*, videos(id, title, thumbnail_url, video_url)")
+            .select("*, exercices(id, title, thumbnail_url, video_url)")
             .eq("traitement_type_id", traitement.id)
             .order("ordre");
 
@@ -179,7 +179,7 @@ export default function TraitementType() {
             ...traitement,
             tests: testsData?.map((t) => ({
               ...t,
-              video: t.videos
+              video: t.exercices
             })) || [],
             seances: seancesData?.map((s) => ({
               ...s,
@@ -195,7 +195,7 @@ export default function TraitementType() {
       setPathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
 
       const { data: videosData } = await supabase
-        .from("videos")
+        .from("exercices")
         .select("id, title, thumbnail_url, video_url");
       setVideos(videosData || []);
 

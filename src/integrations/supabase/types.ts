@@ -94,6 +94,74 @@ export type Database = {
         }
         Relationships: []
       }
+      exercices: {
+        Row: {
+          category: string | null
+          category_pathology: string | null
+          category_pathology_tags: string[] | null
+          created_at: string
+          description: string | null
+          duration: number | null
+          id: string
+          is_copy: boolean | null
+          is_shared: boolean | null
+          is_validated: boolean | null
+          most_used_patho: string | null
+          original_id: string | null
+          thumbnail_url: string | null
+          title: string
+          type_renfo: string | null
+          user_id: string
+          video_url: string
+        }
+        Insert: {
+          category?: string | null
+          category_pathology?: string | null
+          category_pathology_tags?: string[] | null
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          id?: string
+          is_copy?: boolean | null
+          is_shared?: boolean | null
+          is_validated?: boolean | null
+          most_used_patho?: string | null
+          original_id?: string | null
+          thumbnail_url?: string | null
+          title: string
+          type_renfo?: string | null
+          user_id: string
+          video_url: string
+        }
+        Update: {
+          category?: string | null
+          category_pathology?: string | null
+          category_pathology_tags?: string[] | null
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          id?: string
+          is_copy?: boolean | null
+          is_shared?: boolean | null
+          is_validated?: boolean | null
+          most_used_patho?: string | null
+          original_id?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          type_renfo?: string | null
+          user_id?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercices_original_id_fkey"
+            columns: ["original_id"]
+            isOneToOne: false
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       featured_seances: {
         Row: {
           added_by: string
@@ -485,7 +553,7 @@ export type Database = {
             foreignKeyName: "seance_exercices_video_id_fkey"
             columns: ["video_id"]
             isOneToOne: false
-            referencedRelation: "videos"
+            referencedRelation: "exercices"
             referencedColumns: ["id"]
           },
         ]
@@ -648,7 +716,7 @@ export type Database = {
             foreignKeyName: "traitement_tests_video_id_fkey"
             columns: ["video_id"]
             isOneToOne: false
-            referencedRelation: "videos"
+            referencedRelation: "exercices"
             referencedColumns: ["id"]
           },
         ]
@@ -712,74 +780,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      videos: {
-        Row: {
-          category: string | null
-          category_pathology: string | null
-          category_pathology_tags: string[] | null
-          created_at: string
-          description: string | null
-          duration: number | null
-          id: string
-          is_copy: boolean | null
-          is_shared: boolean | null
-          is_validated: boolean | null
-          most_used_patho: string | null
-          original_id: string | null
-          thumbnail_url: string | null
-          title: string
-          type_renfo: string | null
-          user_id: string
-          video_url: string
-        }
-        Insert: {
-          category?: string | null
-          category_pathology?: string | null
-          category_pathology_tags?: string[] | null
-          created_at?: string
-          description?: string | null
-          duration?: number | null
-          id?: string
-          is_copy?: boolean | null
-          is_shared?: boolean | null
-          is_validated?: boolean | null
-          most_used_patho?: string | null
-          original_id?: string | null
-          thumbnail_url?: string | null
-          title: string
-          type_renfo?: string | null
-          user_id: string
-          video_url: string
-        }
-        Update: {
-          category?: string | null
-          category_pathology?: string | null
-          category_pathology_tags?: string[] | null
-          created_at?: string
-          description?: string | null
-          duration?: number | null
-          id?: string
-          is_copy?: boolean | null
-          is_shared?: boolean | null
-          is_validated?: boolean | null
-          most_used_patho?: string | null
-          original_id?: string | null
-          thumbnail_url?: string | null
-          title?: string
-          type_renfo?: string | null
-          user_id?: string
-          video_url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "videos_original_id_fkey"
-            columns: ["original_id"]
-            isOneToOne: false
-            referencedRelation: "videos"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {

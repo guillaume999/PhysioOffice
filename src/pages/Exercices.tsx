@@ -68,7 +68,7 @@ export default function Exercices() {
   const fetchExercices = async () => {
     try {
       const { data, error } = await supabase
-        .from("videos")
+        .from("exercices")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -114,7 +114,7 @@ export default function Exercices() {
         videoUrl = urlData.publicUrl;
       }
 
-      const { error: insertError } = await supabase.from("videos").insert({
+      const { error: insertError } = await supabase.from("exercices").insert({
         user_id: user.id,
         title: formData.title,
         description: formData.description || null,
@@ -148,7 +148,7 @@ export default function Exercices() {
   const toggleShare = async (exerciceId: string, currentShared: boolean) => {
     try {
       const { error } = await supabase
-        .from("videos")
+        .from("exercices")
         .update({ is_shared: !currentShared })
         .eq("id", exerciceId);
 
@@ -168,7 +168,7 @@ export default function Exercices() {
     if (!user) return;
 
     try {
-      const { error } = await supabase.from("videos").insert({
+      const { error } = await supabase.from("exercices").insert({
         user_id: user.id,
         title: exercice.title,
         description: exercice.description,
@@ -198,7 +198,7 @@ export default function Exercices() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase.from("videos").insert({
+      const { data, error } = await supabase.from("exercices").insert({
         user_id: user.id,
         title: exercice.title + " (copie)",
         description: exercice.description,
@@ -234,7 +234,7 @@ export default function Exercices() {
 
     try {
       const { error } = await supabase
-        .from("videos")
+        .from("exercices")
         .update({
           title: editingExercice.title,
           description: editingExercice.description,
@@ -264,7 +264,7 @@ export default function Exercices() {
         await supabase.storage.from("videos").remove([path]);
       }
 
-      const { error } = await supabase.from("videos").delete().eq("id", id);
+      const { error } = await supabase.from("exercices").delete().eq("id", id);
       if (error) throw error;
 
       toast.success("Exercice supprimé");
