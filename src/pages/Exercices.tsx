@@ -626,14 +626,20 @@ export default function Exercices() {
                             {exercice.video_url ? (
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1"
+                                  <button
+                                    className="relative group w-16 h-12 rounded overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
                                     onClick={() => setPlayingExercice(exercice)}
                                   >
-                                    <Play className="w-3 h-3" /> Mini
-                                  </Button>
+                                    <video
+                                      src={exercice.video_url}
+                                      className="w-full h-full object-cover"
+                                      muted
+                                      preload="metadata"
+                                    />
+                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
+                                      <Play className="w-5 h-5 text-white fill-white" />
+                                    </div>
+                                  </button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-sm">
                                   <DialogHeader>
