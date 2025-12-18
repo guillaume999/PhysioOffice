@@ -523,9 +523,6 @@ export default function PatientDetail() {
               objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
             }}
             onChange={handleCarePlanChange}
-            onImportTraitement={() => setImportTraitementOpen(true)}
-            onCreateTraitement={handleCreateTraitement}
-            activeTraitementName={activeTraitementName}
           />
         </div>
 
@@ -536,6 +533,9 @@ export default function PatientDetail() {
             onCreateSeance={handleCreateSeance}
             onEditSeance={handleEditSeance}
             onDeleteSeance={handleDeleteSeance}
+            onImportTraitement={() => setImportTraitementOpen(true)}
+            onCreateTraitement={handleCreateTraitement}
+            activeTraitementName={activeTraitementName}
           />
         </div>
 
