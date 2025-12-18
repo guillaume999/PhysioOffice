@@ -211,16 +211,12 @@ export type Database = {
           address: string | null
           allergies: string | null
           blood_type: string | null
-          city: string | null
           created_at: string
-          date_of_birth: string | null
-          email: string | null
-          first_name: string
           id: string
-          last_name: string
           medical_notes: string | null
           mutual_number: string | null
-          phone: string | null
+          name: string
+          numero: string | null
           postal_code: string | null
           prescription: string | null
           remaining_sessions: number | null
@@ -232,16 +228,12 @@ export type Database = {
           address?: string | null
           allergies?: string | null
           blood_type?: string | null
-          city?: string | null
           created_at?: string
-          date_of_birth?: string | null
-          email?: string | null
-          first_name: string
           id?: string
-          last_name: string
           medical_notes?: string | null
           mutual_number?: string | null
-          phone?: string | null
+          name: string
+          numero?: string | null
           postal_code?: string | null
           prescription?: string | null
           remaining_sessions?: number | null
@@ -253,16 +245,12 @@ export type Database = {
           address?: string | null
           allergies?: string | null
           blood_type?: string | null
-          city?: string | null
           created_at?: string
-          date_of_birth?: string | null
-          email?: string | null
-          first_name?: string
           id?: string
-          last_name?: string
           medical_notes?: string | null
           mutual_number?: string | null
-          phone?: string | null
+          name?: string
+          numero?: string | null
           postal_code?: string | null
           prescription?: string | null
           remaining_sessions?: number | null

@@ -15,12 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface Patient {
   id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string | null;
-  email: string | null;
-  phone: string | null;
-  city: string | null;
+  name: string;
+  numero: string | null;
   status: string;
   mutual_number: string | null;
   remaining_sessions: number | null;
@@ -59,12 +55,8 @@ export default function Patients() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("in_treatment");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ 
-    first_name: "", 
-    last_name: "", 
-    email: "", 
-    phone: "", 
-    date_of_birth: "", 
-    city: "",
+    name: "", 
+    numero: "",
     status: "active",
     mutual_number: "",
     remaining_sessions: 0,
@@ -82,7 +74,7 @@ export default function Patients() {
   const fetchPatients = async () => {
     const { data, error } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, date_of_birth, email, phone, city, status, mutual_number, remaining_sessions, prescription")
+      .select("id, name, numero, status, mutual_number, remaining_sessions, prescription")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
     else setPatients(data || []);
@@ -108,13 +100,13 @@ export default function Patients() {
     else { 
       toast({ title: "Patient ajouté" }); 
       setIsDialogOpen(false); 
-      setFormData({ first_name: "", last_name: "", email: "", phone: "", date_of_birth: "", city: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
+      setFormData({ name: "", numero: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
       fetchPatients(); 
     }
   };
 
   const filtered = patients.filter(p => {
-    const matchesSearch = `${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -142,16 +134,8 @@ export default function Patients() {
                 <DialogHeader><DialogTitle>Nouveau patient</DialogTitle></DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Prénom *</Label><Input required value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
-                    <div><Label>Nom *</Label><Input required value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-                    <div><Label>Téléphone</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Date de naissance</Label><Input type="date" value={formData.date_of_birth} onChange={e => setFormData({...formData, date_of_birth: e.target.value})} /></div>
-                    <div><Label>Ville</Label><Input value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} /></div>
+                    <div><Label>Nom *</Label><Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+                    <div><Label>Numéro</Label><Input value={formData.numero} onChange={e => setFormData({...formData, numero: e.target.value})} /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -244,7 +228,7 @@ export default function Patients() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
-                  <TableHead>Prénom</TableHead>
+                  <TableHead>Numéro</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>N° Mutuelle</TableHead>
                   <TableHead>Séances restantes</TableHead>
@@ -254,8 +238,8 @@ export default function Patients() {
               <TableBody>
                 {filtered.map(p => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.last_name}</TableCell>
-                    <TableCell>{p.first_name}</TableCell>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>{p.numero || "-"}</TableCell>
                     <TableCell>
                       <Select value={p.status} onValueChange={(value) => updatePatientStatus(p.id, value)}>
                         <SelectTrigger className={`w-32 h-8 text-xs ${statusColors[p.status] || ""}`}>
