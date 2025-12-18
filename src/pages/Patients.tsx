@@ -236,10 +236,14 @@ export default function Patients() {
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
-                  <TableRow key={p.id}>
+                  <TableRow 
+                    key={p.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/patients/${p.id}`)}
+                  >
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell>{p.numero || "-"}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
                       <Select value={p.status} onValueChange={(value) => updatePatientStatus(p.id, value)}>
                         <SelectTrigger className={`w-32 h-8 text-xs ${statusColors[p.status] || ""}`}>
                           <SelectValue>{statusLabels[p.status] || p.status}</SelectValue>

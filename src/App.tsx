@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Patients from "./pages/Patients";
+import PatientDetail from "./pages/PatientDetail";
 import Exercices from "./pages/Exercices";
 import IADiagnostic from "./pages/IADiagnostic";
 import Notes from "./pages/Notes";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/patients" element={<Patients />} />
+            <Route path="/patients/:id" element={<PatientDetail />} />
             <Route path="/exercices" element={<Exercices />} />
             <Route path="/ia-diagnostic" element={<IADiagnostic />} />
             <Route path="/notes" element={<Notes />} />
