@@ -724,6 +724,7 @@ export type Database = {
           id: string
           is_copy: boolean | null
           is_shared: boolean | null
+          is_validated: boolean | null
           most_used_patho: string | null
           original_id: string | null
           thumbnail_url: string | null
@@ -742,6 +743,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean | null
+          is_validated?: boolean | null
           most_used_patho?: string | null
           original_id?: string | null
           thumbnail_url?: string | null
@@ -760,6 +762,7 @@ export type Database = {
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean | null
+          is_validated?: boolean | null
           most_used_patho?: string | null
           original_id?: string | null
           thumbnail_url?: string | null

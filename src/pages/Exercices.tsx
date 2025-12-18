@@ -278,6 +278,7 @@ export default function Exercices() {
   const filteredExercices = exercices.filter(exercice => {
     if (filter === "mine" && exercice.user_id !== user?.id) return false;
     if (filter === "physiooffice" && exercice.user_id === user?.id) return false;
+    if (filter === "shared" && (exercice.user_id === user?.id || !exercice.is_shared)) return false;
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -529,7 +530,14 @@ export default function Exercices() {
               size="sm"
               onClick={() => setFilter("physiooffice")}
             >
-              PhysioOffice
+              PhysioOfficeExercices
+            </Button>
+            <Button
+              variant={filter === "shared" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter("shared")}
+            >
+              Partagés
             </Button>
           </div>
           <div className="relative flex-1 max-w-md">
