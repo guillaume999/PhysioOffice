@@ -129,7 +129,7 @@ export default function Auth() {
         } else {
           toast({
             title: "Connexion réussie",
-            description: "Bienvenue sur MediCabinet !",
+            description: "Bienvenue sur PhysioOffice !",
           });
         }
       } else {
@@ -170,8 +170,8 @@ export default function Auth() {
 
   const getDescription = () => {
     switch (mode) {
-      case "login": return "Connectez-vous à votre espace MediCabinet";
-      case "signup": return "Rejoignez MediCabinet et gérez votre cabinet";
+      case "login": return "Connectez-vous à votre espace PhysioOffice";
+      case "signup": return "Rejoignez PhysioOffice et gérez votre cabinet";
       case "forgot-password": return "Entrez votre email pour recevoir un lien de réinitialisation";
     }
   };

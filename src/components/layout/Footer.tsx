@@ -8,9 +8,9 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">M</span>
+              <span className="text-sm font-bold text-primary-foreground">P</span>
             </div>
-            <span className="font-display font-semibold text-foreground">MediCabinet</span>
+            <span className="font-display font-semibold text-foreground">PhysioOffice</span>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
@@ -30,7 +30,7 @@ export function Footer() {
         </div>
 
         <div className="mt-6 pt-6 border-t text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} MediCabinet. Tous droits réservés.
+          © {new Date().getFullYear()} PhysioOffice. Tous droits réservés.
         </div>
       </div>
     </footer>
