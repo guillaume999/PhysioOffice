@@ -13,8 +13,13 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
+    setIsMenuOpen(false);
+    try {
+      await signOut();
+      navigate("/");
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
