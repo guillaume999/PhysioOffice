@@ -966,7 +966,7 @@ function ExerciceThumbnail({
         hasVideo ? `Lire la vidéo : ${exercice.title}` : `Aucune vidéo : ${exercice.title}`
       }
     >
-      {src ? (
+      {hasVideo && src ? (
         <img
           src={src}
           alt={`Vignette vidéo - ${exercice.title}`}
@@ -974,9 +974,13 @@ function ExerciceThumbnail({
           loading="lazy"
           onError={() => setThumbError(true)}
         />
-      ) : (
+      ) : hasVideo ? (
         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
           <Play className="w-6 h-6 text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 text-center p-1">
+          <span className="text-[10px] text-muted-foreground leading-tight">Aucune vidéo</span>
         </div>
       )}
 
