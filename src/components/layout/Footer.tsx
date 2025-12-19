@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 import { Heart } from "lucide-react";
-import { forwardRef } from "react";
 
-export const Footer = forwardRef<HTMLElement>(function Footer(_, ref) {
+export function Footer() {
   return (
-    <footer ref={ref} className="border-t bg-card/50">
+    <footer className="border-t bg-card/50">
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -36,6 +35,4 @@ export const Footer = forwardRef<HTMLElement>(function Footer(_, ref) {
       </div>
     </footer>
   );
-});
-
-Footer.displayName = "Footer";
+}

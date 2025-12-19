@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { LogOut, User, Menu, X, Shield } from "lucide-react";
-import { useState, forwardRef } from "react";
+import { useState } from "react";
 
-export const Navbar = forwardRef<HTMLElement>(function Navbar(_, ref) {
+export function Navbar() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export const Navbar = forwardRef<HTMLElement>(function Navbar(_, ref) {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav ref={ref} className="sticky top-0 z-50 glass border-b">
+    <nav className="sticky top-0 z-50 glass border-b">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
@@ -237,6 +237,4 @@ export const Navbar = forwardRef<HTMLElement>(function Navbar(_, ref) {
       </div>
     </nav>
   );
-});
-
-Navbar.displayName = "Navbar";
+}
