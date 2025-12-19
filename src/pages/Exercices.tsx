@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -632,19 +633,23 @@ export default function Exercices() {
             </div>
           </div>
 
-          {/* Exercices Grid */}
+          {/* Exercices Table */}
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="glass animate-pulse">
-                  <div className="aspect-video bg-muted" />
-                  <CardContent className="p-4 space-y-2">
-                    <div className="h-4 bg-muted rounded w-3/4" />
-                    <div className="h-3 bg-muted rounded w-1/2" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Card className="glass">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center gap-4 animate-pulse">
+                      <div className="w-24 h-16 bg-muted rounded" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted rounded w-1/3" />
+                        <div className="h-3 bg-muted rounded w-1/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           ) : filteredExercices.length === 0 ? (
             <Card className="glass">
               <CardContent className="py-12">
@@ -654,166 +659,182 @@ export default function Exercices() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredExercices.map((exercice) => (
-                <Card key={exercice.id} className="glass overflow-hidden group">
-                  {/* Thumbnail */}
-                  <div 
-                    className="aspect-video bg-muted relative cursor-pointer"
-                    onClick={() => exercice.video_url && openVideoDialog(exercice)}
-                  >
-                    {exercice.thumbnail_url ? (
-                      <img
-                        src={exercice.thumbnail_url}
-                        alt={exercice.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                        <Play className="w-12 h-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    {exercice.video_url && (
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Play className="w-12 h-12 text-white" />
-                      </div>
-                    )}
-                  </div>
-
-                  <CardContent className="p-4 space-y-3">
-                    {/* Title and Status */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold line-clamp-2">{exercice.title}</h3>
-                      {getStatusBadge(exercice)}
-                    </div>
-
-                    {/* Author */}
-                    {exercice.author_name && (
-                      <p className="text-sm text-muted-foreground">
-                        Par {exercice.author_name}
-                      </p>
-                    )}
-
-                    {/* Tags */}
-                    {exercice.pathologie_tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {exercice.pathologie_tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Description */}
-                    {exercice.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {exercice.description}
-                      </p>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {/* Edit - only for owner and draft status */}
-                      {canEdit(exercice) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(exercice)}
+            <Card className="glass overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-28">Vidéo</TableHead>
+                    <TableHead>Titre</TableHead>
+                    <TableHead>Tags pathologie</TableHead>
+                    <TableHead>Auteur</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExercices.map((exercice) => (
+                    <TableRow key={exercice.id}>
+                      {/* Thumbnail */}
+                      <TableCell>
+                        <div 
+                          className="w-24 h-16 bg-muted rounded overflow-hidden relative cursor-pointer group"
+                          onClick={() => exercice.video_url && openVideoDialog(exercice)}
                         >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Modifier
-                        </Button>
-                      )}
-
-                      {/* Share toggle - only for owner and not shared */}
-                      {exercice.user_id === user?.id && exercice.status !== "shared" && !exercice.is_copy && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleShare(exercice)}
-                        >
-                          {exercice.status === "pending" ? (
-                            <>
-                              <X className="w-4 h-4 mr-1" />
-                              Annuler
-                            </>
+                          {exercice.thumbnail_url ? (
+                            <img
+                              src={exercice.thumbnail_url}
+                              alt={exercice.title}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                              <Play className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          {exercice.video_url && (
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Play className="w-6 h-6 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Title & Description */}
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{exercice.title}</p>
+                          {exercice.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1">
+                              {exercice.description}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Tags */}
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {exercice.pathologie_tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+
+                      {/* Author */}
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {exercice.author_name || "-"}
+                        </span>
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell>
+                        {getStatusBadge(exercice)}
+                      </TableCell>
+
+                      {/* Actions */}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {/* Edit */}
+                          {canEdit(exercice) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(exercice)}
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+
+                          {/* Share toggle */}
+                          {exercice.user_id === user?.id && exercice.status !== "shared" && !exercice.is_copy && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleShare(exercice)}
+                              title={exercice.status === "pending" ? "Annuler le partage" : "Partager"}
+                            >
+                              {exercice.status === "pending" ? (
+                                <X className="w-4 h-4" />
+                              ) : (
+                                <Users className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+
+                          {/* Copy */}
+                          {exercice.user_id !== user?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => copyExercice(exercice)}
+                              title="Dupliquer"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          )}
+
+                          {/* Admin actions */}
+                          {isAdmin && (
                             <>
-                              <Users className="w-4 h-4 mr-1" />
-                              Partager
+                              {exercice.status === "pending" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-green-500"
+                                  onClick={() => validateExercice(exercice)}
+                                  title="Valider"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {!featuredExerciceIds.includes(exercice.id) && exercice.status === "shared" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-purple-500"
+                                  onClick={() => addToPlatform(exercice)}
+                                  title="Ajouter à la plateforme"
+                                >
+                                  <Shield className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {featuredExerciceIds.includes(exercice.id) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500"
+                                  onClick={() => removeFromPlatform(exercice.id)}
+                                  title="Retirer de la plateforme"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              )}
                             </>
                           )}
-                        </Button>
-                      )}
 
-                      {/* Copy - for shared or platform exercices not owned by user */}
-                      {exercice.user_id !== user?.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyExercice(exercice)}
-                        >
-                          <Copy className="w-4 h-4 mr-1" />
-                          Dupliquer
-                        </Button>
-                      )}
-
-                      {/* Admin actions */}
-                      {isAdmin && (
-                        <>
-                          {exercice.status === "pending" && (
+                          {/* Delete */}
+                          {canDelete(exercice) && (
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-green-500 border-green-500/30"
-                              onClick={() => validateExercice(exercice)}
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => deleteExercice(exercice.id)}
+                              title="Supprimer"
                             >
-                              <Check className="w-4 h-4 mr-1" />
-                              Valider
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
-                          {!featuredExerciceIds.includes(exercice.id) && exercice.status === "shared" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-purple-500 border-purple-500/30"
-                              onClick={() => addToPlatform(exercice)}
-                            >
-                              <Shield className="w-4 h-4 mr-1" />
-                              Plateforme
-                            </Button>
-                          )}
-                          {featuredExerciceIds.includes(exercice.id) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-500 border-red-500/30"
-                              onClick={() => removeFromPlatform(exercice.id)}
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              Retirer
-                            </Button>
-                          )}
-                        </>
-                      )}
-
-                      {/* Delete */}
-                      {canDelete(exercice) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive border-destructive/30"
-                          onClick={() => deleteExercice(exercice.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
           )}
         </div>
       </div>
