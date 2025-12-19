@@ -294,7 +294,7 @@ export function ExerciceDetailDialog({
             <Button
               variant={isFeatured ? "outline" : "secondary"}
               onClick={handleToggleFeatured}
-              disabled={loading || exercice.status !== "shared"}
+              disabled={loading}
               className="gap-1"
             >
               {isFeatured ? (
