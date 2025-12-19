@@ -32,14 +32,7 @@ interface TraitementType {
 interface TraitementTest {
   id: string;
   description: string;
-  video_id: string | null;
   ordre: number;
-  video?: {
-    id: string;
-    title: string;
-    thumbnail_url: string | null;
-    video_url: string;
-  };
 }
 
 interface TraitementSeance {
@@ -165,7 +158,7 @@ export default function TraitementType() {
         (traitementsData || []).map(async (traitement) => {
           const { data: testsData } = await supabase
             .from("traitement_tests")
-            .select("*, exercices(id, title, thumbnail_url, video_url)")
+            .select("*")
             .eq("traitement_type_id", traitement.id)
             .order("ordre");
 
@@ -177,10 +170,7 @@ export default function TraitementType() {
 
           return {
             ...traitement,
-            tests: testsData?.map((t) => ({
-              ...t,
-              video: t.exercices
-            })) || [],
+            tests: testsData || [],
             seances: seancesData?.map((s) => ({
               ...s,
               seance: s.seance_types
@@ -193,11 +183,6 @@ export default function TraitementType() {
 
       const { data: pathoData } = await supabase.from("pathologies").select("name");
       setPathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
-
-      const { data: videosData } = await supabase
-        .from("exercices")
-        .select("id, title, thumbnail_url, video_url");
-      setVideos(videosData || []);
 
       const { data: seancesData } = await supabase
         .from("seance_types")

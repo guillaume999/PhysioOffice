@@ -94,6 +94,94 @@ export type Database = {
         }
         Relationships: []
       }
+      exercices: {
+        Row: {
+          author_name: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_copy: boolean | null
+          is_platform: boolean | null
+          original_id: string | null
+          pathologie_tags: string[] | null
+          status: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_copy?: boolean | null
+          is_platform?: boolean | null
+          original_id?: string | null
+          pathologie_tags?: string[] | null
+          status?: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_copy?: boolean | null
+          is_platform?: boolean | null
+          original_id?: string | null
+          pathologie_tags?: string[] | null
+          status?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercices_original_id_fkey"
+            columns: ["original_id"]
+            isOneToOne: false
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      featured_exercices: {
+        Row: {
+          added_by: string
+          created_at: string
+          exercice_id: string
+          id: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          exercice_id: string
+          id?: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          exercice_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_exercices_exercice_id_fkey"
+            columns: ["exercice_id"]
+            isOneToOne: true
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       featured_seances: {
         Row: {
           added_by: string
