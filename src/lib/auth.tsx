@@ -71,9 +71,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  const hardClearLocalAuth = () => {
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      if (!url) return;
+      const ref = new URL(url).hostname.split(".")[0];
+      const prefixes = [
+        `sb-${ref}-auth-token`,
+        `sb-${ref}-auth-token-code-verifier`,
+      ];
+
+      for (const key of Object.keys(localStorage)) {
+        if (prefixes.some((p) => key.startsWith(p))) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const signOut = async () => {
-    // Use scope: 'local' to always clear local session even if server session is invalid
-    await supabase.auth.signOut({ scope: 'local' });
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      // When backend session is already gone, logout returns 403 session_not_found.
+      // We still want to clear local session reliably.
+      if (error) {
+        hardClearLocalAuth();
+      }
+    } catch {
+      hardClearLocalAuth();
+    } finally {
+      setSession(null);
+      setUser(null);
+    }
   };
 
   return (
