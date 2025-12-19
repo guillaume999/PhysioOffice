@@ -22,6 +22,7 @@ import {
   Shield,
   CheckCircle,
   ClipboardList,
+  Dumbbell,
 } from "lucide-react";
 
 interface UserProfile {
@@ -63,6 +64,18 @@ interface TraitementType {
   created_at: string;
 }
 
+interface ExerciceType {
+  id: string;
+  title: string;
+  description: string | null;
+  author_name: string | null;
+  status: string;
+  is_copy: boolean | null;
+  original_id: string | null;
+  user_id: string;
+  created_at: string;
+}
+
 interface Stats {
   totalUsers: number;
   premiumUsers: number;
@@ -70,6 +83,8 @@ interface Stats {
   totalSeances: number;
   totalTraitements: number;
   pendingTraitements: number;
+  totalExercices: number;
+  pendingExercices: number;
   totalPatients: number;
 }
 
@@ -83,6 +98,7 @@ export default function Admin() {
   const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
+  const [exercices, setExercices] = useState<ExerciceType[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     premiumUsers: 0,
@@ -90,11 +106,14 @@ export default function Admin() {
     totalSeances: 0,
     totalTraitements: 0,
     pendingTraitements: 0,
+    totalExercices: 0,
+    pendingExercices: 0,
     totalPatients: 0,
   });
   const [userSearch, setUserSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
   const [traitementSearch, setTraitementSearch] = useState("");
+  const [exerciceSearch, setExerciceSearch] = useState("");
   const [loading, setLoading] = useState(true);
   
   // Admin role confirmation dialog state
@@ -166,6 +185,15 @@ export default function Admin() {
       if (traitementsError) throw traitementsError;
       setTraitements(traitementsData || []);
 
+      // Fetch exercices
+      const { data: exercicesData, error: exercicesError } = await supabase
+        .from("exercices")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (exercicesError) throw exercicesError;
+      setExercices(exercicesData || []);
+
       // Calculate stats
       const now = new Date();
       const premiumCount = usersData?.filter(u => u.is_premium).length || 0;
@@ -173,6 +201,7 @@ export default function Admin() {
         !u.is_premium && u.trial_end_date && new Date(u.trial_end_date) > now
       ).length || 0;
       const pendingTraitementsCount = traitementsData?.filter(t => t.is_shared && !t.is_validated).length || 0;
+      const pendingExercicesCount = exercicesData?.filter(e => e.status === 'pending').length || 0;
 
       // Fetch patients count
       const { count: patientsCount } = await supabase
@@ -186,6 +215,8 @@ export default function Admin() {
         totalSeances: seancesData?.length || 0,
         totalTraitements: traitementsData?.length || 0,
         pendingTraitements: pendingTraitementsCount,
+        totalExercices: exercicesData?.length || 0,
+        pendingExercices: pendingExercicesCount,
         totalPatients: patientsCount || 0,
       });
     } catch (error) {
@@ -410,6 +441,57 @@ export default function Admin() {
     }
   };
 
+  const toggleExerciceValidation = async (exerciceId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'shared' ? 'pending' : 'shared';
+    try {
+      const { error } = await supabase
+        .from("exercices")
+        .update({ status: newStatus })
+        .eq("id", exerciceId);
+
+      if (error) throw error;
+
+      setExercices(exercices.map(e => 
+        e.id === exerciceId ? { ...e, status: newStatus } : e
+      ));
+
+      toast({
+        title: "Succès",
+        description: `Exercice ${newStatus === 'shared' ? "validé" : "invalidé"}.`,
+      });
+    } catch (error) {
+      console.error("Error validating exercice:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider l'exercice.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteExercice = async (exerciceId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet exercice ?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("exercices")
+        .delete()
+        .eq("id", exerciceId);
+
+      if (error) throw error;
+
+      setExercices(exercices.filter(e => e.id !== exerciceId));
+      toast({ title: "Exercice supprimé" });
+    } catch (error) {
+      console.error("Error deleting exercice:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'exercice.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("fr-FR", {
       day: "2-digit",
@@ -473,6 +555,24 @@ export default function Admin() {
 
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
 
+  // Calculate copy counts for each original exercice
+  const exerciceCopyCounts = exercices.reduce((acc, e) => {
+    if (e.is_copy && e.original_id) {
+      acc[e.original_id] = (acc[e.original_id] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Filter out copies from exercices (only show originals)
+  const filteredExercices = exercices
+    .filter(e => !e.is_copy)
+    .filter(e =>
+      e.title.toLowerCase().includes(exerciceSearch.toLowerCase()) ||
+      e.author_name?.toLowerCase().includes(exerciceSearch.toLowerCase())
+    );
+
+  const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
+
   if (authLoading || adminLoading || loading) {
     return (
       <Layout>
@@ -532,6 +632,20 @@ export default function Admin() {
               <p className="text-xs text-muted-foreground">TTT en attente</p>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Dumbbell className="w-6 h-6 mx-auto text-primary mb-2" />
+              <p className="text-2xl font-bold">{stats.totalExercices}</p>
+              <p className="text-xs text-muted-foreground">Exercices</p>
+            </CardContent>
+          </Card>
+          <Card className={stats.pendingExercices > 0 ? "border-orange-500" : ""}>
+            <CardContent className="p-4 text-center">
+              <Dumbbell className="w-6 h-6 mx-auto text-orange-500 mb-2" />
+              <p className="text-2xl font-bold">{stats.pendingExercices}</p>
+              <p className="text-xs text-muted-foreground">Exo en attente</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
@@ -549,6 +663,13 @@ export default function Admin() {
               Traitements
               {pendingTraitements.length > 0 && (
                 <Badge variant="destructive" className="ml-1">{pendingTraitements.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="exercices" className="flex items-center gap-2">
+              <Dumbbell className="w-4 h-4" />
+              Exercices
+              {pendingExercices.length > 0 && (
+                <Badge variant="destructive" className="ml-1">{pendingExercices.length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -834,6 +955,130 @@ export default function Admin() {
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {getUserDisplayName(t.user_id)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="exercices">
+            <Card>
+              <CardHeader>
+                <CardTitle>Modération des exercices</CardTitle>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher par titre ou auteur..."
+                    value={exerciceSearch}
+                    onChange={(e) => setExerciceSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {pendingExercices.length > 0 && (
+                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      En attente de validation ({pendingExercices.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingExercices.map((e) => (
+                        <div key={e.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium">{e.title}</p>
+                              <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"}</p>
+                            </div>
+                            {exerciceCopyCounts[e.id] > 0 && (
+                              <Badge variant="secondary" className="text-xs">{exerciceCopyCounts[e.id]} copies</Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => toggleExerciceValidation(e.id, e.status)}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Valider
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteExercice(e.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2">Titre</th>
+                        <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">Créé le</th>
+                        <th className="text-left py-3 px-2">Copies</th>
+                        <th className="text-left py-3 px-2">Statut</th>
+                        <th className="text-left py-3 px-2">Validé</th>
+                        <th className="text-left py-3 px-2">Actions</th>
+                        <th className="text-left py-3 px-2">Utilisateur</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExercices.map((e) => (
+                        <tr key={e.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2">{e.title}</td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {e.author_name || "Anonyme"}
+                          </td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {formatDateTime(e.created_at)}
+                          </td>
+                          <td className="py-3 px-2">
+                            {exerciceCopyCounts[e.id] ? (
+                              <Badge variant="secondary">{exerciceCopyCounts[e.id]}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
+                            {e.status === 'shared' ? (
+                              <Badge className="bg-green-500">Partagé</Badge>
+                            ) : e.status === 'pending' ? (
+                              <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                            ) : (
+                              <Badge variant="outline">Brouillon</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
+                            <Switch
+                              checked={e.status === 'shared'}
+                              onCheckedChange={() => toggleExerciceValidation(e.id, e.status)}
+                              disabled={e.status === 'draft'}
+                            />
+                          </td>
+                          <td className="py-3 px-2">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteExercice(e.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                          <td className="py-3 px-2 text-sm text-muted-foreground">
+                            {getUserDisplayName(e.user_id)}
                           </td>
                         </tr>
                       ))}
