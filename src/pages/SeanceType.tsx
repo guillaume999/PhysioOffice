@@ -35,34 +35,11 @@ interface SeanceType {
 
 interface SeanceExercice {
   id: string;
-  video_id: string | null;
   ordre: number;
+  name: string | null;
   description: string | null;
-  video?: {
-    id: string;
-    title: string;
-    thumbnail_url: string | null;
-  };
-}
-
-interface VideoOption {
-  id: string;
-  title: string;
-  thumbnail_url: string | null;
-  description?: string | null;
-  video_url?: string;
-  duration?: number | null;
-  category?: string | null;
-}
-
-interface VideoDetail {
-  id: string;
-  title: string;
-  thumbnail_url: string | null;
-  description: string | null;
-  video_url: string;
-  duration: number | null;
-  category: string | null;
+  repetitions: number | null;
+  duration_seconds: number | null;
 }
 
 type FilterType = "all" | "mine" | "shared";
@@ -76,12 +53,9 @@ export default function SeanceType() {
   const [featuredSeanceIds, setFeaturedSeanceIds] = useState<string[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
   const [objectifs, setObjectifs] = useState<{ principal: string[]; secondaire: string[] }>({ principal: [], secondaire: [] });
-  const [videos, setVideos] = useState<VideoOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
-  const [videoDetailDialogOpen, setVideoDetailDialogOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<VideoDetail | null>(null);
   const [selectedSeance, setSelectedSeance] = useState<SeanceType | null>(null);
   const [comments, setComments] = useState<{ id: string; content: string; created_at: string }[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -97,7 +71,7 @@ export default function SeanceType() {
     newObjectifPrincipal: "",
     objectif_secondaire: "",
     newObjectifSecondaire: "",
-    exercices: [] as { video_id: string; description: string }[]
+    exercices: [] as { name: string; description: string; repetitions: string; duration: string }[]
   });
 
   useEffect(() => {
@@ -186,7 +160,7 @@ export default function SeanceType() {
         (seancesData || []).map(async (seance) => {
           const { data: exercicesData } = await supabase
             .from("seance_exercices")
-            .select("*, exercices(id, title, thumbnail_url)")
+            .select("*")
             .eq("seance_type_id", seance.id)
             .order("ordre");
 
@@ -209,10 +183,7 @@ export default function SeanceType() {
 
           return {
             ...seance,
-            exercices: exercicesData?.map((ex) => ({
-              ...ex,
-              video: ex.exercices
-            })) || [],
+            exercices: exercicesData || [],
             likes_count: likesCount || 0,
             comments_count: commentsCount || 0,
             user_liked: !!userLike
@@ -237,11 +208,6 @@ export default function SeanceType() {
         secondaire: [...new Set(objData?.filter((o) => o.type === "secondaire").map((o) => o.name) || [])]
       });
 
-      // Fetch exercices
-      const { data: videosData } = await supabase
-        .from("exercices")
-        .select("id, title, thumbnail_url");
-      setVideos(videosData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -297,8 +263,10 @@ export default function SeanceType() {
         const ex = formData.exercices[i];
         await supabase.from("seance_exercices").insert({
           seance_type_id: seanceData.id,
-          video_id: ex.video_id || null,
+          name: ex.name || null,
           description: ex.description || null,
+          repetitions: ex.repetitions ? parseInt(ex.repetitions) : null,
+          duration_seconds: ex.duration ? parseInt(ex.duration) : null,
           ordre: i
         });
       }
@@ -408,25 +376,6 @@ export default function SeanceType() {
     }
   };
 
-  const openVideoDetail = async (videoId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("exercices")
-        .select("id, title, thumbnail_url, description, video_url, duration, category")
-        .eq("id", videoId)
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setSelectedVideo(data);
-        setVideoDetailDialogOpen(true);
-      }
-    } catch (error) {
-      console.error("Error fetching video details:", error);
-      toast.error("Erreur lors du chargement de la vidéo");
-    }
-  };
-
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return null;
     const mins = Math.floor(seconds / 60);
@@ -461,8 +410,10 @@ export default function SeanceType() {
         for (const ex of seance.exercices) {
           await supabase.from("seance_exercices").insert({
             seance_type_id: newSeance.id,
-            video_id: ex.video_id,
+            name: ex.name,
             description: ex.description,
+            repetitions: ex.repetitions,
+            duration_seconds: ex.duration_seconds,
             ordre: ex.ordre,
           });
         }
@@ -478,7 +429,7 @@ export default function SeanceType() {
   const addExercice = () => {
     setFormData({
       ...formData,
-      exercices: [...formData.exercices, { video_id: "", description: "" }]
+      exercices: [...formData.exercices, { name: "", description: "", repetitions: "", duration: "" }]
     });
   };
 
@@ -622,21 +573,30 @@ export default function SeanceType() {
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
-                      <Select value={ex.video_id} onValueChange={(v) => updateExercice(index, "video_id", v)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner une vidéo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {videos.map((v) => (
-                            <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        placeholder="Nom de l'exercice"
+                        value={ex.name}
+                        onChange={(e) => updateExercice(index, "name", e.target.value)}
+                      />
                       <Textarea
                         placeholder="Description / commentaires"
                         value={ex.description}
                         onChange={(e) => updateExercice(index, "description", e.target.value)}
                       />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Répétitions"
+                          type="number"
+                          value={ex.repetitions}
+                          onChange={(e) => updateExercice(index, "repetitions", e.target.value)}
+                        />
+                        <Input
+                          placeholder="Durée (sec)"
+                          type="number"
+                          value={ex.duration}
+                          onChange={(e) => updateExercice(index, "duration", e.target.value)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -742,26 +702,18 @@ export default function SeanceType() {
                         <TableCell>
                           <div className="space-y-2 max-w-xs">
                             {seance.exercices?.map((ex, i) => (
-                              <div
-                                key={ex.id}
-                                className={`flex items-start gap-2 text-sm ${ex.video_id ? "cursor-pointer hover:bg-muted/50 rounded p-1 -m-1 transition-colors" : ""}`}
-                                onClick={() => ex.video_id && openVideoDetail(ex.video_id)}
-                              >
-                                {ex.video?.thumbnail_url ? (
-                                  <img
-                                    src={ex.video.thumbnail_url}
-                                    alt={ex.video.title}
-                                    className="w-12 h-8 object-cover rounded flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-12 h-8 bg-muted rounded flex items-center justify-center flex-shrink-0">
-                                    <Video className="w-4 h-4 text-muted-foreground" />
-                                  </div>
-                                )}
+                              <div key={ex.id} className="flex items-start gap-2 text-sm">
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate hover:text-primary">{ex.video?.title || `Exercice ${i + 1}`}</p>
+                                  <p className="font-medium truncate">{ex.name || `Exercice ${i + 1}`}</p>
                                   {ex.description && (
                                     <p className="text-muted-foreground text-xs truncate">{ex.description}</p>
+                                  )}
+                                  {(ex.repetitions || ex.duration_seconds) && (
+                                    <p className="text-muted-foreground text-xs">
+                                      {ex.repetitions && `${ex.repetitions} reps`}
+                                      {ex.repetitions && ex.duration_seconds && " - "}
+                                      {ex.duration_seconds && `${ex.duration_seconds}s`}
+                                    </p>
                                   )}
                                 </div>
                               </div>
@@ -895,65 +847,6 @@ export default function SeanceType() {
           </DialogContent>
         </Dialog>
 
-        {/* Video Detail Dialog */}
-        <Dialog open={videoDetailDialogOpen} onOpenChange={setVideoDetailDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Video className="w-5 h-5" />
-                {selectedVideo?.title}
-              </DialogTitle>
-            </DialogHeader>
-            {selectedVideo && (
-              <div className="space-y-4">
-                {/* Video Player or Thumbnail */}
-                <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                  {selectedVideo.video_url ? (
-                    <video
-                      src={selectedVideo.video_url}
-                      controls
-                      className="w-full h-full object-contain"
-                      poster={selectedVideo.thumbnail_url || undefined}
-                    >
-                      Votre navigateur ne supporte pas la lecture de vidéos.
-                    </video>
-                  ) : selectedVideo.thumbnail_url ? (
-                    <img
-                      src={selectedVideo.thumbnail_url}
-                      alt={selectedVideo.title}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Video className="w-16 h-16 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Video Info */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    {selectedVideo.category && (
-                      <Badge variant="outline">{selectedVideo.category}</Badge>
-                    )}
-                    {selectedVideo.duration && (
-                      <span>Durée: {formatDuration(selectedVideo.duration)}</span>
-                    )}
-                  </div>
-
-                  {selectedVideo.description && (
-                    <div>
-                      <h4 className="font-medium mb-1">Description</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {selectedVideo.description}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );
