@@ -528,6 +528,23 @@ export default function Exercices() {
       case "pending":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
       default:
+        // Show share button for drafts owned by user
+        if (exercice.user_id === user?.id && !exercice.is_copy && userCanShare) {
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleShare(exercice);
+              }}
+              className="h-7 text-xs"
+            >
+              <Users className="w-3 h-3 mr-1" />
+              Partager
+            </Button>
+          );
+        }
         return <Badge variant="outline">Brouillon</Badge>;
     }
   };
