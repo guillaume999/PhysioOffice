@@ -119,11 +119,15 @@ export default function Exercices() {
       // Fetch user profile
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("pseudo, can_share")
+        .select("pseudo, can_share, first_name, last_name")
         .eq("user_id", user!.id)
         .maybeSingle();
       
-      setUserPseudo(profileData?.pseudo || null);
+      // Use pseudo if available, otherwise use first_name + last_name
+      const authorName = profileData?.pseudo || 
+        [profileData?.first_name, profileData?.last_name].filter(Boolean).join(" ") || 
+        null;
+      setUserPseudo(authorName);
       setUserCanShare(profileData?.can_share !== false);
 
       // Fetch featured exercices
