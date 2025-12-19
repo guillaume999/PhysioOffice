@@ -94,6 +94,44 @@ export type Database = {
         }
         Relationships: []
       }
+      exercice_consultations: {
+        Row: {
+          consulted_at: string
+          created_at: string
+          exercice_id: string
+          id: string
+          is_consulted: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consulted_at?: string
+          created_at?: string
+          exercice_id: string
+          id?: string
+          is_consulted?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consulted_at?: string
+          created_at?: string
+          exercice_id?: string
+          id?: string
+          is_consulted?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercice_consultations_exercice_id_fkey"
+            columns: ["exercice_id"]
+            isOneToOne: false
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercices: {
         Row: {
           author_name: string | null

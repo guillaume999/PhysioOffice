@@ -209,6 +209,14 @@ export default function Admin() {
       
       setFeaturedExerciceIds(new Set(featuredData?.map(f => f.exercice_id) || []));
 
+      // Fetch consulted exercices for current admin
+      const { data: consultedData } = await supabase
+        .from("exercice_consultations")
+        .select("exercice_id")
+        .eq("is_consulted", true);
+      
+      setConsultedExerciceIds(new Set(consultedData?.map(c => c.exercice_id) || []));
+
       // Calculate stats
       const now = new Date();
       const premiumCount = usersData?.filter(u => u.is_premium).length || 0;
@@ -502,6 +510,50 @@ export default function Admin() {
       toast({
         title: "Erreur",
         description: "Impossible de supprimer l'exercice.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleConsulted = async (exerciceId: string, isCurrentlyConsulted: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (isCurrentlyConsulted) {
+        // Remove consultation record
+        await supabase
+          .from("exercice_consultations")
+          .delete()
+          .eq("exercice_id", exerciceId)
+          .eq("user_id", user.id);
+        
+        setConsultedExerciceIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(exerciceId);
+          return newSet;
+        });
+      } else {
+        // Upsert consultation record
+        await supabase
+          .from("exercice_consultations")
+          .upsert({
+            exercice_id: exerciceId,
+            user_id: user.id,
+            is_consulted: true,
+            consulted_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,exercice_id' });
+        
+        setConsultedExerciceIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(exerciceId);
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling consulted status:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le statut consulté.",
         variant: "destructive",
       });
     }
@@ -1093,17 +1145,7 @@ export default function Admin() {
                             <Button
                               variant={consultedExerciceIds.has(e.id) ? "default" : "outline"}
                               size="sm"
-                              onClick={() => {
-                                setConsultedExerciceIds(prev => {
-                                  const newSet = new Set(prev);
-                                  if (newSet.has(e.id)) {
-                                    newSet.delete(e.id);
-                                  } else {
-                                    newSet.add(e.id);
-                                  }
-                                  return newSet;
-                                });
-                              }}
+                              onClick={() => toggleConsulted(e.id, consultedExerciceIds.has(e.id))}
                               className="gap-1"
                             >
                               <CheckCircle className="w-4 h-4" />
@@ -1139,15 +1181,7 @@ export default function Admin() {
           isConsulted={selectedExercice ? consultedExerciceIds.has(selectedExercice.id) : false}
           onConsultedChange={(consulted) => {
             if (!selectedExercice) return;
-            setConsultedExerciceIds(prev => {
-              const newSet = new Set(prev);
-              if (consulted) {
-                newSet.add(selectedExercice.id);
-              } else {
-                newSet.delete(selectedExercice.id);
-              }
-              return newSet;
-            });
+            toggleConsulted(selectedExercice.id, !consulted);
           }}
         />
       </div>
