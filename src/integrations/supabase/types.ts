@@ -94,115 +94,6 @@ export type Database = {
         }
         Relationships: []
       }
-      exercices: {
-        Row: {
-          category: string | null
-          category_pathology: string | null
-          category_pathology_tags: string[] | null
-          created_at: string
-          deleted_at: string | null
-          deleted_by_owner: boolean | null
-          description: string | null
-          duration: number | null
-          id: string
-          is_copy: boolean | null
-          is_shared: boolean | null
-          is_validated: boolean | null
-          most_used_patho: string | null
-          original_id: string | null
-          rejected_at: string | null
-          rejection_reason: string | null
-          thumbnail_url: string | null
-          title: string
-          type_renfo: string | null
-          user_id: string
-          video_url: string
-        }
-        Insert: {
-          category?: string | null
-          category_pathology?: string | null
-          category_pathology_tags?: string[] | null
-          created_at?: string
-          deleted_at?: string | null
-          deleted_by_owner?: boolean | null
-          description?: string | null
-          duration?: number | null
-          id?: string
-          is_copy?: boolean | null
-          is_shared?: boolean | null
-          is_validated?: boolean | null
-          most_used_patho?: string | null
-          original_id?: string | null
-          rejected_at?: string | null
-          rejection_reason?: string | null
-          thumbnail_url?: string | null
-          title: string
-          type_renfo?: string | null
-          user_id: string
-          video_url: string
-        }
-        Update: {
-          category?: string | null
-          category_pathology?: string | null
-          category_pathology_tags?: string[] | null
-          created_at?: string
-          deleted_at?: string | null
-          deleted_by_owner?: boolean | null
-          description?: string | null
-          duration?: number | null
-          id?: string
-          is_copy?: boolean | null
-          is_shared?: boolean | null
-          is_validated?: boolean | null
-          most_used_patho?: string | null
-          original_id?: string | null
-          rejected_at?: string | null
-          rejection_reason?: string | null
-          thumbnail_url?: string | null
-          title?: string
-          type_renfo?: string | null
-          user_id?: string
-          video_url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "exercices_original_id_fkey"
-            columns: ["original_id"]
-            isOneToOne: false
-            referencedRelation: "exercices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      featured_exercices: {
-        Row: {
-          added_by: string
-          created_at: string
-          exercice_id: string
-          id: string
-        }
-        Insert: {
-          added_by: string
-          created_at?: string
-          exercice_id: string
-          id?: string
-        }
-        Update: {
-          added_by?: string
-          created_at?: string
-          exercice_id?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "featured_exercices_exercice_id_fkey"
-            columns: ["exercice_id"]
-            isOneToOne: true
-            referencedRelation: "exercices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       featured_seances: {
         Row: {
           added_by: string
@@ -590,13 +481,6 @@ export type Database = {
             referencedRelation: "seance_types"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "seance_exercices_video_id_fkey"
-            columns: ["video_id"]
-            isOneToOne: false
-            referencedRelation: "exercices"
-            referencedColumns: ["id"]
-          },
         ]
       }
       seance_likes: {
@@ -753,13 +637,6 @@ export type Database = {
             referencedRelation: "traitement_types"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "traitement_tests_video_id_fkey"
-            columns: ["video_id"]
-            isOneToOne: false
-            referencedRelation: "exercices"
-            referencedColumns: ["id"]
-          },
         ]
       }
       traitement_types: {
@@ -835,11 +712,6 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_exercice_featured: { Args: { _exercice_id: string }; Returns: boolean }
-      user_has_exercice_copy: {
-        Args: { _exercice_id: string; _user_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
       app_role: "admin" | "user"
