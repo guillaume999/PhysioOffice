@@ -159,7 +159,7 @@ export default function Index() {
                 Prêt à transformer votre pratique ?
               </h2>
               <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
-                Rejoignez les professionnels de santé qui utilisent déjà MediCabinet pour optimiser leur quotidien.
+                Rejoignez les professionnels de santé qui utilisent déjà PhysioOffice pour optimiser leur quotidien.
               </p>
               {!user && (
                 <Link

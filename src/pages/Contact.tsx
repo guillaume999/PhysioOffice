@@ -44,7 +44,7 @@ export default function Contact() {
             </CardContent>
           </Card>
           <div className="space-y-6">
-            <Card><CardContent className="flex items-center gap-4 pt-6"><Mail className="w-8 h-8 text-primary" /><div><p className="font-medium">Email</p><p className="text-muted-foreground">contact@medicabinet.fr</p></div></CardContent></Card>
+            <Card><CardContent className="flex items-center gap-4 pt-6"><Mail className="w-8 h-8 text-primary" /><div><p className="font-medium">Email</p><p className="text-muted-foreground">contact@physiooffice.fr</p></div></CardContent></Card>
             <Card><CardContent className="flex items-center gap-4 pt-6"><Phone className="w-8 h-8 text-primary" /><div><p className="font-medium">Téléphone</p><p className="text-muted-foreground">01 23 45 67 89</p></div></CardContent></Card>
             <Card><CardContent className="flex items-center gap-4 pt-6"><MapPin className="w-8 h-8 text-primary" /><div><p className="font-medium">Adresse</p><p className="text-muted-foreground">123 Rue de la Santé, 75000 Paris</p></div></CardContent></Card>
           </div>
