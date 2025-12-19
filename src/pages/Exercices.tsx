@@ -814,23 +814,33 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
       </div>
 
       <div className="space-y-2">
-        <Label>Pathologies</Label>
-        <div className="flex flex-wrap gap-2 mb-2">
+        <Label>Tags pathologie</Label>
+        <p className="text-xs text-muted-foreground">Cliquez pour sélectionner plusieurs tags</p>
+        <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/30 min-h-[60px]">
           {pathologies.map((pathologie) => (
             <Badge
               key={pathologie}
               variant={formData.pathologie_tags.includes(pathologie) ? "default" : "outline"}
-              className="cursor-pointer"
+              className="cursor-pointer transition-all hover:scale-105"
               onClick={() => toggleTag(pathologie)}
             >
+              {formData.pathologie_tags.includes(pathologie) && <Check className="w-3 h-3 mr-1" />}
               {pathologie}
             </Badge>
           ))}
+          {pathologies.length === 0 && (
+            <span className="text-sm text-muted-foreground">Aucun tag disponible</span>
+          )}
         </div>
+        {formData.pathologie_tags.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {formData.pathologie_tags.length} tag(s) sélectionné(s)
+          </p>
+        )}
         <Input
           value={formData.newPathologie}
           onChange={(e) => setFormData({ ...formData, newPathologie: e.target.value })}
-          placeholder="Nouvelle pathologie..."
+          placeholder="Ajouter un nouveau tag pathologie..."
         />
       </div>
 
