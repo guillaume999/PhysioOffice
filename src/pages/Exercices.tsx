@@ -677,23 +677,40 @@ export default function Exercices() {
                       {/* Thumbnail */}
                       <TableCell>
                         <div 
-                          className="w-24 h-16 bg-muted rounded overflow-hidden relative cursor-pointer group"
+                          className={`w-24 h-16 bg-muted rounded overflow-hidden relative group ${exercice.video_url ? 'cursor-pointer' : ''}`}
                           onClick={() => exercice.video_url && openVideoDialog(exercice)}
                         >
-                          {exercice.thumbnail_url ? (
-                            <img
-                              src={exercice.thumbnail_url}
-                              alt={exercice.title}
-                              className="w-full h-full object-cover"
-                            />
+                          {exercice.video_url ? (
+                            <>
+                              {exercice.thumbnail_url ? (
+                                <img
+                                  src={exercice.thumbnail_url}
+                                  alt={exercice.title}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // If thumbnail fails to load, hide it and show play icon
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <video
+                                  src={exercice.video_url}
+                                  className="w-full h-full object-cover"
+                                  preload="metadata"
+                                  muted
+                                  onLoadedData={(e) => {
+                                    // Seek to first frame to show as thumbnail
+                                    e.currentTarget.currentTime = 0.1;
+                                  }}
+                                />
+                              )}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Play className="w-6 h-6 text-white" />
+                              </div>
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
                               <Play className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                          )}
-                          {exercice.video_url && (
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Play className="w-6 h-6 text-white" />
                             </div>
                           )}
                         </div>
