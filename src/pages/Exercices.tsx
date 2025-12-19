@@ -533,6 +533,23 @@ export default function Exercices() {
       case "shared":
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
       case "pending":
+        // Show cancel button for pending exercises owned by user
+        if (exercice.user_id === user?.id && !exercice.is_copy) {
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleShare(exercice);
+              }}
+              className="h-7 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+            >
+              <X className="w-3 h-3 mr-1" />
+              En attente
+            </Button>
+          );
+        }
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
       default:
         // Show share button for drafts owned by user
