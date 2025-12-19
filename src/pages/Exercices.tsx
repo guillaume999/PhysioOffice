@@ -773,18 +773,6 @@ export default function Exercices() {
                             </Button>
                           )}
 
-                          {/* Cancel share for pending */}
-                          {exercice.user_id === user?.id && exercice.status === "pending" && !exercice.is_copy && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleShare(exercice)}
-                              title="Annuler le partage"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-
                           {/* Copy */}
                           {exercice.user_id !== user?.id && (
                             <Button
