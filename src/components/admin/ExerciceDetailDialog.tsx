@@ -310,16 +310,6 @@ export function ExerciceDetailDialog({
               )}
             </Button>
 
-            {exercice.video_url && (
-              <Button
-                variant="outline"
-                onClick={() => window.open(exercice.video_url!, "_blank")}
-                className="gap-1"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Voir vidéo
-              </Button>
-            )}
 
             <Button
               variant="destructive"
