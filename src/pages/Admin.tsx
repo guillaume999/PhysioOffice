@@ -104,6 +104,7 @@ export default function Admin() {
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [exercices, setExercices] = useState<ExerciceType[]>([]);
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
+  const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
   const [selectedExercice, setSelectedExercice] = useState<ExerciceType | null>(null);
   const [exerciceDialogOpen, setExerciceDialogOpen] = useState(false);
   const [stats, setStats] = useState<Stats>({
@@ -1045,7 +1046,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Plateforme</th>
-                        <th className="text-left py-3 px-2">Utilisateur</th>
+                        <th className="text-left py-3 px-2">Consulté</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1088,8 +1089,26 @@ export default function Admin() {
                               <span className="text-muted-foreground">Non</span>
                             )}
                           </td>
-                          <td className="py-3 px-2 text-sm text-muted-foreground">
-                            {getUserDisplayName(e.user_id)}
+                          <td className="py-3 px-2" onClick={(ev) => ev.stopPropagation()}>
+                            <Button
+                              variant={consultedExerciceIds.has(e.id) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setConsultedExerciceIds(prev => {
+                                  const newSet = new Set(prev);
+                                  if (newSet.has(e.id)) {
+                                    newSet.delete(e.id);
+                                  } else {
+                                    newSet.add(e.id);
+                                  }
+                                  return newSet;
+                                });
+                              }}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              {consultedExerciceIds.has(e.id) ? "Consulté" : "Non consulté"}
+                            </Button>
                           </td>
                         </tr>
                       ))}
