@@ -80,8 +80,18 @@ export default function Profile() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate pseudo is required
+    if (!pseudo || pseudo.trim().length < 3) {
+      toast({
+        title: "Pseudo requis",
+        description: "Le pseudo doit contenir au moins 3 caractères",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Client-side validation for reserved pseudo
-    if (pseudo && pseudo.toLowerCase() === "admin") {
+    if (pseudo.toLowerCase() === "admin") {
       toast({
         title: "Pseudo non autorisé",
         description: "Le pseudo 'admin' est réservé et ne peut pas être utilisé",
@@ -234,14 +244,18 @@ export default function Profile() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pseudo">Pseudo (affiché comme auteur)</Label>
+                  <Label htmlFor="pseudo">Pseudo * (affiché comme auteur)</Label>
                   <Input
                     id="pseudo"
                     value={pseudo}
                     onChange={(e) => setPseudo(e.target.value)}
                     placeholder="MonPseudo"
+                    required
                   />
-                  <p className="text-xs text-muted-foreground">Ce pseudo sera utilisé comme nom d'auteur pour vos séances et traitements partagés</p>
+                  <p className="text-xs text-muted-foreground">Ce pseudo sera utilisé comme nom d'auteur pour vos séances, exercices et traitements partagés</p>
+                  {!pseudo && (
+                    <p className="text-xs text-amber-600">Le pseudo est obligatoire pour créer du contenu</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

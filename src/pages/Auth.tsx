@@ -14,6 +14,7 @@ import { z } from "zod";
 const emailSchema = z.string().email("Email invalide").max(255, "Email trop long");
 const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
 const nameSchema = z.string().max(100, "Nom trop long").optional();
+const pseudoSchema = z.string().min(3, "Le pseudo doit contenir au moins 3 caractères").max(30, "Le pseudo ne doit pas dépasser 30 caractères");
 
 type AuthMode = "login" | "signup" | "forgot-password";
 
@@ -23,8 +24,9 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [pseudo, setPseudo] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; pseudo?: string }>({});
   
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
@@ -37,7 +39,7 @@ export default function Auth() {
   }, [user, navigate]);
 
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: { email?: string; password?: string; pseudo?: string } = {};
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
@@ -48,6 +50,15 @@ export default function Auth() {
       const passwordResult = passwordSchema.safeParse(password);
       if (!passwordResult.success) {
         newErrors.password = passwordResult.error.errors[0].message;
+      }
+    }
+
+    if (mode === "signup") {
+      const pseudoResult = pseudoSchema.safeParse(pseudo);
+      if (!pseudoResult.success) {
+        newErrors.pseudo = pseudoResult.error.errors[0].message;
+      } else if (pseudo.toLowerCase() === "admin") {
+        newErrors.pseudo = "Ce pseudo est réservé";
       }
     }
     
@@ -122,7 +133,7 @@ export default function Auth() {
           });
         }
       } else {
-        const { error } = await signUp(email, password, firstName, lastName);
+        const { error } = await signUp(email, password, firstName, lastName, pseudo);
         if (error) {
           if (error.message.includes("User already registered")) {
             toast({
@@ -183,30 +194,48 @@ export default function Auth() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "signup" && (
-                <div className="grid grid-cols-2 gap-4">
+                <>
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
+                    <Label htmlFor="pseudo">Pseudo * (nom d'auteur)</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="pseudo"
+                        placeholder="MonPseudo"
+                        value={pseudo}
+                        onChange={(e) => {
+                          setPseudo(e.target.value);
+                          setErrors((prev) => ({ ...prev, pseudo: undefined }));
+                        }}
+                        className={`pl-10 ${errors.pseudo ? "border-destructive" : ""}`}
+                      />
+                    </div>
+                    {errors.pseudo && (
+                      <p className="text-sm text-destructive">{errors.pseudo}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Ce pseudo sera affiché comme auteur de vos contenus partagés</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Prénom</Label>
                       <Input
                         id="firstName"
                         placeholder="Jean"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        className="pl-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Nom</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Dupont"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Dupont"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
-                </div>
+                </>
               )}
 
               <div className="space-y-2">

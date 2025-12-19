@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string, pseudo?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -36,10 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string, pseudo?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -47,9 +47,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           first_name: firstName,
           last_name: lastName,
+          pseudo: pseudo,
         },
       },
     });
+
+    // Update the profile with the pseudo after signup
+    if (!error && data.user && pseudo) {
+      await supabase
+        .from("profiles")
+        .update({ pseudo })
+        .eq("user_id", data.user.id);
+    }
+
     return { error };
   };
 
