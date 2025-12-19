@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check } from "lucide-react";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -46,6 +46,7 @@ export default function Exercices() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,6 +56,7 @@ export default function Exercices() {
     description: "",
     pathologie_tags: [] as string[],
     newPathologie: "",
+    videoFile: null as File | null,
     video_url: "",
     thumbnail_url: ""
   });
@@ -151,6 +153,73 @@ export default function Exercices() {
     }
   };
 
+  const uploadVideoAndThumbnail = async (videoFile: File): Promise<{ videoUrl: string; thumbnailUrl: string }> => {
+    const fileExt = videoFile.name.split('.').pop();
+    const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
+    
+    // Upload video
+    const { data: videoData, error: videoError } = await supabase.storage
+      .from('videos')
+      .upload(fileName, videoFile);
+    
+    if (videoError) throw videoError;
+    
+    const { data: { publicUrl: videoUrl } } = supabase.storage
+      .from('videos')
+      .getPublicUrl(fileName);
+
+    // Generate and upload thumbnail
+    const thumbnailBlob = await generateThumbnailBlob(videoFile);
+    const thumbnailFileName = `${user!.id}/${Date.now()}_thumb.jpg`;
+    
+    const { error: thumbError } = await supabase.storage
+      .from('videos')
+      .upload(thumbnailFileName, thumbnailBlob);
+    
+    if (thumbError) throw thumbError;
+    
+    const { data: { publicUrl: thumbnailUrl } } = supabase.storage
+      .from('videos')
+      .getPublicUrl(thumbnailFileName);
+
+    return { videoUrl, thumbnailUrl };
+  };
+
+  const generateThumbnailBlob = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = URL.createObjectURL(file);
+      
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(1, video.duration * 0.1);
+      };
+
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(video.src);
+              if (blob) resolve(blob);
+              else reject(new Error("Failed to generate thumbnail"));
+            },
+            'image/jpeg',
+            0.8
+          );
+        } else {
+          reject(new Error("Failed to get canvas context"));
+        }
+      };
+
+      video.onerror = () => reject(new Error("Failed to load video"));
+    });
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
 
@@ -159,15 +228,25 @@ export default function Exercices() {
       return;
     }
 
+    setIsUploading(true);
     try {
       const tags = [...formData.pathologie_tags];
       if (formData.newPathologie.trim() && !tags.includes(formData.newPathologie.trim())) {
         tags.push(formData.newPathologie.trim());
-        // Save new pathologie
         await supabase.from("pathologies").insert({ 
           user_id: user.id, 
           name: formData.newPathologie.trim() 
         });
+      }
+
+      let videoUrl = formData.video_url;
+      let thumbnailUrl = formData.thumbnail_url;
+
+      // Upload video if file selected
+      if (formData.videoFile) {
+        const uploaded = await uploadVideoAndThumbnail(formData.videoFile);
+        videoUrl = uploaded.videoUrl;
+        thumbnailUrl = uploaded.thumbnailUrl;
       }
 
       const { error } = await supabase
@@ -177,8 +256,8 @@ export default function Exercices() {
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           pathologie_tags: tags,
-          video_url: formData.video_url.trim() || null,
-          thumbnail_url: formData.thumbnail_url.trim() || null,
+          video_url: videoUrl || null,
+          thumbnail_url: thumbnailUrl || null,
           author_name: userPseudo,
           status: "draft"
         });
@@ -192,6 +271,8 @@ export default function Exercices() {
     } catch (error) {
       console.error("Error creating exercice:", error);
       toast.error("Erreur lors de la création");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -203,6 +284,7 @@ export default function Exercices() {
       return;
     }
 
+    setIsUploading(true);
     try {
       const tags = [...formData.pathologie_tags];
       if (formData.newPathologie.trim() && !tags.includes(formData.newPathologie.trim())) {
@@ -213,14 +295,24 @@ export default function Exercices() {
         });
       }
 
+      let videoUrl = formData.video_url;
+      let thumbnailUrl = formData.thumbnail_url;
+
+      // Upload video if new file selected
+      if (formData.videoFile) {
+        const uploaded = await uploadVideoAndThumbnail(formData.videoFile);
+        videoUrl = uploaded.videoUrl;
+        thumbnailUrl = uploaded.thumbnailUrl;
+      }
+
       const { error } = await supabase
         .from("exercices")
         .update({
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           pathologie_tags: tags,
-          video_url: formData.video_url.trim() || null,
-          thumbnail_url: formData.thumbnail_url.trim() || null
+          video_url: videoUrl || null,
+          thumbnail_url: thumbnailUrl || null
         })
         .eq("id", selectedExercice.id);
 
@@ -233,6 +325,8 @@ export default function Exercices() {
     } catch (error) {
       console.error("Error updating exercice:", error);
       toast.error("Erreur lors de la modification");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -242,6 +336,7 @@ export default function Exercices() {
       description: "",
       pathologie_tags: [],
       newPathologie: "",
+      videoFile: null,
       video_url: "",
       thumbnail_url: ""
     });
@@ -255,6 +350,7 @@ export default function Exercices() {
       description: exercice.description || "",
       pathologie_tags: exercice.pathologie_tags || [],
       newPathologie: "",
+      videoFile: null,
       video_url: exercice.video_url || "",
       thumbnail_url: exercice.thumbnail_url || ""
     });
@@ -490,6 +586,7 @@ export default function Exercices() {
                   toggleTag={toggleTag}
                   onSubmit={handleSubmit}
                   submitLabel="Créer"
+                  isUploading={isUploading}
                 />
               </DialogContent>
             </Dialog>
@@ -737,6 +834,7 @@ export default function Exercices() {
             toggleTag={toggleTag}
             onSubmit={handleUpdate}
             submitLabel="Enregistrer"
+            isUploading={isUploading}
           />
         </DialogContent>
       </Dialog>
@@ -772,6 +870,7 @@ interface ExerciceFormProps {
     description: string;
     pathologie_tags: string[];
     newPathologie: string;
+    videoFile: File | null;
     video_url: string;
     thumbnail_url: string;
   };
@@ -780,6 +879,7 @@ interface ExerciceFormProps {
     description: string;
     pathologie_tags: string[];
     newPathologie: string;
+    videoFile: File | null;
     video_url: string;
     thumbnail_url: string;
   }>>;
@@ -787,9 +887,77 @@ interface ExerciceFormProps {
   toggleTag: (tag: string) => void;
   onSubmit: () => void;
   submitLabel: string;
+  isUploading?: boolean;
 }
 
-function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel }: ExerciceFormProps) {
+function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel, isUploading }: ExerciceFormProps) {
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      toast.error("Veuillez sélectionner un fichier vidéo");
+      return;
+    }
+
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("La vidéo ne doit pas dépasser 50 Mo");
+      return;
+    }
+
+    setFormData({ ...formData, videoFile: file });
+    
+    // Create video preview
+    const videoUrl = URL.createObjectURL(file);
+    setVideoPreview(videoUrl);
+
+    // Generate thumbnail from video
+    generateThumbnail(file);
+  };
+
+  const generateThumbnail = (file: File) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.src = URL.createObjectURL(file);
+    
+    video.onloadeddata = () => {
+      // Seek to 1 second or 10% of the video
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setThumbnailPreview(thumbnailDataUrl);
+      }
+      URL.revokeObjectURL(video.src);
+    };
+  };
+
+  const removeVideo = () => {
+    setFormData({ ...formData, videoFile: null, video_url: "", thumbnail_url: "" });
+    setVideoPreview(null);
+    setThumbnailPreview(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  };
+
+  // Show existing video if no new file selected
+  const displayVideoUrl = videoPreview || formData.video_url;
+  const displayThumbnailUrl = thumbnailPreview || formData.thumbnail_url;
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -845,27 +1013,83 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="video_url">URL de la vidéo</Label>
-        <Input
-          id="video_url"
-          value={formData.video_url}
-          onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-          placeholder="https://..."
+        <Label>Vidéo</Label>
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          onChange={handleVideoSelect}
+          className="hidden"
         />
+        
+        {displayVideoUrl ? (
+          <div className="space-y-2">
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+              {displayThumbnailUrl && (
+                <img 
+                  src={displayThumbnailUrl} 
+                  alt="Vignette" 
+                  className="w-full h-full object-cover"
+                />
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <Play className="w-12 h-12 text-white" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex-1"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Changer la vidéo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={removeVideo}
+                className="text-destructive"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => videoInputRef.current?.click()}
+            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+          >
+            <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Cliquez pour télécharger une vidéo
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              MP4, WebM, MOV (max. 50 Mo)
+            </p>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          La vignette sera générée automatiquement à partir de la vidéo
+        </p>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="thumbnail_url">URL de la vignette</Label>
-        <Input
-          id="thumbnail_url"
-          value={formData.thumbnail_url}
-          onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
-          placeholder="https://..."
-        />
-      </div>
-
-      <Button onClick={onSubmit} className="w-full gradient-primary text-primary-foreground">
-        {submitLabel}
+      <Button 
+        onClick={onSubmit} 
+        className="w-full gradient-primary text-primary-foreground"
+        disabled={isUploading}
+      >
+        {isUploading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Téléchargement en cours...
+          </>
+        ) : (
+          submitLabel
+        )}
       </Button>
     </div>
   );
