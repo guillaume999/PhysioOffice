@@ -375,9 +375,16 @@ export default function Exercices() {
     const newStatus = exercice.status === "draft" ? "pending" : "draft";
     
     try {
+      const updateData: { status: string; author_name?: string | null } = { status: newStatus };
+      
+      // Set author_name from pseudo when submitting for sharing
+      if (newStatus === "pending" && userPseudo) {
+        updateData.author_name = userPseudo;
+      }
+      
       await supabase
         .from("exercices")
-        .update({ status: newStatus })
+        .update(updateData)
         .eq("id", exercice.id);
       
       toast.success(newStatus === "pending" ? "Exercice en attente de validation" : "Exercice retiré du partage");
