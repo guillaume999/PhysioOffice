@@ -1136,6 +1136,19 @@ export default function Admin() {
           getUserDisplayName={getUserDisplayName}
           isFeatured={selectedExercice ? featuredExerciceIds.has(selectedExercice.id) : false}
           copyCount={selectedExercice ? (exerciceCopyCounts[selectedExercice.id] || 0) : 0}
+          isConsulted={selectedExercice ? consultedExerciceIds.has(selectedExercice.id) : false}
+          onConsultedChange={(consulted) => {
+            if (!selectedExercice) return;
+            setConsultedExerciceIds(prev => {
+              const newSet = new Set(prev);
+              if (consulted) {
+                newSet.add(selectedExercice.id);
+              } else {
+                newSet.delete(selectedExercice.id);
+              }
+              return newSet;
+            });
+          }}
         />
       </div>
     </Layout>

@@ -46,6 +46,8 @@ interface ExerciceDetailDialogProps {
   getUserDisplayName: (userId: string) => string;
   isFeatured: boolean;
   copyCount: number;
+  isConsulted: boolean;
+  onConsultedChange: (consulted: boolean) => void;
 }
 
 export function ExerciceDetailDialog({
@@ -56,10 +58,11 @@ export function ExerciceDetailDialog({
   getUserDisplayName,
   isFeatured,
   copyCount,
+  isConsulted,
+  onConsultedChange,
 }: ExerciceDetailDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [reviewed, setReviewed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (!exercice) return null;
@@ -263,8 +266,8 @@ export function ExerciceDetailDialog({
           <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
             <Checkbox
               id="reviewed"
-              checked={reviewed}
-              onCheckedChange={(checked) => setReviewed(checked === true)}
+              checked={isConsulted}
+              onCheckedChange={(checked) => onConsultedChange(checked === true)}
             />
             <Label
               htmlFor="reviewed"
