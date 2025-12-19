@@ -13,23 +13,44 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to clear all Supabase auth data from localStorage
+function clearLocalAuthData() {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+      if (error) {
+        // Session is invalid, clear everything
+        clearLocalAuthData();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      }
       setLoading(false);
     });
 
@@ -71,40 +92,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const hardClearLocalAuth = () => {
-    try {
-      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      if (!url) return;
-      const ref = new URL(url).hostname.split(".")[0];
-      const prefixes = [
-        `sb-${ref}-auth-token`,
-        `sb-${ref}-auth-token-code-verifier`,
-      ];
-
-      for (const key of Object.keys(localStorage)) {
-        if (prefixes.some((p) => key.startsWith(p))) {
-          localStorage.removeItem(key);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   const signOut = async () => {
+    // Always clear local state first for immediate UI update
+    setSession(null);
+    setUser(null);
+    
+    // Try to sign out from Supabase (ignore errors since session might be invalid)
     try {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      // When backend session is already gone, logout returns 403 session_not_found.
-      // We still want to clear local session reliably.
-      if (error) {
-        hardClearLocalAuth();
-      }
+      await supabase.auth.signOut({ scope: 'local' });
     } catch {
-      hardClearLocalAuth();
-    } finally {
-      setSession(null);
-      setUser(null);
+      // Ignore - we'll force clear anyway
     }
+    
+    // Force clear all local auth data
+    clearLocalAuthData();
   };
 
   return (
