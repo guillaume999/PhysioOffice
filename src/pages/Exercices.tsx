@@ -676,44 +676,10 @@ export default function Exercices() {
                     <TableRow key={exercice.id}>
                       {/* Thumbnail */}
                       <TableCell>
-                        <div 
-                          className={`w-24 h-16 bg-muted rounded overflow-hidden relative group ${exercice.video_url ? 'cursor-pointer' : ''}`}
-                          onClick={() => exercice.video_url && openVideoDialog(exercice)}
-                        >
-                          {exercice.video_url ? (
-                            <>
-                              {exercice.thumbnail_url ? (
-                                <img
-                                  src={exercice.thumbnail_url}
-                                  alt={exercice.title}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    // If thumbnail fails to load, hide it and show play icon
-                                    e.currentTarget.style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <video
-                                  src={exercice.video_url}
-                                  className="w-full h-full object-cover"
-                                  preload="metadata"
-                                  muted
-                                  onLoadedData={(e) => {
-                                    // Seek to first frame to show as thumbnail
-                                    e.currentTarget.currentTime = 0.1;
-                                  }}
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Play className="w-6 h-6 text-white" />
-                              </div>
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                              <Play className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
+                        <ExerciceThumbnail
+                          exercice={exercice}
+                          onOpen={() => openVideoDialog(exercice)}
+                        />
                       </TableCell>
 
                       {/* Title & Description */}
@@ -899,6 +865,127 @@ export default function Exercices() {
         </DialogContent>
       </Dialog>
     </Layout>
+  );
+}
+
+function createVideoThumbnailDataUrl(videoUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = videoUrl;
+
+    const cleanup = () => {
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 6000);
+
+    video.onloadeddata = () => {
+      const t = Math.min(1.5, Math.max(0.1, video.duration * 0.1));
+      video.currentTime = t;
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 180;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          window.clearTimeout(timeout);
+          cleanup();
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        window.clearTimeout(timeout);
+        cleanup();
+        resolve(dataUrl);
+      } catch {
+        window.clearTimeout(timeout);
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    video.onerror = () => {
+      window.clearTimeout(timeout);
+      cleanup();
+      resolve(null);
+    };
+  });
+}
+
+function ExerciceThumbnail({
+  exercice,
+  onOpen,
+}: {
+  exercice: Exercice;
+  onOpen: () => void;
+}) {
+  const [generatedThumb, setGeneratedThumb] = useState<string | null>(null);
+  const [thumbError, setThumbError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setThumbError(false);
+    setGeneratedThumb(null);
+
+    if (!exercice.video_url) return;
+    if (exercice.thumbnail_url) return;
+
+    createVideoThumbnailDataUrl(exercice.video_url).then((url) => {
+      if (!cancelled) setGeneratedThumb(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [exercice.video_url, exercice.thumbnail_url]);
+
+  const hasVideo = Boolean(exercice.video_url);
+  const src = !thumbError ? (exercice.thumbnail_url ?? generatedThumb) : generatedThumb;
+
+  return (
+    <button
+      type="button"
+      disabled={!hasVideo}
+      onClick={() => hasVideo && onOpen()}
+      className={`w-24 h-16 bg-muted rounded overflow-hidden relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        hasVideo ? "cursor-pointer" : "cursor-default opacity-70"
+      }`}
+      aria-label={
+        hasVideo ? `Lire la vidéo : ${exercice.title}` : `Aucune vidéo : ${exercice.title}`
+      }
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={`Vignette vidéo - ${exercice.title}`}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={() => setThumbError(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+          <Play className="w-6 h-6 text-muted-foreground" />
+        </div>
+      )}
+
+      {hasVideo && (
+        <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <Play className="w-6 h-6 text-background" />
+        </div>
+      )}
+    </button>
   );
 }
 
