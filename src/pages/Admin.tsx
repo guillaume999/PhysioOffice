@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPasswordConfirmDialog } from "@/components/admin/AdminPasswordConfirmDialog";
 import { ExerciceDetailDialog } from "@/components/admin/ExerciceDetailDialog";
+import { RejectExerciceDialog } from "@/components/admin/RejectExerciceDialog";
 import { 
   Users, 
   FileText, 
@@ -24,6 +25,7 @@ import {
   CheckCircle,
   ClipboardList,
   Dumbbell,
+  XCircle,
 } from "lucide-react";
 
 interface UserProfile {
@@ -132,6 +134,13 @@ export default function Admin() {
     userEmail: string | null;
     action: "add" | "remove";
   }>({ open: false, userId: "", userEmail: null, action: "add" });
+
+  // Reject exercice dialog state
+  const [rejectExerciceDialog, setRejectExerciceDialog] = useState<{
+    open: boolean;
+    exerciceId: string | null;
+    exerciceTitle: string;
+  }>({ open: false, exerciceId: null, exerciceTitle: "" });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -1077,6 +1086,19 @@ export default function Admin() {
                               Valider
                             </Button>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setRejectExerciceDialog({
+                                open: true,
+                                exerciceId: e.id,
+                                exerciceTitle: e.title
+                              })}
+                              className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Refuser
+                            </Button>
+                            <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => deleteExercice(e.id)}
@@ -1184,6 +1206,14 @@ export default function Admin() {
             if (!selectedExercice) return;
             toggleConsulted(selectedExercice.id, !consulted);
           }}
+        />
+
+        <RejectExerciceDialog
+          exerciceId={rejectExerciceDialog.exerciceId}
+          exerciceTitle={rejectExerciceDialog.exerciceTitle}
+          open={rejectExerciceDialog.open}
+          onOpenChange={(open) => setRejectExerciceDialog(prev => ({ ...prev, open }))}
+          onSuccess={fetchData}
         />
       </div>
     </Layout>
