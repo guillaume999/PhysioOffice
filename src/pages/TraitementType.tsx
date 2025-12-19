@@ -81,7 +81,7 @@ export default function TraitementType() {
   const [formData, setFormData] = useState({
     pathologie: "",
     newPathologie: "",
-    tests: [] as { description: string; video_id: string }[],
+    tests: [] as { description: string }[],
     seances: [] as string[]
   });
 
@@ -229,7 +229,6 @@ export default function TraitementType() {
         await supabase.from("traitement_tests").insert({
           traitement_type_id: traitementData.id,
           description: test.description,
-          video_id: test.video_id && test.video_id !== "none" ? test.video_id : null,
           ordre: i
         });
       }
@@ -319,7 +318,6 @@ export default function TraitementType() {
           await supabase.from("traitement_tests").insert({
             traitement_type_id: newTraitement.id,
             description: test.description,
-            video_id: test.video_id,
             ordre: test.ordre
           });
         }
@@ -346,7 +344,7 @@ export default function TraitementType() {
   const addTest = () => {
     setFormData({
       ...formData,
-      tests: [...formData.tests, { description: "", video_id: "" }]
+      tests: [...formData.tests, { description: "" }]
     });
   };
 
@@ -457,17 +455,6 @@ export default function TraitementType() {
                           onChange={(e) => updateTest(index, "description", e.target.value)}
                           rows={2}
                         />
-                        <Select value={test.video_id} onValueChange={(v) => updateTest(index, "video_id", v)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Vidéo associée (optionnel)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Aucune vidéo</SelectItem>
-                            {videos.map((v) => (
-                              <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => removeTest(index)}>
                         <X className="w-4 h-4" />
@@ -669,22 +656,6 @@ export default function TraitementType() {
             {testDetailDialog && (
               <div className="space-y-4">
                 <p className="text-sm">{testDetailDialog.description}</p>
-                {testDetailDialog.video && (
-                  <div
-                    className="relative cursor-pointer group"
-                    onClick={() => setVideoDialog(testDetailDialog.video?.video_url || null)}
-                  >
-                    <img
-                      src={testDetailDialog.video.thumbnail_url || "/placeholder.svg"}
-                      alt={testDetailDialog.video.title}
-                      className="w-full h-40 object-cover rounded-lg"
-                    />
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                      <Play className="w-12 h-12 text-white" />
-                    </div>
-                    <p className="mt-2 text-sm font-medium">{testDetailDialog.video.title}</p>
-                  </div>
-                )}
               </div>
             )}
           </DialogContent>
