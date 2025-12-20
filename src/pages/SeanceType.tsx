@@ -3,14 +3,10 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Plus, Heart, MessageCircle, Trash2, Video, X, Search, Users, User, Shield, Copy } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -42,37 +38,19 @@ interface SeanceExercice {
   duration_seconds: number | null;
 }
 
-type FilterType = "all" | "mine" | "shared";
+type FilterType = "mine" | "platform" | "shared";
 
 export default function SeanceType() {
   const { user } = useAuth();
-  const [userPseudo, setUserPseudo] = useState<string | null>(null);
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [filteredSeances, setFilteredSeances] = useState<SeanceType[]>([]);
   const [featuredSeanceIds, setFeaturedSeanceIds] = useState<string[]>([]);
-  const [pathologies, setPathologies] = useState<string[]>([]);
-  const [objectifs, setObjectifs] = useState<{ principal: string[]; secondaire: string[] }>({ principal: [], secondaire: [] });
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
-  const [selectedSeance, setSelectedSeance] = useState<SeanceType | null>(null);
-  const [comments, setComments] = useState<{ id: string; content: string; created_at: string }[]>([]);
-  const [newComment, setNewComment] = useState("");
   
   // Filter and search state
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [formData, setFormData] = useState({
-    pathologie: "",
-    newPathologie: "",
-    objectif_principal: "",
-    newObjectifPrincipal: "",
-    objectif_secondaire: "",
-    newObjectifSecondaire: "",
-    exercices: [] as { name: string; description: string; repetitions: string; duration: string }[]
-  });
 
   useEffect(() => {
     if (user) {
@@ -87,31 +65,28 @@ export default function SeanceType() {
   const applyFilters = () => {
     let result = [...seances];
 
-    // Get IDs of originals that the user has copied
+    // Get IDs of originals that the user has copied (for hiding in shared view)
     const userCopiedOriginalIds = seances
       .filter((s) => s.is_copy && s.user_id === user?.id && s.original_id)
       .map((s) => s.original_id);
 
-    // Filter out originals that user has already copied
-    result = result.filter((s) => !userCopiedOriginalIds.includes(s.id));
-
-    // Filter out copies from other users (except featured ones)
-    result = result.filter((s) => {
-      // Keep if not a copy
-      if (!s.is_copy) return true;
-      // Keep if it's the user's own copy
-      if (s.user_id === user?.id) return true;
-      // Keep if it's featured by admin
-      if (featuredSeanceIds.includes(s.id)) return true;
-      // Otherwise hide copies from other users
-      return false;
-    });
+    // Filter out originals that user has already copied (in shared view)
+    if (filter === "shared") {
+      result = result.filter((s) => !userCopiedOriginalIds.includes(s.id));
+    }
 
     // Apply filter type
     if (filter === "mine") {
       result = result.filter((s) => s.user_id === user?.id);
+    } else if (filter === "platform") {
+      result = result.filter((s) => featuredSeanceIds.includes(s.id));
     } else if (filter === "shared") {
-      result = result.filter((s) => s.is_shared && s.user_id !== user?.id);
+      result = result.filter((s) => 
+        s.is_shared && 
+        s.is_validated &&
+        s.user_id !== user?.id && 
+        !featuredSeanceIds.includes(s.id)
+      );
     }
 
     // Apply search
@@ -131,14 +106,13 @@ export default function SeanceType() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch user pseudo
+      // Fetch user profile
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("pseudo, can_share")
+        .select("can_share")
         .eq("user_id", user!.id)
-        .single();
+        .maybeSingle();
       
-      setUserPseudo(profileData?.pseudo || null);
       setUserCanShare(profileData?.can_share !== false);
 
       // Fetch featured seances
@@ -192,100 +166,11 @@ export default function SeanceType() {
       );
 
       setSeances(seancesWithDetails);
-
-      // Fetch pathologies
-      const { data: pathoData } = await supabase
-        .from("pathologies")
-        .select("name");
-      setPathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
-
-      // Fetch objectifs
-      const { data: objData } = await supabase
-        .from("objectifs")
-        .select("name, type");
-      setObjectifs({
-        principal: [...new Set(objData?.filter((o) => o.type === "principal").map((o) => o.name) || [])],
-        secondaire: [...new Set(objData?.filter((o) => o.type === "secondaire").map((o) => o.name) || [])]
-      });
-
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!user) return;
-
-    const pathologie = formData.newPathologie || formData.pathologie;
-    const objectif_principal = formData.newObjectifPrincipal || formData.objectif_principal;
-    const objectif_secondaire = formData.newObjectifSecondaire || formData.objectif_secondaire;
-
-    if (!pathologie || !objectif_principal) {
-      toast.error("Pathologie et objectif principal requis");
-      return;
-    }
-
-    try {
-      // Create seance type
-      const { data: seanceData, error: seanceError } = await supabase
-        .from("seance_types")
-        .insert({
-          user_id: user.id,
-          pathologie,
-          objectif_principal,
-          objectif_secondaire: objectif_secondaire || null,
-          author_name: userPseudo,
-          is_shared: false
-        })
-        .select()
-        .single();
-
-      if (seanceError) throw seanceError;
-
-      // Save new pathologie if created
-      if (formData.newPathologie) {
-        await supabase.from("pathologies").insert({ user_id: user.id, name: formData.newPathologie });
-      }
-
-      // Save new objectifs if created
-      if (formData.newObjectifPrincipal) {
-        await supabase.from("objectifs").insert({ user_id: user.id, name: formData.newObjectifPrincipal, type: "principal" });
-      }
-      if (formData.newObjectifSecondaire) {
-        await supabase.from("objectifs").insert({ user_id: user.id, name: formData.newObjectifSecondaire, type: "secondaire" });
-      }
-
-      // Create exercices
-      for (let i = 0; i < formData.exercices.length; i++) {
-        const ex = formData.exercices[i];
-        await supabase.from("seance_exercices").insert({
-          seance_type_id: seanceData.id,
-          name: ex.name || null,
-          description: ex.description || null,
-          repetitions: ex.repetitions ? parseInt(ex.repetitions) : null,
-          duration_seconds: ex.duration ? parseInt(ex.duration) : null,
-          ordre: i
-        });
-      }
-
-      toast.success("Séance type créée avec succès");
-      setDialogOpen(false);
-      setFormData({
-        pathologie: "",
-        newPathologie: "",
-        objectif_principal: "",
-        newObjectifPrincipal: "",
-        objectif_secondaire: "",
-        newObjectifSecondaire: "",
-        exercices: []
-      });
-      fetchData();
-    } catch (error) {
-      console.error("Error creating seance:", error);
-      toast.error("Erreur lors de la création");
     }
   };
 
@@ -337,34 +222,6 @@ export default function SeanceType() {
     }
   };
 
-  const openComments = async (seance: SeanceType) => {
-    setSelectedSeance(seance);
-    const { data } = await supabase
-      .from("seance_comments")
-      .select("id, content, created_at")
-      .eq("seance_type_id", seance.id)
-      .order("created_at", { ascending: false });
-    setComments(data || []);
-    setCommentsDialogOpen(true);
-  };
-
-  const addComment = async () => {
-    if (!user || !selectedSeance || !newComment.trim()) return;
-
-    try {
-      await supabase.from("seance_comments").insert({
-        seance_type_id: selectedSeance.id,
-        user_id: user.id,
-        content: newComment.trim()
-      });
-      setNewComment("");
-      openComments(selectedSeance);
-      fetchData();
-    } catch (error) {
-      console.error("Error adding comment:", error);
-    }
-  };
-
   const deleteSeance = async (id: string) => {
     try {
       await supabase.from("seance_types").delete().eq("id", id);
@@ -376,17 +233,17 @@ export default function SeanceType() {
     }
   };
 
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return null;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const copySeance = async (seance: SeanceType) => {
     if (!user) return;
 
     try {
+      // Fetch user pseudo
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("pseudo")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
       // Create the seance copy
       const { data: newSeance, error: seanceError } = await supabase
         .from("seance_types")
@@ -426,25 +283,6 @@ export default function SeanceType() {
       toast.error("Erreur lors de la copie");
     }
   };
-  const addExercice = () => {
-    setFormData({
-      ...formData,
-      exercices: [...formData.exercices, { name: "", description: "", repetitions: "", duration: "" }]
-    });
-  };
-
-  const removeExercice = (index: number) => {
-    setFormData({
-      ...formData,
-      exercices: formData.exercices.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateExercice = (index: number, field: string, value: string) => {
-    const updated = [...formData.exercices];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData({ ...formData, exercices: updated });
-  };
 
   if (!user) {
     return (
@@ -469,142 +307,6 @@ export default function SeanceType() {
               <p className="text-muted-foreground">Gérez vos modèles de séances prédéfinies</p>
             </div>
           </div>
-
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nouvelle séance
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Créer une séance type</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                {userPseudo ? (
-                  <p className="text-sm text-muted-foreground">Auteur: <span className="font-medium text-foreground">{userPseudo}</span></p>
-                ) : (
-                  <p className="text-sm text-amber-600">Définissez votre pseudo dans votre profil pour qu'il apparaisse comme auteur</p>
-                )}
-
-                {/* Pathologie */}
-                <div className="space-y-2">
-                  <Label>Pathologie</Label>
-                  <Select value={formData.pathologie} onValueChange={(v) => setFormData({ ...formData, pathologie: v, newPathologie: "" })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner ou créer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pathologies.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                      <SelectItem value="__new__">+ Créer nouveau</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.pathologie === "__new__" && (
-                    <Input
-                      placeholder="Nouvelle pathologie"
-                      value={formData.newPathologie}
-                      onChange={(e) => setFormData({ ...formData, newPathologie: e.target.value })}
-                    />
-                  )}
-                </div>
-
-                {/* Objectif Principal */}
-                <div className="space-y-2">
-                  <Label>Objectif Principal</Label>
-                  <Select value={formData.objectif_principal} onValueChange={(v) => setFormData({ ...formData, objectif_principal: v, newObjectifPrincipal: "" })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner ou créer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {objectifs.principal.map((o) => (
-                        <SelectItem key={o} value={o}>{o}</SelectItem>
-                      ))}
-                      <SelectItem value="__new__">+ Créer nouveau</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.objectif_principal === "__new__" && (
-                    <Input
-                      placeholder="Nouvel objectif principal"
-                      value={formData.newObjectifPrincipal}
-                      onChange={(e) => setFormData({ ...formData, newObjectifPrincipal: e.target.value })}
-                    />
-                  )}
-                </div>
-
-                {/* Objectif Secondaire */}
-                <div className="space-y-2">
-                  <Label>Objectif Secondaire (optionnel)</Label>
-                  <Select value={formData.objectif_secondaire} onValueChange={(v) => setFormData({ ...formData, objectif_secondaire: v, newObjectifSecondaire: "" })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner ou créer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {objectifs.secondaire.map((o) => (
-                        <SelectItem key={o} value={o}>{o}</SelectItem>
-                      ))}
-                      <SelectItem value="__new__">+ Créer nouveau</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.objectif_secondaire === "__new__" && (
-                    <Input
-                      placeholder="Nouvel objectif secondaire"
-                      value={formData.newObjectifSecondaire}
-                      onChange={(e) => setFormData({ ...formData, newObjectifSecondaire: e.target.value })}
-                    />
-                  )}
-                </div>
-
-                {/* Exercices */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Exercices</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addExercice}>
-                      <Plus className="w-4 h-4 mr-1" /> Ajouter
-                    </Button>
-                  </div>
-                  {formData.exercices.map((ex, index) => (
-                    <div key={index} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Exercice {index + 1}</span>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeExercice(index)}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <Input
-                        placeholder="Nom de l'exercice"
-                        value={ex.name}
-                        onChange={(e) => updateExercice(index, "name", e.target.value)}
-                      />
-                      <Textarea
-                        placeholder="Description / commentaires"
-                        value={ex.description}
-                        onChange={(e) => updateExercice(index, "description", e.target.value)}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Répétitions"
-                          type="number"
-                          value={ex.repetitions}
-                          onChange={(e) => updateExercice(index, "repetitions", e.target.value)}
-                        />
-                        <Input
-                          placeholder="Durée (sec)"
-                          type="number"
-                          value={ex.duration}
-                          onChange={(e) => updateExercice(index, "duration", e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Button onClick={handleSubmit} className="w-full">Créer la séance</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Filters and Search */}
@@ -613,15 +315,6 @@ export default function SeanceType() {
             <div className="flex flex-col md:flex-row gap-4">
               {/* Filter Buttons */}
               <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={filter === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("all")}
-                  className="gap-2"
-                >
-                  <Users className="w-4 h-4" />
-                  Toutes
-                </Button>
                 <Button
                   variant={filter === "mine" ? "default" : "outline"}
                   size="sm"
@@ -632,12 +325,21 @@ export default function SeanceType() {
                   Mes séances
                 </Button>
                 <Button
+                  variant={filter === "platform" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("platform")}
+                  className="gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  Plateforme
+                </Button>
+                <Button
                   variant={filter === "shared" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setFilter("shared")}
                   className="gap-2"
                 >
-                  <Shield className="w-4 h-4" />
+                  <Users className="w-4 h-4" />
                   Partagées
                 </Button>
               </div>
@@ -734,15 +436,10 @@ export default function SeanceType() {
                               <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
                               {seance.likes_count}
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => openComments(seance)}
-                            >
+                            <div className="flex items-center gap-1 text-muted-foreground">
                               <MessageCircle className="w-4 h-4" />
                               {seance.comments_count}
-                            </Button>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -812,41 +509,6 @@ export default function SeanceType() {
             )}
           </CardContent>
         </Card>
-
-        {/* Comments Dialog */}
-        <Dialog open={commentsDialogOpen} onOpenChange={setCommentsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Commentaires</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ajouter un commentaire..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addComment()}
-                />
-                <Button onClick={addComment}>Envoyer</Button>
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {comments.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Aucun commentaire</p>
-                ) : (
-                  comments.map((c) => (
-                    <div key={c.id} className="p-2 bg-muted rounded-lg">
-                      <p className="text-sm">{c.content}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(c.created_at).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
       </div>
     </Layout>
   );
