@@ -75,9 +75,14 @@ export default function Exercices() {
   const applyFilters = () => {
     let result = [...exercices];
 
-    // Get IDs of originals that the user has copied
+    // Get IDs of originals that the user has copied (for hiding in shared view)
     const userCopiedOriginalIds = exercices
       .filter((e) => e.is_copy && e.user_id === user?.id && e.original_id)
+      .map((e) => e.original_id);
+
+    // Get IDs of exercises that have a shared copy (pending/shared) - for "mine" view
+    const sharedCopyOriginalIds = exercices
+      .filter((e) => e.original_id && e.user_id === user?.id && (e.status === "pending" || e.status === "shared"))
       .map((e) => e.original_id);
 
     // Filter out originals that user has already copied (in shared view)
@@ -87,7 +92,13 @@ export default function Exercices() {
 
     // Apply filter type
     if (filter === "mine") {
-      result = result.filter((e) => e.user_id === user?.id);
+      result = result.filter((e) => {
+        // Only show user's exercises
+        if (e.user_id !== user?.id) return false;
+        // Hide shared copies (pending/shared with original_id) - these are for sharing only
+        if (e.original_id && (e.status === "pending" || e.status === "shared")) return false;
+        return true;
+      });
     } else if (filter === "platform") {
       result = result.filter((e) => featuredExerciceIds.includes(e.id));
     } else if (filter === "shared") {
@@ -111,6 +122,21 @@ export default function Exercices() {
     }
 
     setFilteredExercices(result);
+  };
+
+  // Check if an exercise has a pending or shared copy
+  const hasSharedCopy = (exerciceId: string) => {
+    return exercices.some(
+      (e) => e.original_id === exerciceId && e.user_id === user?.id && (e.status === "pending" || e.status === "shared")
+    );
+  };
+
+  // Get the shared copy status for an exercise
+  const getSharedCopyStatus = (exerciceId: string) => {
+    const copy = exercices.find(
+      (e) => e.original_id === exerciceId && e.user_id === user?.id && (e.status === "pending" || e.status === "shared")
+    );
+    return copy?.status || null;
   };
 
   const fetchData = async () => {
@@ -367,30 +393,49 @@ export default function Exercices() {
       toast.error("Vous n'avez pas la permission de partager du contenu");
       return;
     }
-    if (exercice.status === "shared") {
-      toast.error("Un exercice partagé ne peut plus être modifié");
-      return;
-    }
 
-    const newStatus = exercice.status === "draft" ? "pending" : "draft";
-    
     try {
-      const updateData: { status: string; author_name?: string | null } = { status: newStatus };
-      
-      // Set author_name from pseudo when submitting for sharing
-      if (newStatus === "pending" && userPseudo) {
-        updateData.author_name = userPseudo;
-      }
-      
-      await supabase
+      // Check if there's already a pending/shared copy of this exercise
+      const { data: existingCopy } = await supabase
         .from("exercices")
-        .update(updateData)
-        .eq("id", exercice.id);
+        .select("id, status")
+        .eq("original_id", exercice.id)
+        .eq("user_id", user!.id)
+        .in("status", ["pending", "shared"])
+        .maybeSingle();
+
+      if (existingCopy) {
+        if (existingCopy.status === "pending") {
+          // Cancel the pending share - delete the copy
+          await supabase.from("exercices").delete().eq("id", existingCopy.id);
+          toast.success("Demande de partage annulée");
+        } else {
+          toast.error("Cet exercice est déjà partagé");
+        }
+        fetchData();
+        return;
+      }
+
+      // Create a copy for sharing (original stays as draft and editable)
+      const { error } = await supabase.from("exercices").insert({
+        user_id: user!.id,
+        title: exercice.title,
+        description: exercice.description,
+        pathologie_tags: exercice.pathologie_tags,
+        video_url: exercice.video_url,
+        thumbnail_url: exercice.thumbnail_url,
+        author_name: userPseudo,
+        is_copy: false, // This is a shared copy, not a user copy
+        original_id: exercice.id,
+        status: "pending"
+      });
+
+      if (error) throw error;
       
-      toast.success(newStatus === "pending" ? "Exercice en attente de validation" : "Exercice retiré du partage");
+      toast.success("Exercice soumis pour validation. Votre version originale reste modifiable.");
       fetchData();
     } catch (error) {
-      console.error("Error toggling share:", error);
+      console.error("Error sharing exercice:", error);
       toast.error("Erreur lors du partage");
     }
   };
@@ -543,13 +588,15 @@ export default function Exercices() {
     if (featuredExerciceIds.includes(exercice.id)) {
       return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Plateforme</Badge>;
     }
-    switch (exercice.status) {
-      case "shared":
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
-      case "pending":
-        // Show cancel button for pending exercises owned by user
-        if (exercice.user_id === user?.id && !exercice.is_copy) {
-          return (
+    
+    // For user's own exercises in "mine" filter, check if there's a shared copy
+    if (filter === "mine" && exercice.user_id === user?.id && exercice.status === "draft") {
+      const sharedCopyStatus = getSharedCopyStatus(exercice.id);
+      
+      if (sharedCopyStatus === "pending") {
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Brouillon</Badge>
             <Button
               variant="outline"
               size="sm"
@@ -560,15 +607,26 @@ export default function Exercices() {
               className="h-7 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
             >
               <X className="w-3 h-3 mr-1" />
-              En attente
+              Annuler partage
             </Button>
-          );
-        }
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
-      default:
-        // Show share button for drafts owned by user
-        if (exercice.user_id === user?.id && !exercice.is_copy && userCanShare) {
-          return (
+          </div>
+        );
+      }
+      
+      if (sharedCopyStatus === "shared") {
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Brouillon</Badge>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>
+          </div>
+        );
+      }
+      
+      // No shared copy - show share button
+      if (!exercice.is_copy && userCanShare) {
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Brouillon</Badge>
             <Button
               variant="outline"
               size="sm"
@@ -581,8 +639,19 @@ export default function Exercices() {
               <Users className="w-3 h-3 mr-1" />
               Partager
             </Button>
-          );
-        }
+          </div>
+        );
+      }
+      
+      return <Badge variant="outline">Brouillon</Badge>;
+    }
+    
+    switch (exercice.status) {
+      case "shared":
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
+      case "pending":
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
+      default:
         return <Badge variant="outline">Brouillon</Badge>;
     }
   };
@@ -591,8 +660,9 @@ export default function Exercices() {
     const isOnPlatform = featuredExerciceIds.includes(exercice.id);
     // Admins can edit platform exercises
     if (isAdmin && isOnPlatform) return true;
-    // Users can only edit their own draft exercises
-    return exercice.user_id === user?.id && exercice.status === "draft" && !isOnPlatform;
+    // Users can edit their own draft exercises (even if they have a shared copy)
+    // But cannot edit shared copies or platform exercises
+    return exercice.user_id === user?.id && exercice.status === "draft" && !isOnPlatform && !exercice.original_id;
   };
 
   const canDelete = (exercice: Exercice) => {
