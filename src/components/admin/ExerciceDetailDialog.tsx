@@ -201,6 +201,7 @@ export function ExerciceDetailDialog({
 
         toast({ title: "Exercice ajouté à la plateforme" });
       }
+      onOpenChange(false);
       onUpdate();
     } catch (error) {
       console.error("Error toggling featured:", error);
