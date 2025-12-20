@@ -703,6 +703,10 @@ export default function Exercices() {
     
     switch (exercice.status) {
       case "shared":
+        // Check if this shared exercise is on the platform (for "shared" and "platform" filters)
+        if (featuredExerciceIds.includes(exercice.id)) {
+          return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Plateforme</Badge>;
+        }
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
       case "pending":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
