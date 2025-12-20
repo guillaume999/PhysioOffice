@@ -3,19 +3,33 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+
+interface SeanceExercice {
+  id: string;
+  ordre: number;
+  name: string | null;
+  description: string | null;
+  repetitions: number | null;
+  duration_seconds: number | null;
+  series: number;
+  exercice_id: string | null;
+}
 
 interface SeanceType {
   id: string;
   pathologie: string;
+  pathologies: string[];
   objectif_principal: string;
+  objectifs_principaux: string[];
   objectif_secondaire: string | null;
+  objectifs_secondaires: string[];
   author_name: string | null;
   is_shared: boolean;
   is_copy: boolean;
@@ -27,15 +41,6 @@ interface SeanceType {
   likes_count?: number;
   comments_count?: number;
   user_liked?: boolean;
-}
-
-interface SeanceExercice {
-  id: string;
-  ordre: number;
-  name: string | null;
-  description: string | null;
-  repetitions: number | null;
-  duration_seconds: number | null;
 }
 
 type FilterType = "mine" | "platform" | "shared";
@@ -51,6 +56,10 @@ export default function SeanceType() {
   // Filter and search state
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Dialog state
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [editingSeance, setEditingSeance] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -92,12 +101,16 @@ export default function SeanceType() {
     // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (s) =>
+      result = result.filter((s) => {
+        const pathos = s.pathologies?.length > 0 ? s.pathologies : [s.pathologie];
+        const objPrincipaux = s.objectifs_principaux?.length > 0 ? s.objectifs_principaux : [s.objectif_principal];
+        
+        return (
           s.author_name?.toLowerCase().includes(query) ||
-          s.pathologie.toLowerCase().includes(query) ||
-          s.objectif_principal.toLowerCase().includes(query)
-      );
+          pathos.some(p => p.toLowerCase().includes(query)) ||
+          objPrincipaux.some(o => o.toLowerCase().includes(query))
+        );
+      });
     }
 
     setFilteredSeances(result);
@@ -157,6 +170,9 @@ export default function SeanceType() {
 
           return {
             ...seance,
+            pathologies: seance.pathologies || [],
+            objectifs_principaux: seance.objectifs_principaux || [],
+            objectifs_secondaires: seance.objectifs_secondaires || [],
             exercices: exercicesData || [],
             likes_count: likesCount || 0,
             comments_count: commentsCount || 0,
@@ -172,6 +188,32 @@ export default function SeanceType() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openCreateDialog = () => {
+    setEditingSeance(null);
+    setFormDialogOpen(true);
+  };
+
+  const openEditDialog = (seance: SeanceType) => {
+    setEditingSeance({
+      id: seance.id,
+      pathologies: seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie],
+      objectifs_principaux: seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : [seance.objectif_principal],
+      objectifs_secondaires: seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []),
+      exercices: (seance.exercices || []).map(ex => ({
+        id: ex.id,
+        exercice_id: ex.exercice_id,
+        name: ex.name || "",
+        description: ex.description || "",
+        repetitions: ex.repetitions,
+        duration_seconds: ex.duration_seconds,
+        series: ex.series || 1,
+        ordre: ex.ordre
+      })),
+      author_name: seance.author_name
+    });
+    setFormDialogOpen(true);
   };
 
   const toggleShare = async (seanceId: string, currentlyShared: boolean, isCopy: boolean, isValidated: boolean) => {
@@ -224,6 +266,8 @@ export default function SeanceType() {
 
   const deleteSeance = async (id: string) => {
     try {
+      // Delete exercices first
+      await supabase.from("seance_exercices").delete().eq("seance_type_id", id);
       await supabase.from("seance_types").delete().eq("id", id);
       toast.success("Séance supprimée");
       fetchData();
@@ -233,7 +277,7 @@ export default function SeanceType() {
     }
   };
 
-  const copySeance = async (seance: SeanceType) => {
+  const duplicateSeance = async (seance: SeanceType) => {
     if (!user) return;
 
     try {
@@ -250,12 +294,15 @@ export default function SeanceType() {
         .insert({
           user_id: user.id,
           pathologie: seance.pathologie,
+          pathologies: seance.pathologies || [],
           objectif_principal: seance.objectif_principal,
+          objectifs_principaux: seance.objectifs_principaux || [],
           objectif_secondaire: seance.objectif_secondaire,
-          author_name: seance.author_name,
+          objectifs_secondaires: seance.objectifs_secondaires || [],
+          author_name: profileData?.pseudo || seance.author_name,
           is_shared: false,
-          is_copy: true,
-          original_id: seance.id,
+          is_copy: seance.user_id !== user.id,
+          original_id: seance.user_id !== user.id ? seance.id : null,
         })
         .select()
         .single();
@@ -267,21 +314,37 @@ export default function SeanceType() {
         for (const ex of seance.exercices) {
           await supabase.from("seance_exercices").insert({
             seance_type_id: newSeance.id,
+            exercice_id: ex.exercice_id,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,
             duration_seconds: ex.duration_seconds,
+            series: ex.series || 1,
             ordre: ex.ordre,
           });
         }
       }
 
-      toast.success("Séance copiée dans votre bibliothèque");
+      toast.success(seance.user_id !== user.id ? "Séance copiée dans votre bibliothèque" : "Séance dupliquée");
       fetchData();
     } catch (error) {
-      console.error("Error copying seance:", error);
-      toast.error("Erreur lors de la copie");
+      console.error("Error duplicating seance:", error);
+      toast.error("Erreur lors de la duplication");
     }
+  };
+
+  const getDisplayPathologies = (seance: SeanceType) => {
+    return seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie];
+  };
+
+  const getDisplayObjectifsPrincipaux = (seance: SeanceType) => {
+    return seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : [seance.objectif_principal];
+  };
+
+  const getDisplayObjectifsSecondaires = (seance: SeanceType) => {
+    if (seance.objectifs_secondaires?.length > 0) return seance.objectifs_secondaires;
+    if (seance.objectif_secondaire) return [seance.objectif_secondaire];
+    return [];
   };
 
   if (!user) {
@@ -307,6 +370,10 @@ export default function SeanceType() {
               <p className="text-muted-foreground">Gérez vos modèles de séances prédéfinies</p>
             </div>
           </div>
+          <Button onClick={openCreateDialog} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nouvelle séance
+          </Button>
         </div>
 
         {/* Filters and Search */}
@@ -366,149 +433,178 @@ export default function SeanceType() {
             {loading ? (
               <p className="text-muted-foreground">Chargement...</p>
             ) : filteredSeances.length === 0 ? (
-              <p className="text-muted-foreground">Aucune séance type trouvée.</p>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">Aucune séance type trouvée.</p>
+                {filter === "mine" && (
+                  <Button onClick={openCreateDialog} variant="outline" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Créer votre première séance
+                  </Button>
+                )}
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Pathologie</TableHead>
-                      <TableHead>Objectif Principal</TableHead>
-                      <TableHead>Objectif Secondaire</TableHead>
-                      <TableHead>Exercices</TableHead>
-                      <TableHead>Interactions</TableHead>
-                      <TableHead>Auteur</TableHead>
-                      <TableHead>Partagée</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSeances.map((seance) => {
-                      const isOwner = seance.user_id === user?.id;
-                      const canShare = isOwner && !seance.is_copy;
-                      return (
-                      <TableRow key={seance.id}>
-                        <TableCell>
-                          <Badge variant="outline">{seance.pathologie}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{seance.objectif_principal}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {seance.objectif_secondaire ? (
-                            <Badge variant="outline">{seance.objectif_secondaire}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2 max-w-xs">
-                            {seance.exercices?.map((ex, i) => (
-                              <div key={ex.id} className="flex items-start gap-2 text-sm">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate">{ex.name || `Exercice ${i + 1}`}</p>
-                                  {ex.description && (
-                                    <p className="text-muted-foreground text-xs truncate">{ex.description}</p>
-                                  )}
-                                  {(ex.repetitions || ex.duration_seconds) && (
-                                    <p className="text-muted-foreground text-xs">
-                                      {ex.repetitions && `${ex.repetitions} reps`}
-                                      {ex.repetitions && ex.duration_seconds && " - "}
-                                      {ex.duration_seconds && `${ex.duration_seconds}s`}
-                                    </p>
+              <div className="grid gap-4">
+                {filteredSeances.map((seance) => {
+                  const isOwner = seance.user_id === user?.id;
+                  const canShare = isOwner && !seance.is_copy;
+                  const pathologies = getDisplayPathologies(seance);
+                  const objectifsPrincipaux = getDisplayObjectifsPrincipaux(seance);
+                  const objectifsSecondaires = getDisplayObjectifsSecondaires(seance);
+
+                  return (
+                    <Card key={seance.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col lg:flex-row gap-4">
+                          {/* Main content */}
+                          <div className="flex-1 space-y-3">
+                            {/* Pathologies */}
+                            <div className="flex flex-wrap gap-1">
+                              {pathologies.map((p, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
+                              ))}
+                              {seance.is_copy && (
+                                <Badge variant="secondary" className="text-xs">Copie</Badge>
+                              )}
+                            </div>
+
+                            {/* Objectifs Principaux */}
+                            <div className="flex flex-wrap gap-1">
+                              {objectifsPrincipaux.map((o, i) => (
+                                <Badge key={i} variant="default" className="text-xs">{o}</Badge>
+                              ))}
+                            </div>
+
+                            {/* Objectifs Secondaires */}
+                            {objectifsSecondaires.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {objectifsSecondaires.map((o, i) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">{o}</Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Exercices */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground font-medium">
+                                Exercices ({seance.exercices?.length || 0})
+                              </p>
+                              {seance.exercices && seance.exercices.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {seance.exercices.slice(0, 5).map((ex, i) => (
+                                    <div key={ex.id} className="text-xs bg-muted/50 px-2 py-1 rounded">
+                                      <span className="font-medium">{ex.name || `Exercice ${i + 1}`}</span>
+                                      <span className="text-muted-foreground ml-1">
+                                        ({ex.series || 1}x
+                                        {ex.repetitions ? ` ${ex.repetitions} reps` : ""}
+                                        {ex.duration_seconds ? ` ${ex.duration_seconds}s` : ""})
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {seance.exercices.length > 5 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      +{seance.exercices.length - 5} autres
+                                    </span>
                                   )}
                                 </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">Aucun exercice</p>
+                              )}
+                            </div>
+
+                            {/* Author */}
+                            <p className="text-xs text-muted-foreground">
+                              Par <span className="font-medium">{seance.author_name || "Anonyme"}</span>
+                            </p>
+                          </div>
+
+                          {/* Side panel - Interactions & Actions */}
+                          <div className="flex flex-col gap-3 lg:w-48">
+                            {/* Interactions */}
+                            <div className="flex items-center gap-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
+                                onClick={() => handleLike(seance.id, seance.user_liked || false)}
+                              >
+                                <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
+                                {seance.likes_count}
+                              </Button>
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <MessageCircle className="w-4 h-4" />
+                                {seance.comments_count}
                               </div>
-                            ))}
-                            {(!seance.exercices || seance.exercices.length === 0) && (
-                              <span className="text-muted-foreground text-sm">Aucun exercice</span>
+                            </div>
+
+                            {/* Share status */}
+                            {canShare && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={seance.is_shared}
+                                  onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
+                                  disabled={seance.is_validated && seance.is_shared}
+                                />
+                                <span className="text-xs">Partager</span>
+                                {seance.is_shared && seance.is_validated && (
+                                  <Badge className="text-xs bg-green-500">Validé</Badge>
+                                )}
+                                {seance.is_shared && !seance.is_validated && (
+                                  <Badge variant="secondary" className="text-xs">En attente</Badge>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
-                              onClick={() => handleLike(seance.id, seance.user_liked || false)}
-                            >
-                              <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
-                              {seance.likes_count}
-                            </Button>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <MessageCircle className="w-4 h-4" />
-                              {seance.comments_count}
+
+                            {/* Actions */}
+                            <div className="flex gap-1 flex-wrap">
+                              {isOwner && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditDialog(seance)}
+                                  className="gap-1"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  Modifier
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => duplicateSeance(seance)}
+                                className="gap-1"
+                              >
+                                <Copy className="w-3 h-3" />
+                                {isOwner ? "Dupliquer" : "Copier"}
+                              </Button>
+                              {isOwner && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => deleteSeance(seance.id)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">{seance.author_name || "Anonyme"}</span>
-                          {seance.is_copy && (
-                            <Badge variant="outline" className="ml-2 text-xs">Copie</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {canShare ? (
-                            <>
-                              <Checkbox
-                                checked={seance.is_shared}
-                                onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
-                                disabled={seance.is_validated && seance.is_shared}
-                              />
-                              {seance.is_shared && seance.is_validated && (
-                                <Badge className="ml-2 text-xs bg-green-500">Validé</Badge>
-                              )}
-                              {seance.is_shared && !seance.is_validated && (
-                                <Badge variant="secondary" className="ml-2 text-xs bg-orange-500">En attente</Badge>
-                              )}
-                            </>
-                          ) : isOwner && seance.is_copy ? (
-                            <span className="text-xs text-muted-foreground">Non partageable</span>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <Badge variant={seance.is_shared ? "default" : "outline"}>
-                                {seance.is_shared ? "Oui" : "Non"}
-                              </Badge>
-                              {seance.is_shared && seance.is_validated && (
-                                <Badge className="text-xs bg-green-500">Validé</Badge>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {!isOwner && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => copySeance(seance)}
-                                title="Copier dans ma bibliothèque"
-                              >
-                                <Copy className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {isOwner && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                                onClick={() => deleteSeance(seance.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Form Dialog */}
+        <SeanceFormDialog
+          open={formDialogOpen}
+          onOpenChange={setFormDialogOpen}
+          seance={editingSeance}
+          onSuccess={fetchData}
+        />
       </div>
     </Layout>
   );

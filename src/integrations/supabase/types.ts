@@ -576,33 +576,46 @@ export type Database = {
           created_at: string
           description: string | null
           duration_seconds: number | null
+          exercice_id: string | null
           id: string
           name: string | null
           ordre: number
           repetitions: number | null
           seance_type_id: string
+          series: number | null
         }
         Insert: {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          exercice_id?: string | null
           id?: string
           name?: string | null
           ordre?: number
           repetitions?: number | null
           seance_type_id: string
+          series?: number | null
         }
         Update: {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          exercice_id?: string | null
           id?: string
           name?: string | null
           ordre?: number
           repetitions?: number | null
           seance_type_id?: string
+          series?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "seance_exercices_exercice_id_fkey"
+            columns: ["exercice_id"]
+            isOneToOne: false
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "seance_exercices_seance_type_id_fkey"
             columns: ["seance_type_id"]
@@ -651,8 +664,11 @@ export type Database = {
           is_validated: boolean | null
           objectif_principal: string
           objectif_secondaire: string | null
+          objectifs_principaux: string[] | null
+          objectifs_secondaires: string[] | null
           original_id: string | null
           pathologie: string
+          pathologies: string[] | null
           updated_at: string
           user_id: string
         }
@@ -665,8 +681,11 @@ export type Database = {
           is_validated?: boolean | null
           objectif_principal: string
           objectif_secondaire?: string | null
+          objectifs_principaux?: string[] | null
+          objectifs_secondaires?: string[] | null
           original_id?: string | null
           pathologie: string
+          pathologies?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -679,8 +698,11 @@ export type Database = {
           is_validated?: boolean | null
           objectif_principal?: string
           objectif_secondaire?: string | null
+          objectifs_principaux?: string[] | null
+          objectifs_secondaires?: string[] | null
           original_id?: string | null
           pathologie?: string
+          pathologies?: string[] | null
           updated_at?: string
           user_id?: string
         }
