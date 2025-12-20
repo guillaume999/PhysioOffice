@@ -136,6 +136,7 @@ export type Database = {
         Row: {
           author_name: string | null
           created_at: string
+          deleted_by_author: boolean | null
           description: string | null
           id: string
           is_copy: boolean | null
@@ -153,6 +154,7 @@ export type Database = {
         Insert: {
           author_name?: string | null
           created_at?: string
+          deleted_by_author?: boolean | null
           description?: string | null
           id?: string
           is_copy?: boolean | null
@@ -170,6 +172,7 @@ export type Database = {
         Update: {
           author_name?: string | null
           created_at?: string
+          deleted_by_author?: boolean | null
           description?: string | null
           id?: string
           is_copy?: boolean | null
