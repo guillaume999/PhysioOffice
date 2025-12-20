@@ -505,12 +505,12 @@ export default function SeanceType() {
                             )}
 
                             {/* Exercices */}
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold">
                                 Exercices ({seance.exercices?.length || 0})
                               </p>
                               {seance.exercices && seance.exercices.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   {seance.exercices.map((ex, i) => {
                                     const thumbnailUrl = ex.exercice?.thumbnail_url || null;
                                     const exerciceName = ex.exercice?.title || ex.name || `Exercice ${i + 1}`;
@@ -518,10 +518,15 @@ export default function SeanceType() {
                                     return (
                                       <div 
                                         key={ex.id} 
-                                        className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50"
+                                        className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50"
                                       >
+                                        {/* Order number */}
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                          <span className="text-sm font-bold text-primary">{i + 1}</span>
+                                        </div>
+
                                         {/* Thumbnail */}
-                                        <div className="w-16 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                                        <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                                           {thumbnailUrl ? (
                                             <img 
                                               src={thumbnailUrl} 
@@ -530,46 +535,49 @@ export default function SeanceType() {
                                             />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                              <Calendar className="w-5 h-5" />
+                                              <Calendar className="w-6 h-6" />
                                             </div>
                                           )}
                                         </div>
                                         
                                         {/* Exercise info */}
                                         <div className="flex-1 min-w-0">
-                                          <p className="font-medium text-sm truncate">{exerciceName}</p>
-                                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>{ex.series || 1} série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                          <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
+                                          
+                                          {/* Stats - larger display */}
+                                          <div className="flex items-center gap-4 flex-wrap">
+                                            <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg">
+                                              <span className="text-lg font-bold text-primary">{ex.series || 1}</span>
+                                              <span className="text-sm text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                            </div>
+                                            
                                             {ex.repetitions && (
-                                              <>
-                                                <span>•</span>
-                                                <span>{ex.repetitions} reps</span>
-                                              </>
+                                              <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
+                                                <span className="text-lg font-bold">{ex.repetitions}</span>
+                                                <span className="text-sm text-muted-foreground">répétitions</span>
+                                              </div>
                                             )}
+                                            
                                             {ex.duration_seconds && (
-                                              <>
-                                                <span>•</span>
-                                                <span>{ex.duration_seconds}s</span>
-                                              </>
+                                              <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
+                                                <span className="text-lg font-bold">{ex.duration_seconds}</span>
+                                                <span className="text-sm text-muted-foreground">secondes</span>
+                                              </div>
                                             )}
                                           </div>
+
                                           {ex.description && (
-                                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                                               {ex.description}
                                             </p>
                                           )}
                                         </div>
-
-                                        {/* Order badge */}
-                                        <Badge variant="outline" className="text-xs flex-shrink-0">
-                                          #{i + 1}
-                                        </Badge>
                                       </div>
                                     );
                                   })}
                                 </div>
                               ) : (
-                                <p className="text-sm text-muted-foreground">Aucun exercice</p>
+                                <p className="text-sm text-muted-foreground py-4 text-center">Aucun exercice</p>
                               )}
                             </div>
 
