@@ -12,13 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 interface Patient {
   id: string;
   name: string;
   numero: string | null;
   status: string;
-  mutual_number: string | null;
+  has_mutual: boolean;
   remaining_sessions: number | null;
   prescription: string | null;
 }
@@ -57,7 +58,7 @@ export default function Patients() {
   const [formData, setFormData] = useState({ 
     name: "", 
     status: "active",
-    mutual_number: "",
+    has_mutual: false,
     remaining_sessions: 0,
     prescription: "none"
   });
@@ -73,7 +74,7 @@ export default function Patients() {
   const fetchPatients = async () => {
     const { data, error } = await supabase
       .from("patients")
-      .select("id, name, numero, status, mutual_number, remaining_sessions, prescription")
+      .select("id, name, numero, status, has_mutual, remaining_sessions, prescription")
       .order("created_at", { ascending: false });
     if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
     else setPatients(data || []);
@@ -99,7 +100,7 @@ export default function Patients() {
     else { 
       toast({ title: "Patient ajouté" }); 
       setIsDialogOpen(false); 
-      setFormData({ name: "", status: "active", mutual_number: "", remaining_sessions: 0, prescription: "none" }); 
+      setFormData({ name: "", status: "active", has_mutual: false, remaining_sessions: 0, prescription: "none" }); 
       fetchPatients(); 
     }
   };
@@ -150,8 +151,16 @@ export default function Patients() {
                       </Select>
                     </div>
                     <div>
-                      <Label>N° Mutuelle</Label>
-                      <Input value={formData.mutual_number} onChange={e => setFormData({...formData, mutual_number: e.target.value})} />
+                      <Label>Mutuelle</Label>
+                      <div className="flex items-center gap-3 h-10">
+                        <Switch
+                          checked={formData.has_mutual}
+                          onCheckedChange={(checked) => setFormData({...formData, has_mutual: checked})}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {formData.has_mutual ? "Oui" : "Non"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -229,7 +238,7 @@ export default function Patients() {
                   <TableHead>Nom</TableHead>
                   <TableHead>Numéro</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>N° Mutuelle</TableHead>
+                  <TableHead>Mutuelle</TableHead>
                   <TableHead>Séances restantes</TableHead>
                   <TableHead>Prescription</TableHead>
                 </TableRow>
@@ -256,7 +265,13 @@ export default function Patients() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>{p.mutual_number || "-"}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        p.has_mutual ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {p.has_mutual ? "Oui" : "Non"}
+                      </span>
+                    </TableCell>
                     <TableCell>{p.remaining_sessions ?? 0}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${

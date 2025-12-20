@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Save, Trash2, User, Copy } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -24,7 +25,7 @@ interface PatientData {
   name: string;
   numero: string | null;
   status: string;
-  mutual_number: string | null;
+  has_mutual: boolean;
   remaining_sessions: number | null;
   prescription: string | null;
   address: string | null;
@@ -193,7 +194,7 @@ export default function PatientDetail() {
       .update({
         name: formData.name,
         status: formData.status,
-        mutual_number: formData.mutual_number,
+        has_mutual: formData.has_mutual ?? false,
         remaining_sessions: formData.remaining_sessions,
         prescription: formData.prescription,
         address: formData.address,
@@ -272,7 +273,7 @@ export default function PatientDetail() {
           user_id: user.id,
           name: `${patient.name} (copie)`,
           status: patient.status,
-          mutual_number: patient.mutual_number,
+          has_mutual: patient.has_mutual,
           remaining_sessions: patient.remaining_sessions,
           prescription: patient.prescription,
           address: patient.address,
@@ -503,11 +504,16 @@ export default function PatientDetail() {
                 </Select>
               </div>
               <div>
-                <Label>N° Mutuelle</Label>
-                <Input 
-                  value={formData.mutual_number || ""} 
-                  onChange={e => setFormData({...formData, mutual_number: e.target.value})} 
-                />
+                <Label>Mutuelle</Label>
+                <div className="flex items-center gap-3 h-10">
+                  <Switch
+                    checked={formData.has_mutual ?? false}
+                    onCheckedChange={(checked) => setFormData({...formData, has_mutual: checked})}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {formData.has_mutual ? "Oui" : "Non"}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

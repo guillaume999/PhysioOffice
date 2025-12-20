@@ -440,9 +440,9 @@ export type Database = {
           allergies: string | null
           blood_type: string | null
           created_at: string
+          has_mutual: boolean
           id: string
           medical_notes: string | null
-          mutual_number: string | null
           name: string
           numero: string | null
           postal_code: string | null
@@ -457,9 +457,9 @@ export type Database = {
           allergies?: string | null
           blood_type?: string | null
           created_at?: string
+          has_mutual?: boolean
           id?: string
           medical_notes?: string | null
-          mutual_number?: string | null
           name: string
           numero?: string | null
           postal_code?: string | null
@@ -474,9 +474,9 @@ export type Database = {
           allergies?: string | null
           blood_type?: string | null
           created_at?: string
+          has_mutual?: boolean
           id?: string
           medical_notes?: string | null
-          mutual_number?: string | null
           name?: string
           numero?: string | null
           postal_code?: string | null
