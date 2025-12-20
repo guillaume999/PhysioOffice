@@ -424,11 +424,11 @@ export default function Exercices() {
           // Cancel the pending share - delete the copy
           await supabase.from("exercices").delete().eq("id", existingCopy.id);
           toast.success("Demande de partage annulée");
-        } else {
-          toast.error("Cet exercice est déjà partagé");
+          fetchData();
+          return;
         }
-        fetchData();
-        return;
+        // If already shared, create a new pending copy for re-sharing (don't touch the existing shared copy)
+        // The new copy will replace the old one once validated
       }
 
       // Create a copy for sharing (original stays as draft and editable)
