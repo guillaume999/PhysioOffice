@@ -588,7 +588,11 @@ export default function Exercices() {
   };
 
   const canEdit = (exercice: Exercice) => {
-    return exercice.user_id === user?.id && exercice.status === "draft";
+    const isOnPlatform = featuredExerciceIds.includes(exercice.id);
+    // Admins can edit platform exercises
+    if (isAdmin && isOnPlatform) return true;
+    // Users can only edit their own draft exercises
+    return exercice.user_id === user?.id && exercice.status === "draft" && !isOnPlatform;
   };
 
   const canDelete = (exercice: Exercice) => {
