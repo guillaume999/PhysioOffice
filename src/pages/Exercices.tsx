@@ -495,10 +495,24 @@ export default function Exercices() {
     }
   };
 
-  const deleteExercice = async (id: string) => {
+  const deleteExercice = async (exercice: Exercice) => {
     try {
-      await supabase.from("exercices").delete().eq("id", id);
-      toast.success("Exercice supprimé");
+      // Check if exercise is shared or on platform - use soft delete
+      const isOnPlatform = featuredExerciceIds.includes(exercice.id);
+      const isSharedOrPending = exercice.status === "shared" || exercice.status === "pending";
+      
+      if (isOnPlatform || isSharedOrPending) {
+        // Soft delete - mark as deleted by author
+        await supabase
+          .from("exercices")
+          .update({ deleted_by_author: true })
+          .eq("id", exercice.id);
+        toast.success("Exercice retiré de votre bibliothèque");
+      } else {
+        // Hard delete for draft exercises
+        await supabase.from("exercices").delete().eq("id", exercice.id);
+        toast.success("Exercice supprimé");
+      }
       fetchData();
     } catch (error) {
       console.error("Error deleting exercice:", error);
@@ -830,7 +844,7 @@ export default function Exercices() {
                               variant="ghost"
                               size="icon"
                               className="text-destructive"
-                              onClick={() => deleteExercice(exercice.id)}
+                              onClick={() => deleteExercice(exercice)}
                               title="Supprimer"
                             >
                               <Trash2 className="w-4 h-4" />
