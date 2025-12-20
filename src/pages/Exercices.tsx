@@ -595,55 +595,44 @@ export default function Exercices() {
       
       if (sharedCopyStatus === "pending") {
         return (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Brouillon</Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleShare(exercice);
-              }}
-              className="h-7 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-            >
-              <X className="w-3 h-3 mr-1" />
-              Annuler partage
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleShare(exercice);
+            }}
+            className="h-7 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+          >
+            <X className="w-3 h-3 mr-1" />
+            Annuler partage
+          </Button>
         );
       }
       
       if (sharedCopyStatus === "shared") {
-        return (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Brouillon</Badge>
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>
-          </div>
-        );
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
       }
       
       // No shared copy - show share button
       if (!exercice.is_copy && userCanShare) {
         return (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Brouillon</Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleShare(exercice);
-              }}
-              className="h-7 text-xs"
-            >
-              <Users className="w-3 h-3 mr-1" />
-              Partager
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleShare(exercice);
+            }}
+            className="h-7 text-xs"
+          >
+            <Users className="w-3 h-3 mr-1" />
+            Partager
+          </Button>
         );
       }
       
-      return <Badge variant="outline">Brouillon</Badge>;
+      return null;
     }
     
     switch (exercice.status) {
@@ -652,7 +641,7 @@ export default function Exercices() {
       case "pending":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
       default:
-        return <Badge variant="outline">Brouillon</Badge>;
+        return null;
     }
   };
 
