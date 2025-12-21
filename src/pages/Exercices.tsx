@@ -91,6 +91,8 @@ export default function Exercices() {
       result = result.filter((e) => {
         // Only show user's exercises
         if (e.user_id !== user?.id) return false;
+        // Hide legacy "share copies" (created by old system): original_id set but not a user copy
+        if (e.original_id && !e.is_copy) return false;
         // Hide exercises that user has deleted from their library (soft delete)
         if ((e as any).deleted_by_author) return false;
         return true;
