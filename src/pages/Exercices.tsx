@@ -98,6 +98,8 @@ export default function Exercices() {
         if (e.user_id !== user?.id) return false;
         // Hide shared copies (pending/shared with original_id) - these are for sharing only
         if (e.original_id && (e.status === "pending" || e.status === "shared")) return false;
+        // Hide exercises that user has deleted from their library (soft delete)
+        if ((e as any).deleted_by_author) return false;
         return true;
       });
     } else if (filter === "platform") {
