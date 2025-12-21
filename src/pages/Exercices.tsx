@@ -102,7 +102,8 @@ export default function Exercices() {
     } else if (filter === "shared") {
       result = result.filter((e) => 
         e.status === "shared" && 
-        !featuredExerciceIds.includes(e.id)
+        !featuredExerciceIds.includes(e.id) &&
+        !(e as any).deleted_by_author
       );
     }
 
