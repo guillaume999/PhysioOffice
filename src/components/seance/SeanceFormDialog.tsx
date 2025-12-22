@@ -245,11 +245,31 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
         // Delete old exercices
         await supabase.from("seance_exercices").delete().eq("seance_type_id", seance.id);
 
-        // Insert new exercices
+        // Insert new exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
+          let exerciceId = ex.exercice_id;
+          
+          // If it's a custom exercice (no exercice_id), create it in the exercices table
+          if (!exerciceId && ex.name) {
+            const { data: newExercice } = await supabase
+              .from("exercices")
+              .insert({
+                user_id: user.id,
+                title: ex.name,
+                description: ex.description || null,
+                status: "draft"
+              })
+              .select()
+              .single();
+            
+            if (newExercice) {
+              exerciceId = newExercice.id;
+            }
+          }
+          
           await supabase.from("seance_exercices").insert({
             seance_type_id: seance.id,
-            exercice_id: ex.exercice_id,
+            exercice_id: exerciceId,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,
@@ -282,11 +302,31 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
 
         if (insertError) throw insertError;
 
-        // Insert exercices
+        // Insert exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
+          let exerciceId = ex.exercice_id;
+          
+          // If it's a custom exercice (no exercice_id), create it in the exercices table
+          if (!exerciceId && ex.name) {
+            const { data: newExercice } = await supabase
+              .from("exercices")
+              .insert({
+                user_id: user.id,
+                title: ex.name,
+                description: ex.description || null,
+                status: "draft"
+              })
+              .select()
+              .single();
+            
+            if (newExercice) {
+              exerciceId = newExercice.id;
+            }
+          }
+          
           await supabase.from("seance_exercices").insert({
             seance_type_id: newSeance.id,
-            exercice_id: ex.exercice_id,
+            exercice_id: exerciceId,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,
