@@ -17,9 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
 import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjectivesCard";
-import { PatientSeancesCard } from "@/components/patient/PatientSeancesCard";
 import { ImportTraitementDialog } from "@/components/patient/ImportTraitementDialog";
-import { ImportSeanceDialog } from "@/components/patient/ImportSeanceDialog";
 
 interface PatientData {
   id: string;
@@ -47,15 +45,6 @@ interface CarePlanData {
   active_traitement_id: string | null;
 }
 
-interface PatientSeance {
-  id: string;
-  seance_type_id: string;
-  ordre: number;
-  seance_type?: {
-    pathologie: string;
-    objectif_principal: string;
-  };
-}
 
 const statusLabels: Record<string, string> = {
   active: "Actif",
@@ -87,11 +76,9 @@ export default function PatientDetail() {
     objectifs_prise_en_charge: "",
     active_traitement_id: null,
   });
-  const [patientSeances, setPatientSeances] = useState<PatientSeance[]>([]);
   const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
   
   const [importTraitementOpen, setImportTraitementOpen] = useState(false);
-  const [importSeanceOpen, setImportSeanceOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateOptions, setDuplicateOptions] = useState({
@@ -108,7 +95,6 @@ export default function PatientDetail() {
     if (user && id) {
       fetchPatient();
       fetchCarePlan();
-      fetchPatientSeances();
     }
   }, [user, id]);
 
@@ -163,28 +149,6 @@ export default function PatientDetail() {
     }
   };
 
-  const fetchPatientSeances = async () => {
-    const { data, error } = await supabase
-      .from("patient_seances")
-      .select(`
-        id,
-        seance_type_id,
-        ordre,
-        seance_type:seance_types(pathologie, objectif_principal)
-      `)
-      .eq("patient_id", id)
-      .order("ordre", { ascending: true });
-    
-    if (data) {
-      const formattedData = data.map((item: any) => ({
-        id: item.id,
-        seance_type_id: item.seance_type_id,
-        ordre: item.ordre,
-        seance_type: item.seance_type,
-      }));
-      setPatientSeances(formattedData);
-    }
-  };
 
   const handleSave = async () => {
     if (!id || !user) return;
@@ -335,46 +299,6 @@ export default function PatientDetail() {
     }
   };
 
-  const handleImportSeance = async (seanceTypeId: string) => {
-    if (!id || !user) return;
-    
-    const nextOrdre = patientSeances.length;
-    
-    const { error } = await supabase.from("patient_seances").insert({
-      patient_id: id,
-      seance_type_id: seanceTypeId,
-      user_id: user.id,
-      ordre: nextOrdre,
-    });
-    
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Séance importée" });
-      fetchPatientSeances();
-    }
-  };
-
-  const handleDeleteSeance = async (seanceId: string) => {
-    const { error } = await supabase.from("patient_seances").delete().eq("id", seanceId);
-    
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Séance supprimée" });
-      fetchPatientSeances();
-    }
-  };
-
-  const handleEditSeance = (seance: PatientSeance) => {
-    if (seance.seance_type_id) {
-      navigate(`/seance-type/${seance.seance_type_id}`);
-    }
-  };
-
-  const handleCreateSeance = () => {
-    navigate("/seance-type/new");
-  };
 
   const handleCreateTraitement = () => {
     navigate("/traitement-type/new");
@@ -445,18 +369,7 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        <PatientSeancesCard
-          seances={patientSeances}
-          onImportSeance={() => setImportSeanceOpen(true)}
-          onCreateSeance={handleCreateSeance}
-          onEditSeance={handleEditSeance}
-          onDeleteSeance={handleDeleteSeance}
-          onImportTraitement={() => setImportTraitementOpen(true)}
-          onCreateTraitement={handleCreateTraitement}
-          activeTraitementName={activeTraitementName}
-        />
-
-        <div className="mt-6">
+        <div>
           <PatientCommentsCard
             comments={carePlan.comments}
             onChange={(value) => handleCarePlanChange("comments", value)}
@@ -571,11 +484,6 @@ export default function PatientDetail() {
           onSelect={handleSelectTraitement}
         />
 
-        <ImportSeanceDialog
-          open={importSeanceOpen}
-          onOpenChange={setImportSeanceOpen}
-          onSelect={handleImportSeance}
-        />
 
         <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
           <DialogContent>
