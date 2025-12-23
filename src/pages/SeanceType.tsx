@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -230,7 +230,8 @@ export default function SeanceType() {
         repetitions: ex.repetitions,
         duration_seconds: ex.duration_seconds,
         series: ex.series || 1,
-        ordre: ex.ordre
+        ordre: ex.ordre,
+        video_url: ex.exercice?.video_url || null
       })),
       author_name: seance.author_name
     });
@@ -513,6 +514,7 @@ export default function SeanceType() {
                                 <div className="space-y-3">
                                   {seance.exercices.map((ex, i) => {
                                     const thumbnailUrl = ex.exercice?.thumbnail_url || null;
+                                    const videoUrl = ex.exercice?.video_url || null;
                                     const exerciceName = ex.exercice?.title || ex.name || `Exercice ${i + 1}`;
                                     
                                     return (
@@ -525,17 +527,28 @@ export default function SeanceType() {
                                           <span className="text-sm font-bold text-primary">{i + 1}</span>
                                         </div>
 
-                                        {/* Thumbnail */}
-                                        <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                                        {/* Thumbnail or Video */}
+                                        <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                                           {thumbnailUrl ? (
                                             <img 
                                               src={thumbnailUrl} 
                                               alt={exerciceName}
                                               className="w-full h-full object-cover"
                                             />
+                                          ) : videoUrl ? (
+                                            <video 
+                                              src={videoUrl}
+                                              className="w-full h-full object-cover"
+                                              muted
+                                            />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                                               <Calendar className="w-6 h-6" />
+                                            </div>
+                                          )}
+                                          {videoUrl && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                              <Video className="w-5 h-5 text-white" />
                                             </div>
                                           )}
                                         </div>
