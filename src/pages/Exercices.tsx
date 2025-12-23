@@ -122,6 +122,32 @@ export default function Exercices() {
     setFilteredExercices(result);
   };
 
+  const getFilterCounts = () => {
+    const userCopiedOriginalIds = exercices
+      .filter((e) => e.is_copy && e.user_id === user?.id && e.original_id)
+      .map((e) => e.original_id);
+
+    const mine = exercices.filter((e) => {
+      if (e.user_id !== user?.id) return false;
+      if (e.original_id && !e.is_copy) return false;
+      if ((e as any).deleted_by_author) return false;
+      return true;
+    }).length;
+
+    const platform = exercices.filter((e) => featuredExerciceIds.includes(e.id)).length;
+
+    const shared = exercices.filter((e) => 
+      e.status === "shared" && 
+      !featuredExerciceIds.includes(e.id) &&
+      !(e as any).deleted_by_author &&
+      !userCopiedOriginalIds.includes(e.id)
+    ).length;
+
+    return { mine, platform, shared };
+  };
+
+  const filterCounts = getFilterCounts();
+
   // Check if an exercise is on the platform
   const isOnPlatform = (exerciceId: string) => {
     return featuredExerciceIds.includes(exerciceId);
@@ -704,7 +730,7 @@ export default function Exercices() {
                 className="flex items-center gap-2"
               >
                 <User className="w-4 h-4" />
-                Mes exercices
+                Mes exercices ({filterCounts.mine})
               </Button>
               <Button
                 variant={filter === "platform" ? "default" : "outline"}
@@ -712,7 +738,7 @@ export default function Exercices() {
                 className="flex items-center gap-2"
               >
                 <Shield className="w-4 h-4" />
-                PhysioOffice
+                PhysioOffice ({filterCounts.platform})
               </Button>
               <Button
                 variant={filter === "shared" ? "default" : "outline"}
@@ -720,7 +746,7 @@ export default function Exercices() {
                 className="flex items-center gap-2"
               >
                 <Users className="w-4 h-4" />
-                Partagés
+                Partagés ({filterCounts.shared})
               </Button>
             </div>
 
