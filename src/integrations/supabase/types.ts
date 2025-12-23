@@ -438,6 +438,7 @@ export type Database = {
         Row: {
           address: string | null
           allergies: string | null
+          antecedents: string | null
           blood_type: string | null
           created_at: string
           has_mutual: boolean
@@ -455,6 +456,7 @@ export type Database = {
         Insert: {
           address?: string | null
           allergies?: string | null
+          antecedents?: string | null
           blood_type?: string | null
           created_at?: string
           has_mutual?: boolean
@@ -472,6 +474,7 @@ export type Database = {
         Update: {
           address?: string | null
           allergies?: string | null
+          antecedents?: string | null
           blood_type?: string | null
           created_at?: string
           has_mutual?: boolean

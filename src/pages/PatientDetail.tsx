@@ -4,11 +4,12 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -33,6 +34,7 @@ interface PatientData {
   medical_notes: string | null;
   allergies: string | null;
   blood_type: string | null;
+  antecedents: string | null;
   created_at: string;
 }
 
@@ -202,6 +204,7 @@ export default function PatientDetail() {
         medical_notes: formData.medical_notes,
         allergies: formData.allergies,
         blood_type: formData.blood_type,
+        antecedents: formData.antecedents,
       })
       .eq("id", id);
     
@@ -281,6 +284,7 @@ export default function PatientDetail() {
           medical_notes: patient.medical_notes,
           allergies: patient.allergies,
           blood_type: patient.blood_type,
+          antecedents: patient.antecedents,
         })
         .select()
         .single();
@@ -469,6 +473,24 @@ export default function PatientDetail() {
             onChange={handleCarePlanChange}
           />
         </div>
+
+        {/* Antécédents Card */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5 text-amber-500" />
+              <CardTitle className="text-lg">Antécédents</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="Antécédents médicaux, chirurgicaux, familiaux..."
+              value={formData.antecedents || ""}
+              onChange={(e) => setFormData({ ...formData, antecedents: e.target.value })}
+              className="min-h-[120px]"
+            />
+          </CardContent>
+        </Card>
 
         <Card className="mt-6">
           <CardHeader>
