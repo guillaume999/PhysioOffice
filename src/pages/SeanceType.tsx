@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface SeanceExercice {
   id: string;
@@ -66,6 +67,7 @@ export default function SeanceType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
+  const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -527,8 +529,11 @@ export default function SeanceType() {
                                           <span className="text-sm font-bold text-primary">{i + 1}</span>
                                         </div>
 
-                                        {/* Thumbnail or Video */}
-                                        <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                        {/* Thumbnail or Video - Clickable */}
+                                        <div 
+                                          className={`w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ${videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
+                                          onClick={() => videoUrl && setVideoToPlay(videoUrl)}
+                                        >
                                           {thumbnailUrl ? (
                                             <img 
                                               src={thumbnailUrl} 
@@ -547,8 +552,8 @@ export default function SeanceType() {
                                             </div>
                                           )}
                                           {videoUrl && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                              <Video className="w-5 h-5 text-white" />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors">
+                                              <Play className="w-5 h-5 text-white fill-white" />
                                             </div>
                                           )}
                                         </div>
@@ -688,6 +693,28 @@ export default function SeanceType() {
           seance={editingSeance}
           onSuccess={fetchData}
         />
+
+        {/* Video Player Dialog */}
+        <Dialog open={!!videoToPlay} onOpenChange={(open) => !open && setVideoToPlay(null)}>
+          <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-black border-none">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 text-white hover:bg-white/20"
+              onClick={() => setVideoToPlay(null)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            {videoToPlay && (
+              <video
+                src={videoToPlay}
+                controls
+                autoPlay
+                className="w-full h-auto max-h-[80vh]"
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
