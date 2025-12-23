@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2 } from "lucide-react";
+import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -590,19 +590,41 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                             <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
                               <Video className="w-4 h-4 text-primary" />
                               <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
-                              {!ex.exercice_id && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeVideo(index)}
-                                  className="h-6 px-2"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => fileInputRefs.current[index]?.click()}
+                                className="h-6 px-2"
+                                disabled={uploadingVideo === index}
+                              >
+                                {uploadingVideo === index ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Pencil className="w-3 h-3" />
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeVideo(index)}
+                                className="h-6 px-2"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                              <input
+                                type="file"
+                                accept="video/*"
+                                ref={(el) => { fileInputRefs.current[index] = el; }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleVideoUpload(index, file);
+                                }}
+                                className="hidden"
+                              />
                             </div>
-                          ) : !ex.exercice_id ? (
+                          ) : (
                             <div>
                               <input
                                 type="file"
@@ -635,8 +657,6 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                                 )}
                               </Button>
                             </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Aucune vidéo</p>
                           )}
                         </div>
 
