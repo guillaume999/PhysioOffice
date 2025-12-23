@@ -249,20 +249,23 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
         for (const ex of exercices) {
           let exerciceId = ex.exercice_id;
           
-          // If it's a custom exercice (no exercice_id), create it in the exercices table
-          if (!exerciceId && ex.name) {
-            const { data: newExercice } = await supabase
+          // If it's a custom exercice (no exercice_id) and has a name, create it in the exercices table
+          if (!exerciceId && ex.name && ex.name.trim()) {
+            const { data: newExercice, error: exerciceError } = await supabase
               .from("exercices")
               .insert({
                 user_id: user.id,
-                title: ex.name,
-                description: ex.description || null,
-                status: "draft"
+                title: ex.name.trim(),
+                description: ex.description?.trim() || null,
+                status: "draft",
+                pathologie_tags: []
               })
               .select()
               .single();
             
-            if (newExercice) {
+            if (exerciceError) {
+              console.error("Error creating exercice:", exerciceError);
+            } else if (newExercice) {
               exerciceId = newExercice.id;
             }
           }
@@ -306,20 +309,23 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
         for (const ex of exercices) {
           let exerciceId = ex.exercice_id;
           
-          // If it's a custom exercice (no exercice_id), create it in the exercices table
-          if (!exerciceId && ex.name) {
-            const { data: newExercice } = await supabase
+          // If it's a custom exercice (no exercice_id) and has a name, create it in the exercices table
+          if (!exerciceId && ex.name && ex.name.trim()) {
+            const { data: newExercice, error: exerciceError } = await supabase
               .from("exercices")
               .insert({
                 user_id: user.id,
-                title: ex.name,
-                description: ex.description || null,
-                status: "draft"
+                title: ex.name.trim(),
+                description: ex.description?.trim() || null,
+                status: "draft",
+                pathologie_tags: []
               })
               .select()
               .single();
             
-            if (newExercice) {
+            if (exerciceError) {
+              console.error("Error creating exercice:", exerciceError);
+            } else if (newExercice) {
               exerciceId = newExercice.id;
             }
           }
