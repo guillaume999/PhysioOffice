@@ -121,6 +121,24 @@ export default function TraitementType() {
     setFilteredTraitements(result);
   };
 
+  const getFilterCounts = () => {
+    const userCopiedOriginalIds = traitements
+      .filter((t) => t.is_copy && t.user_id === user?.id && t.original_id)
+      .map((t) => t.original_id);
+
+    const mine = traitements.filter((t) => t.user_id === user?.id).length;
+    const shared = traitements.filter((t) => 
+      t.is_shared && 
+      t.is_validated &&
+      t.user_id !== user?.id &&
+      !userCopiedOriginalIds.includes(t.id)
+    ).length;
+
+    return { mine, shared };
+  };
+
+  const filterCounts = getFilterCounts();
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -367,7 +385,7 @@ export default function TraitementType() {
                   className="gap-2"
                 >
                   <User className="w-4 h-4" />
-                  Mes traitements
+                  Mes traitements ({filterCounts.mine})
                 </Button>
                 <Button
                   variant={filter === "shared" ? "default" : "outline"}
@@ -376,7 +394,7 @@ export default function TraitementType() {
                   className="gap-2"
                 >
                   <Users className="w-4 h-4" />
-                  Partagés
+                  Partagés ({filterCounts.shared})
                 </Button>
               </div>
 
