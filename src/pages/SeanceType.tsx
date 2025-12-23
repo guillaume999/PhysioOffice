@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -68,6 +68,7 @@ export default function SeanceType() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
+  const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -371,6 +372,18 @@ export default function SeanceType() {
     return [];
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedSeances(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   if (!user) {
     return (
       <Layout>
@@ -478,205 +491,229 @@ export default function SeanceType() {
                   return (
                     <Card key={seance.id} className="overflow-hidden">
                       <CardContent className="p-4">
-                        <div className="flex flex-col lg:flex-row gap-4">
-                          {/* Main content */}
-                          <div className="flex-1 space-y-3">
-                            {/* Pathologies */}
-                            <div className="flex flex-wrap gap-1">
-                              {pathologies.map((p, i) => (
-                                <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
-                              ))}
-                              {seance.is_copy && (
-                                <Badge variant="secondary" className="text-xs">Copie</Badge>
-                              )}
-                            </div>
-
-                            {/* Objectifs Principaux */}
-                            <div className="flex flex-wrap gap-1">
-                              {objectifsPrincipaux.map((o, i) => (
-                                <Badge key={i} variant="default" className="text-xs">{o}</Badge>
-                              ))}
-                            </div>
-
-                            {/* Objectifs Secondaires */}
-                            {objectifsSecondaires.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {objectifsSecondaires.map((o, i) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">{o}</Badge>
-                                ))}
-                              </div>
+                        {/* Header - Always visible */}
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                            {pathologies.map((p, i) => (
+                              <Badge key={i} variant="outline" className="text-xs flex-shrink-0">{p}</Badge>
+                            ))}
+                            <span className="text-muted-foreground">-</span>
+                            {objectifsPrincipaux.map((o, i) => (
+                              <Badge key={i} variant="default" className="text-xs flex-shrink-0">{o}</Badge>
+                            ))}
+                            {seance.is_copy && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
                             )}
-
-                            {/* Exercices */}
-                            <div className="space-y-3">
-                              <p className="text-sm font-semibold">
-                                Exercices ({seance.exercices?.length || 0})
-                              </p>
-                              {seance.exercices && seance.exercices.length > 0 ? (
-                                <div className="space-y-3">
-                                  {seance.exercices.map((ex, i) => {
-                                    const thumbnailUrl = ex.exercice?.thumbnail_url || null;
-                                    const videoUrl = ex.exercice?.video_url || null;
-                                    const exerciceName = ex.exercice?.title || ex.name || `Exercice ${i + 1}`;
-                                    
-                                    return (
-                                      <div 
-                                        key={ex.id} 
-                                        className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50"
-                                      >
-                                        {/* Order number */}
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                          <span className="text-sm font-bold text-primary">{i + 1}</span>
-                                        </div>
-
-                                        {/* Thumbnail or Video - Clickable */}
-                                        <div 
-                                          className={`w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ${videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
-                                          onClick={() => videoUrl && setVideoToPlay(videoUrl)}
-                                        >
-                                          {thumbnailUrl ? (
-                                            <img 
-                                              src={thumbnailUrl} 
-                                              alt={exerciceName}
-                                              className="w-full h-full object-cover"
-                                            />
-                                          ) : videoUrl ? (
-                                            <video 
-                                              src={videoUrl}
-                                              className="w-full h-full object-cover"
-                                              muted
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                              <Calendar className="w-6 h-6" />
-                                            </div>
-                                          )}
-                                          {videoUrl && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors">
-                                              <Play className="w-5 h-5 text-white fill-white" />
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Exercise info */}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
-                                          
-                                          {/* Stats - larger display */}
-                                          <div className="flex items-center gap-4 flex-wrap">
-                                            <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg">
-                                              <span className="text-lg font-bold text-primary">{ex.series || 1}</span>
-                                              <span className="text-sm text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
-                                            </div>
-                                            
-                                            {ex.repetitions && (
-                                              <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
-                                                <span className="text-lg font-bold">{ex.repetitions}</span>
-                                                <span className="text-sm text-muted-foreground">répétitions</span>
-                                              </div>
-                                            )}
-                                            
-                                            {ex.duration_seconds && (
-                                              <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
-                                                <span className="text-lg font-bold">{ex.duration_seconds}</span>
-                                                <span className="text-sm text-muted-foreground">secondes</span>
-                                              </div>
-                                            )}
-                                          </div>
-
-                                          {ex.description && (
-                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                                              {ex.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground py-4 text-center">Aucun exercice</p>
-                              )}
-                            </div>
-
-                            {/* Author */}
-                            <p className="text-xs text-muted-foreground">
-                              Par <span className="font-medium">{seance.author_name || "Anonyme"}</span>
-                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              par {seance.author_name || "Anonyme"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              • {seance.exercices?.length || 0} exercices
+                            </span>
                           </div>
-
-                          {/* Side panel - Interactions & Actions */}
-                          <div className="flex flex-col gap-3 lg:w-48">
-                            {/* Interactions */}
-                            <div className="flex items-center gap-3">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
-                                onClick={() => handleLike(seance.id, seance.user_liked || false)}
-                              >
-                                <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
-                                {seance.likes_count}
-                              </Button>
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <MessageCircle className="w-4 h-4" />
-                                {seance.comments_count}
-                              </div>
-                            </div>
-
-                            {/* Share status */}
-                            {canShare && (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={seance.is_shared}
-                                  onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
-                                  disabled={seance.is_validated && seance.is_shared}
-                                />
-                                <span className="text-xs">Partager</span>
-                                {seance.is_shared && seance.is_validated && (
-                                  <Badge className="text-xs bg-green-500">Validé</Badge>
-                                )}
-                                {seance.is_shared && !seance.is_validated && (
-                                  <Badge variant="secondary" className="text-xs">En attente</Badge>
-                                )}
-                              </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleExpand(seance.id)}
+                            className="gap-1 flex-shrink-0"
+                          >
+                            {expandedSeances.has(seance.id) ? (
+                              <>
+                                <ChevronUp className="w-4 h-4" />
+                                Réduire
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4" />
+                                Détails
+                              </>
                             )}
-
-                            {/* Actions */}
-                            <div className="flex gap-1 flex-wrap">
-                              {isOwner && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditDialog(seance)}
-                                  className="gap-1"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                  Modifier
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => duplicateSeance(seance)}
-                                className="gap-1"
-                              >
-                                <Copy className="w-3 h-3" />
-                                {isOwner ? "Dupliquer" : "Copier"}
-                              </Button>
-                              {isOwner && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() => deleteSeance(seance.id)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+                          </Button>
                         </div>
+
+                        {/* Expandable content */}
+                        {expandedSeances.has(seance.id) && (
+                          <div className="mt-4 pt-4 border-t space-y-4">
+                            <div className="flex flex-col lg:flex-row gap-4">
+                              {/* Main content */}
+                              <div className="flex-1 space-y-3">
+                                {/* Objectifs Secondaires */}
+                                {objectifsSecondaires.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    <span className="text-xs text-muted-foreground mr-2">Objectifs secondaires:</span>
+                                    {objectifsSecondaires.map((o, i) => (
+                                      <Badge key={i} variant="secondary" className="text-xs">{o}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Exercices */}
+                                <div className="space-y-3">
+                                  <p className="text-sm font-semibold">
+                                    Exercices ({seance.exercices?.length || 0})
+                                  </p>
+                                  {seance.exercices && seance.exercices.length > 0 ? (
+                                    <div className="space-y-3">
+                                      {seance.exercices.map((ex, i) => {
+                                        const thumbnailUrl = ex.exercice?.thumbnail_url || null;
+                                        const videoUrl = ex.exercice?.video_url || null;
+                                        const exerciceName = ex.exercice?.title || ex.name || `Exercice ${i + 1}`;
+                                        
+                                        return (
+                                          <div 
+                                            key={ex.id} 
+                                            className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50"
+                                          >
+                                            {/* Order number */}
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                              <span className="text-sm font-bold text-primary">{i + 1}</span>
+                                            </div>
+
+                                            {/* Thumbnail or Video - Clickable */}
+                                            <div 
+                                              className={`w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ${videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
+                                              onClick={() => videoUrl && setVideoToPlay(videoUrl)}
+                                            >
+                                              {thumbnailUrl ? (
+                                                <img 
+                                                  src={thumbnailUrl} 
+                                                  alt={exerciceName}
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              ) : videoUrl ? (
+                                                <video 
+                                                  src={videoUrl}
+                                                  className="w-full h-full object-cover"
+                                                  muted
+                                                />
+                                              ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                  <Calendar className="w-6 h-6" />
+                                                </div>
+                                              )}
+                                              {videoUrl && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors">
+                                                  <Play className="w-5 h-5 text-white fill-white" />
+                                                </div>
+                                              )}
+                                            </div>
+                                            
+                                            {/* Exercise info */}
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
+                                              
+                                              {/* Stats - larger display */}
+                                              <div className="flex items-center gap-4 flex-wrap">
+                                                <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg">
+                                                  <span className="text-lg font-bold text-primary">{ex.series || 1}</span>
+                                                  <span className="text-sm text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                                </div>
+                                                
+                                                {ex.repetitions && (
+                                                  <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
+                                                    <span className="text-lg font-bold">{ex.repetitions}</span>
+                                                    <span className="text-sm text-muted-foreground">répétitions</span>
+                                                  </div>
+                                                )}
+                                                
+                                                {ex.duration_seconds && (
+                                                  <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
+                                                    <span className="text-lg font-bold">{ex.duration_seconds}</span>
+                                                    <span className="text-sm text-muted-foreground">secondes</span>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {ex.description && (
+                                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                                  {ex.description}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground py-4 text-center">Aucun exercice</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Side panel - Interactions & Actions */}
+                              <div className="flex flex-col gap-3 lg:w-48">
+                                {/* Interactions */}
+                                <div className="flex items-center gap-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`gap-1 ${seance.user_liked ? "text-red-500" : ""}`}
+                                    onClick={() => handleLike(seance.id, seance.user_liked || false)}
+                                  >
+                                    <Heart className={`w-4 h-4 ${seance.user_liked ? "fill-current" : ""}`} />
+                                    {seance.likes_count}
+                                  </Button>
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <MessageCircle className="w-4 h-4" />
+                                    {seance.comments_count}
+                                  </div>
+                                </div>
+
+                                {/* Share status */}
+                                {canShare && (
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      checked={seance.is_shared}
+                                      onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
+                                      disabled={seance.is_validated && seance.is_shared}
+                                    />
+                                    <span className="text-xs">Partager</span>
+                                    {seance.is_shared && seance.is_validated && (
+                                      <Badge className="text-xs bg-green-500">Validé</Badge>
+                                    )}
+                                    {seance.is_shared && !seance.is_validated && (
+                                      <Badge variant="secondary" className="text-xs">En attente</Badge>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex gap-1 flex-wrap">
+                                  {isOwner && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditDialog(seance)}
+                                      className="gap-1"
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                      Modifier
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => duplicateSeance(seance)}
+                                    className="gap-1"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    {isOwner ? "Dupliquer" : "Copier"}
+                                  </Button>
+                                  {isOwner && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive"
+                                      onClick={() => deleteSeance(seance.id)}
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );
