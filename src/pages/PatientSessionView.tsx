@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Calendar, FileText, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, Calendar, FileText, Clock, AlertCircle, CheckCircle, Play, X, ChevronDown, ChevronUp, Repeat, Timer } from "lucide-react";
 
 interface SeanceType {
   id: string;
@@ -55,6 +56,8 @@ export default function PatientSessionView() {
   const [accessData, setAccessData] = useState<AccessData | null>(null);
   const [seanceExercices, setSeanceExercices] = useState<SeanceExercice[]>([]);
   const [completedExercices, setCompletedExercices] = useState<Set<string>>(new Set());
+  const [expandedExercice, setExpandedExercice] = useState<string | null>(null);
+  const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
 
   useEffect(() => {
     if (codeFromUrl) {
@@ -140,7 +143,8 @@ export default function PatientSessionView() {
     }
   };
 
-  const toggleExerciceComplete = (exerciceId: string) => {
+  const toggleExerciceComplete = (exerciceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setCompletedExercices(prev => {
       const next = new Set(prev);
       if (next.has(exerciceId)) {
@@ -150,6 +154,10 @@ export default function PatientSessionView() {
       }
       return next;
     });
+  };
+
+  const toggleExpandExercice = (exerciceId: string) => {
+    setExpandedExercice(prev => prev === exerciceId ? null : exerciceId);
   };
 
   const formatDuration = (seconds: number) => {
@@ -178,6 +186,10 @@ export default function PatientSessionView() {
       : [accessData.seance.pathologie];
     return pathologies.join(", ");
   };
+
+  const completedCount = completedExercices.size;
+  const totalCount = seanceExercices.length;
+  const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   // Login form
   if (!accessData) {
@@ -236,27 +248,62 @@ export default function PatientSessionView() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         {/* Header */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold">{accessData.patient?.name || "Patient"}</h1>
-                <p className="text-muted-foreground">{getSeanceDisplay()}</p>
+        <Card className="mb-6 overflow-hidden">
+          <div className="bg-primary/5 px-6 py-4 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <Calendar className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold">{accessData.patient?.name || "Patient"}</h1>
+                  <p className="text-sm text-muted-foreground">{getSeanceDisplay()}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background/50 px-3 py-1.5 rounded-full">
                 <Clock className="w-4 h-4" />
                 {getTimeRemaining()}
               </div>
             </div>
-            
-            {/* Objectifs */}
+          </div>
+          
+          <CardContent className="pt-4 space-y-4">
+            {/* Objectifs principaux */}
             {accessData.seance?.objectifs_principaux && accessData.seance.objectifs_principaux.length > 0 && (
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">Objectifs</p>
-                <div className="flex flex-wrap gap-1">
+              <div>
+                <p className="text-sm font-medium mb-2 text-muted-foreground">Objectifs principaux</p>
+                <div className="flex flex-wrap gap-2">
                   {accessData.seance.objectifs_principaux.map((obj, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">{obj}</Badge>
+                    <Badge key={i} variant="default" className="text-sm">{obj}</Badge>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Objectifs secondaires */}
+            {accessData.seance?.objectifs_secondaires && accessData.seance.objectifs_secondaires.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2 text-muted-foreground">Objectifs secondaires</p>
+                <div className="flex flex-wrap gap-2">
+                  {accessData.seance.objectifs_secondaires.map((obj, i) => (
+                    <Badge key={i} variant="secondary" className="text-sm">{obj}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progress bar */}
+            {totalCount > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Progression</span>
+                  <span className="font-medium">{completedCount} / {totalCount} exercices</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-green-500 transition-all duration-300"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
                 </div>
               </div>
             )}
@@ -277,51 +324,143 @@ export default function PatientSessionView() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {seanceExercices.map((exercice) => {
+            <div className="space-y-3">
+              {seanceExercices.map((exercice, index) => {
                 const isCompleted = completedExercices.has(exercice.id);
+                const isExpanded = expandedExercice === exercice.id;
+                const hasVideo = !!exercice.exercices?.video_url;
+                const hasDescription = !!(exercice.description || exercice.exercices?.description);
+                
                 return (
                   <Card 
                     key={exercice.id}
-                    className={`transition-all ${isCompleted ? 'bg-green-500/10 border-green-500/30' : ''}`}
+                    className={`transition-all overflow-hidden ${isCompleted ? 'bg-green-500/5 border-green-500/30' : ''}`}
                   >
-                    <CardContent className="py-4">
-                      <div className="flex items-center gap-3">
+                    {/* Main row - clickable */}
+                    <div 
+                      className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleExpandExercice(exercice.id)}
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Complete button */}
                         <Button
                           variant={isCompleted ? "default" : "outline"}
                           size="icon"
-                          className={`flex-shrink-0 ${isCompleted ? 'bg-green-500 hover:bg-green-600' : ''}`}
-                          onClick={() => toggleExerciceComplete(exercice.id)}
+                          className={`flex-shrink-0 h-10 w-10 ${isCompleted ? 'bg-green-500 hover:bg-green-600 border-green-500' : ''}`}
+                          onClick={(e) => toggleExerciceComplete(exercice.id, e)}
                         >
-                          <CheckCircle className="w-4 h-4" />
+                          <CheckCircle className="w-5 h-5" />
                         </Button>
                         
-                        {exercice.exercices?.thumbnail_url && (
-                          <img 
-                            src={exercice.exercices.thumbnail_url} 
-                            alt="" 
-                            className="w-12 h-12 rounded object-cover flex-shrink-0"
-                          />
+                        {/* Thumbnail */}
+                        {exercice.exercices?.thumbnail_url ? (
+                          <div className="relative flex-shrink-0">
+                            <img 
+                              src={exercice.exercices.thumbnail_url} 
+                              alt="" 
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
+                            {hasVideo && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                                <Play className="w-6 h-6 text-white" />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl font-bold text-muted-foreground">{index + 1}</span>
+                          </div>
                         )}
                         
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className={`font-medium ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                            {exercice.exercices?.title || exercice.name || "Exercice"}
+                          <p className={`font-semibold text-base ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                            {exercice.exercices?.title || exercice.name || `Exercice ${index + 1}`}
                           </p>
-                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            {exercice.series && (
-                              <span>{exercice.series} séries</span>
+                          <div className="flex flex-wrap items-center gap-3 mt-1">
+                            {exercice.series && exercice.series > 0 && (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Repeat className="w-4 h-4" />
+                                <span>{exercice.series} série{exercice.series > 1 ? 's' : ''}</span>
+                              </div>
                             )}
                             {exercice.repetitions && (
-                              <span>× {exercice.repetitions} reps</span>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <span>× {exercice.repetitions} reps</span>
+                              </div>
                             )}
                             {exercice.duration_seconds && (
-                              <span>{formatDuration(exercice.duration_seconds)}</span>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Timer className="w-4 h-4" />
+                                <span>{formatDuration(exercice.duration_seconds)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Expand indicator */}
+                        <div className="flex-shrink-0">
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-0 border-t">
+                        <div className="pt-4 space-y-4">
+                          {/* Description */}
+                          {hasDescription && (
+                            <div>
+                              <p className="text-sm font-medium mb-1">Description</p>
+                              <p className="text-sm text-muted-foreground">
+                                {exercice.description || exercice.exercices?.description}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Video button */}
+                          {hasVideo && (
+                            <Button 
+                              className="w-full gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVideoToPlay(exercice.exercices?.video_url || null);
+                              }}
+                            >
+                              <Play className="w-4 h-4" />
+                              Voir la vidéo
+                            </Button>
+                          )}
+                          
+                          {/* Details grid */}
+                          <div className="grid grid-cols-3 gap-4">
+                            {exercice.series && exercice.series > 0 && (
+                              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                                <p className="text-2xl font-bold">{exercice.series}</p>
+                                <p className="text-xs text-muted-foreground">Série{exercice.series > 1 ? 's' : ''}</p>
+                              </div>
+                            )}
+                            {exercice.repetitions && (
+                              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                                <p className="text-2xl font-bold">{exercice.repetitions}</p>
+                                <p className="text-xs text-muted-foreground">Répétitions</p>
+                              </div>
+                            )}
+                            {exercice.duration_seconds && (
+                              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                                <p className="text-2xl font-bold">{formatDuration(exercice.duration_seconds)}</p>
+                                <p className="text-xs text-muted-foreground">Durée</p>
+                              </div>
                             )}
                           </div>
                         </div>
                       </div>
-                    </CardContent>
+                    )}
                   </Card>
                 );
               })}
@@ -329,6 +468,30 @@ export default function PatientSessionView() {
           )}
         </div>
       </div>
+
+      {/* Video Dialog */}
+      <Dialog open={!!videoToPlay} onOpenChange={() => setVideoToPlay(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white"
+              onClick={() => setVideoToPlay(null)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+            {videoToPlay && (
+              <video
+                src={videoToPlay}
+                controls
+                autoPlay
+                className="w-full aspect-video"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
