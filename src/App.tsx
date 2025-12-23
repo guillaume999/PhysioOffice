@@ -16,6 +16,7 @@ import MentionsLegales from "./pages/MentionsLegales";
 import TraitementType from "./pages/TraitementType";
 import SeanceType from "./pages/SeanceType";
 import Exercices from "./pages/Exercices";
+import Videos from "./pages/Videos";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/traitement-type" element={<TraitementType />} />
             <Route path="/seance-type" element={<SeanceType />} />
             <Route path="/exercices" element={<Exercices />} />
+            <Route path="/videos" element={<Videos />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

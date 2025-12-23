@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, Video } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
@@ -20,6 +20,14 @@ const features = [
     href: "/exercices",
     color: "from-green-500 to-emerald-500",
     bgColor: "bg-green-500/10",
+  },
+  {
+    title: "Vidéos",
+    description: "Accédez à votre vidéothèque",
+    icon: Video,
+    href: "/videos",
+    color: "from-purple-500 to-violet-500",
+    bgColor: "bg-purple-500/10",
   },
   {
     title: "IA Diagnostic",
