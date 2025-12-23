@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Video, Search, Play, X, MoreVertical, Pencil, Trash2, FileVideo, Dumbbell, Calendar } from "lucide-react";
+import { Video, Search, Play, X, MoreVertical, Pencil, Trash2, FileVideo, Dumbbell, Calendar, Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,8 @@ interface VideoSize {
   [key: string]: string;
 }
 
+type DeleteMode = 'video-only' | 'video-and-exercises' | 'video-and-seances';
+
 export default function Videos() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -32,8 +35,11 @@ export default function Videos() {
   const [searchQuery, setSearchQuery] = useState("");
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
   const [videoSizes, setVideoSizes] = useState<VideoSize>({});
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null; mode: 'video' | 'exercises' | 'seances' | 'all' }>({ open: false, video: null, mode: 'video' });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null; mode: DeleteMode }>({ open: false, video: null, mode: 'video-only' });
   const [deleting, setDeleting] = useState(false);
+  const [editDialog, setEditDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null }>({ open: false, video: null });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -103,36 +109,35 @@ export default function Videos() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  const getStoragePathFromUrl = (url: string): string | null => {
+    try {
+      const urlParts = url.split('/videos/');
+      return urlParts[1] || null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleDeleteVideo = async () => {
     if (!deleteDialog.video) return;
 
     setDeleting(true);
     try {
       const video = deleteDialog.video;
+      const videoUrl = video.video_url;
 
-      if (deleteDialog.mode === 'exercises' || deleteDialog.mode === 'all') {
-        // Delete all exercises with this video_url
-        const { error: exError } = await supabase
-          .from("exercices")
-          .delete()
-          .eq("user_id", user?.id)
-          .eq("video_url", video.video_url);
+      // Get all exercises using this video
+      const { data: exercicesWithVideo } = await supabase
+        .from("exercices")
+        .select("id")
+        .eq("user_id", user?.id)
+        .eq("video_url", videoUrl);
 
-        if (exError) throw exError;
-      }
+      const exerciceIds = exercicesWithVideo?.map((e) => e.id) || [];
 
-      if (deleteDialog.mode === 'seances' || deleteDialog.mode === 'all') {
-        // Get all exercice_ids with this video
-        const { data: exercicesData } = await supabase
-          .from("exercices")
-          .select("id")
-          .eq("user_id", user?.id)
-          .eq("video_url", video.video_url);
-
-        if (exercicesData && exercicesData.length > 0) {
-          const exerciceIds = exercicesData.map((e) => e.id);
-
-          // Delete seance_exercices linked to these exercices
+      if (deleteDialog.mode === 'video-and-seances') {
+        // Delete seance_exercices linked to these exercices
+        if (exerciceIds.length > 0) {
           const { error: seError } = await supabase
             .from("seance_exercices")
             .delete()
@@ -140,39 +145,48 @@ export default function Videos() {
 
           if (seError) throw seError;
         }
-      }
 
-      if (deleteDialog.mode === 'video') {
-        // Just remove video_url from this exercice
-        const { error: updateError } = await supabase
+        // Clear video_url from all exercises
+        const { error: clearError } = await supabase
           .from("exercices")
           .update({ video_url: null, thumbnail_url: null })
-          .eq("id", video.id);
+          .eq("user_id", user?.id)
+          .eq("video_url", videoUrl);
 
-        if (updateError) throw updateError;
+        if (clearError) throw clearError;
+      } else if (deleteDialog.mode === 'video-and-exercises') {
+        // Delete all exercises using this video
+        const { error: exError } = await supabase
+          .from("exercices")
+          .delete()
+          .eq("user_id", user?.id)
+          .eq("video_url", videoUrl);
+
+        if (exError) throw exError;
+      } else {
+        // video-only: just clear video_url from all exercises using it
+        const { error: clearError } = await supabase
+          .from("exercices")
+          .update({ video_url: null, thumbnail_url: null })
+          .eq("user_id", user?.id)
+          .eq("video_url", videoUrl);
+
+        if (clearError) throw clearError;
       }
 
-      // Delete from storage if needed
-      if (deleteDialog.mode === 'exercises' || deleteDialog.mode === 'all') {
-        try {
-          const urlParts = video.video_url.split('/videos/');
-          if (urlParts[1]) {
-            await supabase.storage.from('videos').remove([urlParts[1]]);
-          }
-        } catch {
-          // Storage deletion failed, continue anyway
-        }
+      // Delete video from storage
+      const storagePath = getStoragePathFromUrl(videoUrl);
+      if (storagePath) {
+        await supabase.storage.from('videos').remove([storagePath]);
       }
 
       toast({
         title: "Suppression réussie",
-        description: deleteDialog.mode === 'video' 
-          ? "La vidéo a été retirée de l'exercice"
-          : deleteDialog.mode === 'exercises'
-          ? "Tous les exercices avec cette vidéo ont été supprimés"
-          : deleteDialog.mode === 'seances'
-          ? "La vidéo a été retirée de toutes les séances"
-          : "Les exercices et séances associés ont été supprimés",
+        description: deleteDialog.mode === 'video-only'
+          ? "La vidéo a été supprimée et retirée des exercices"
+          : deleteDialog.mode === 'video-and-exercises'
+          ? "La vidéo et tous les exercices associés ont été supprimés"
+          : "La vidéo, ses liens dans les séances et exercices ont été supprimés",
       });
 
       fetchVideos();
@@ -185,12 +199,72 @@ export default function Videos() {
       });
     } finally {
       setDeleting(false);
-      setDeleteDialog({ open: false, video: null, mode: 'video' });
+      setDeleteDialog({ open: false, video: null, mode: 'video-only' });
     }
   };
 
-  const handleEditExercice = (videoId: string) => {
-    window.location.href = `/exercices?edit=${videoId}`;
+  const handleReplaceVideo = async (file: File) => {
+    if (!editDialog.video || !user) return;
+
+    setUploading(true);
+    try {
+      const oldVideoUrl = editDialog.video.video_url;
+
+      // Upload new video
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(fileName);
+
+      const newVideoUrl = urlData.publicUrl;
+
+      // Update all exercises using the old video URL
+      const { error: updateError } = await supabase
+        .from("exercices")
+        .update({ video_url: newVideoUrl, thumbnail_url: null })
+        .eq("user_id", user.id)
+        .eq("video_url", oldVideoUrl);
+
+      if (updateError) throw updateError;
+
+      // Delete old video from storage
+      const oldPath = getStoragePathFromUrl(oldVideoUrl);
+      if (oldPath) {
+        await supabase.storage.from('videos').remove([oldPath]);
+      }
+
+      toast({
+        title: "Vidéo modifiée",
+        description: "La nouvelle vidéo a été appliquée à tous les exercices concernés",
+      });
+
+      setEditDialog({ open: false, video: null });
+      fetchVideos();
+    } catch (error) {
+      console.error("Erreur lors du remplacement:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors du remplacement de la vidéo",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleReplaceVideo(file);
+    }
   };
 
   if (!user) {
@@ -308,38 +382,31 @@ export default function Videos() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditExercice(video.id)}>
+                          <DropdownMenuItem onClick={() => setEditDialog({ open: true, video })}>
                             <Pencil className="w-4 h-4 mr-2" />
-                            Modifier l'exercice
+                            Modifier la vidéo
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => setDeleteDialog({ open: true, video, mode: 'video' })}
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'video-only' })}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Retirer la vidéo
+                            Supprimer la vidéo
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => setDeleteDialog({ open: true, video, mode: 'exercises' })}
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'video-and-exercises' })}
                           >
                             <Dumbbell className="w-4 h-4 mr-2" />
-                            Supprimer les exercices liés
+                            Supprimer vidéo + exercices
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => setDeleteDialog({ open: true, video, mode: 'seances' })}
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'video-and-seances' })}
                           >
                             <Calendar className="w-4 h-4 mr-2" />
-                            Retirer des séances
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setDeleteDialog({ open: true, video, mode: 'all' })}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Tout supprimer
+                            Supprimer vidéo + séances
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -385,25 +452,62 @@ export default function Videos() {
           </DialogContent>
         </Dialog>
 
+        {/* Edit Video Dialog */}
+        <Dialog open={editDialog.open} onOpenChange={(open) => !open && setEditDialog({ open: false, video: null })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Modifier la vidéo</DialogTitle>
+              <DialogDescription>
+                Choisissez une nouvelle vidéo pour remplacer "{editDialog.video?.title}". 
+                Tous les exercices utilisant cette vidéo seront mis à jour.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Upload en cours...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choisir une nouvelle vidéo
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, video: null, mode: 'video' })}>
+        <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, video: null, mode: 'video-only' })}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {deleteDialog.mode === 'video' && "Retirer la vidéo"}
-                {deleteDialog.mode === 'exercises' && "Supprimer les exercices liés"}
-                {deleteDialog.mode === 'seances' && "Retirer des séances"}
-                {deleteDialog.mode === 'all' && "Tout supprimer"}
+                {deleteDialog.mode === 'video-only' && "Supprimer la vidéo"}
+                {deleteDialog.mode === 'video-and-exercises' && "Supprimer vidéo + exercices"}
+                {deleteDialog.mode === 'video-and-seances' && "Supprimer vidéo + séances"}
               </DialogTitle>
               <DialogDescription>
-                {deleteDialog.mode === 'video' && "La vidéo sera retirée de cet exercice mais l'exercice sera conservé."}
-                {deleteDialog.mode === 'exercises' && "Tous les exercices utilisant cette vidéo seront supprimés définitivement."}
-                {deleteDialog.mode === 'seances' && "Cette vidéo sera retirée de toutes les séances qui l'utilisent."}
-                {deleteDialog.mode === 'all' && "Tous les exercices et références dans les séances seront supprimés. Cette action est irréversible."}
+                {deleteDialog.mode === 'video-only' && "La vidéo sera supprimée du stockage et retirée de tous les exercices qui l'utilisent."}
+                {deleteDialog.mode === 'video-and-exercises' && "La vidéo sera supprimée ainsi que tous les exercices qui l'utilisent. Cette action est irréversible."}
+                {deleteDialog.mode === 'video-and-seances' && "La vidéo sera supprimée, retirée des exercices, et les références dans les séances seront supprimées."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialog({ open: false, video: null, mode: 'video' })} disabled={deleting}>
+              <Button variant="outline" onClick={() => setDeleteDialog({ open: false, video: null, mode: 'video-only' })} disabled={deleting}>
                 Annuler
               </Button>
               <Button variant="destructive" onClick={handleDeleteVideo} disabled={deleting}>
