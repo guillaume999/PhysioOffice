@@ -216,13 +216,19 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
     const updated = [...exercices];
     updated[index] = { ...updated[index], [field]: value };
     
-    // If selecting an existing exercice, populate name and description
+    // If selecting an existing exercice, populate name, description and video_url
     if (field === "exercice_id" && value) {
       const selectedEx = availableExercices.find(e => e.id === value);
       if (selectedEx) {
         updated[index].name = selectedEx.title;
         updated[index].description = selectedEx.description || "";
+        updated[index].video_url = selectedEx.video_url || null;
       }
+    }
+    
+    // If switching to custom, clear the video_url from the linked exercise
+    if (field === "exercice_id" && !value) {
+      updated[index].video_url = null;
     }
     
     setExercices(updated);
@@ -577,14 +583,14 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                           />
                         </div>
 
-                        {/* Video upload - only for custom exercices */}
-                        {!ex.exercice_id && (
-                          <div className="space-y-2">
-                            <Label className="text-xs">Vidéo</Label>
-                            {ex.video_url ? (
-                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                                <Video className="w-4 h-4 text-primary" />
-                                <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
+                        {/* Video section */}
+                        <div className="space-y-2">
+                          <Label className="text-xs">Vidéo</Label>
+                          {ex.video_url ? (
+                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                              <Video className="w-4 h-4 text-primary" />
+                              <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
+                              {!ex.exercice_id && (
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -594,43 +600,45 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
-                              </div>
-                            ) : (
-                              <div>
-                                <input
-                                  type="file"
-                                  accept="video/*"
-                                  ref={(el) => { fileInputRefs.current[index] = el; }}
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleVideoUpload(index, file);
-                                  }}
-                                  className="hidden"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => fileInputRefs.current[index]?.click()}
-                                  disabled={uploadingVideo === index}
-                                  className="gap-2"
-                                >
-                                  {uploadingVideo === index ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      Upload en cours...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="w-4 h-4" />
-                                      Ajouter une vidéo
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              )}
+                            </div>
+                          ) : !ex.exercice_id ? (
+                            <div>
+                              <input
+                                type="file"
+                                accept="video/*"
+                                ref={(el) => { fileInputRefs.current[index] = el; }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleVideoUpload(index, file);
+                                }}
+                                className="hidden"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fileInputRefs.current[index]?.click()}
+                                disabled={uploadingVideo === index}
+                                className="gap-2"
+                              >
+                                {uploadingVideo === index ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Upload en cours...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4" />
+                                    Ajouter une vidéo
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Aucune vidéo</p>
+                          )}
+                        </div>
 
                         <div className="grid grid-cols-3 gap-3">
                           <div>
