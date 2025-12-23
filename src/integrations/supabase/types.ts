@@ -794,6 +794,7 @@ export type Database = {
         Row: {
           author_name: string | null
           created_at: string
+          description: string | null
           id: string
           is_copy: boolean | null
           is_shared: boolean
@@ -806,6 +807,7 @@ export type Database = {
         Insert: {
           author_name?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
@@ -818,6 +820,7 @@ export type Database = {
         Update: {
           author_name?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           is_copy?: boolean | null
           is_shared?: boolean
