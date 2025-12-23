@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X } from "lucide-react";
+import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ export default function TraitementType() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
   const [testDetailDialog, setTestDetailDialog] = useState<TraitementTest | null>(null);
+  const [expandedTraitements, setExpandedTraitements] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -312,6 +313,18 @@ export default function TraitementType() {
     return `${pathologies[0]} - ${objectifs[0]}`;
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedTraitements(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   if (!user) {
     return (
       <Layout>
@@ -403,129 +416,156 @@ export default function TraitementType() {
                 {filteredTraitements.map((traitement) => {
                   const isOwner = traitement.user_id === user?.id;
                   const canShare = isOwner && !traitement.is_copy;
+                  const isExpanded = expandedTraitements.has(traitement.id);
 
                   return (
                     <Card key={traitement.id} className="overflow-hidden">
                       <CardContent className="p-4">
-                        <div className="flex flex-col lg:flex-row gap-4">
-                          {/* Main content */}
-                          <div className="flex-1 space-y-3">
-                            {/* Pathologie */}
-                            <div className="flex flex-wrap gap-2 items-center">
-                              <Badge variant="outline" className="text-sm">{traitement.pathologie}</Badge>
-                              {traitement.is_copy && (
-                                <Badge variant="secondary" className="text-xs">Copie</Badge>
-                              )}
-                            </div>
-
-                            {/* Description */}
-                            {traitement.description && (
-                              <p className="text-sm text-muted-foreground">{traitement.description}</p>
+                        {/* Header - Always visible */}
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Badge variant="outline" className="text-sm flex-shrink-0">{traitement.pathologie}</Badge>
+                            {traitement.is_copy && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
                             )}
-
-                            {/* Tests (Exercices) */}
-                            <div className="space-y-2">
-                              <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
-                              {traitement.tests && traitement.tests.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {traitement.tests.map((test) => (
-                                    <Badge
-                                      key={test.id}
-                                      variant="outline"
-                                      className="cursor-pointer hover:bg-muted flex items-center gap-1"
-                                      onClick={() => setTestDetailDialog(test)}
-                                    >
-                                      <FileText className="w-3 h-3" />
-                                      {test.exercices?.title || test.description.substring(0, 25)}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">Aucun test</p>
-                              )}
-                            </div>
-
-                            {/* Séances */}
-                            <div className="space-y-2">
-                              <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
-                              {traitement.seances && traitement.seances.length > 0 ? (
-                                <div className="space-y-2">
-                                  {traitement.seances.map((seance, i) => (
-                                    <div key={seance.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50">
-                                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-xs font-bold text-primary">{i + 1}</span>
-                                      </div>
-                                      <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                      <span className="text-sm">{getSeanceDisplay(seance)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">Aucune séance</p>
-                              )}
-                            </div>
-
-                            {/* Author */}
-                            <p className="text-xs text-muted-foreground">
-                              Par <span className="font-medium">{traitement.author_name || "Anonyme"}</span>
-                            </p>
+                            <span className="text-xs text-muted-foreground truncate">
+                              par {traitement.author_name || "Anonyme"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
+                            </span>
                           </div>
-
-                          {/* Side panel - Interactions & Actions */}
-                          <div className="flex flex-col gap-3 lg:w-48">
-                            {/* Share status */}
-                            {canShare && (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={traitement.is_shared}
-                                  onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
-                                  disabled={traitement.is_validated && traitement.is_shared}
-                                />
-                                <span className="text-xs">Partager</span>
-                                {traitement.is_shared && traitement.is_validated && (
-                                  <Badge className="text-xs bg-green-500">Validé</Badge>
-                                )}
-                                {traitement.is_shared && !traitement.is_validated && (
-                                  <Badge variant="secondary" className="text-xs">En attente</Badge>
-                                )}
-                              </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleExpand(traitement.id)}
+                            className="gap-1 flex-shrink-0"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp className="w-4 h-4" />
+                                Réduire
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-4 h-4" />
+                                Détails
+                              </>
                             )}
-
-                            {/* Actions */}
-                            <div className="flex gap-1 flex-wrap">
-                              {isOwner && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditDialog(traitement)}
-                                  className="gap-1"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                  Modifier
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => duplicateTraitement(traitement)}
-                                className="gap-1"
-                              >
-                                <Copy className="w-3 h-3" />
-                                {isOwner ? "Dupliquer" : "Copier"}
-                              </Button>
-                              {isOwner && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() => deleteTraitement(traitement.id)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+                          </Button>
                         </div>
+
+                        {/* Expandable content */}
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t space-y-4">
+                            <div className="flex flex-col lg:flex-row gap-4">
+                              {/* Main content */}
+                              <div className="flex-1 space-y-3">
+                                {/* Description */}
+                                {traitement.description && (
+                                  <p className="text-sm text-muted-foreground">{traitement.description}</p>
+                                )}
+
+                                {/* Tests (Exercices) */}
+                                <div className="space-y-2">
+                                  <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
+                                  {traitement.tests && traitement.tests.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {traitement.tests.map((test) => (
+                                        <Badge
+                                          key={test.id}
+                                          variant="outline"
+                                          className="cursor-pointer hover:bg-muted flex items-center gap-1"
+                                          onClick={() => setTestDetailDialog(test)}
+                                        >
+                                          <FileText className="w-3 h-3" />
+                                          {test.exercices?.title || test.description.substring(0, 25)}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Aucun test</p>
+                                  )}
+                                </div>
+
+                                {/* Séances */}
+                                <div className="space-y-2">
+                                  <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
+                                  {traitement.seances && traitement.seances.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {traitement.seances.map((seance, i) => (
+                                        <div key={seance.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50">
+                                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                          </div>
+                                          <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-sm">{getSeanceDisplay(seance)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Aucune séance</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Side panel - Interactions & Actions */}
+                              <div className="flex flex-col gap-3 lg:w-48">
+                                {/* Share status */}
+                                {canShare && (
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      checked={traitement.is_shared}
+                                      onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
+                                      disabled={traitement.is_validated && traitement.is_shared}
+                                    />
+                                    <span className="text-xs">Partager</span>
+                                    {traitement.is_shared && traitement.is_validated && (
+                                      <Badge className="text-xs bg-green-500">Validé</Badge>
+                                    )}
+                                    {traitement.is_shared && !traitement.is_validated && (
+                                      <Badge variant="secondary" className="text-xs">En attente</Badge>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex gap-1 flex-wrap">
+                                  {isOwner && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditDialog(traitement)}
+                                      className="gap-1"
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                      Modifier
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => duplicateTraitement(traitement)}
+                                    className="gap-1"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    {isOwner ? "Dupliquer" : "Copier"}
+                                  </Button>
+                                  {isOwner && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive"
+                                      onClick={() => deleteTraitement(traitement.id)}
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );
