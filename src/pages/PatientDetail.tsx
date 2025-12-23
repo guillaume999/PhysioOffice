@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
 import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjectivesCard";
+import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { ImportTraitementDialog } from "@/components/patient/ImportTraitementDialog";
 
 interface PatientData {
@@ -304,6 +305,11 @@ export default function PatientDetail() {
     navigate("/traitement-type/new");
   };
 
+  const handleRemoveTraitement = () => {
+    setCarePlan({ ...carePlan, active_traitement_id: null });
+    setActiveTraitementName(null);
+  };
+
   if (authLoading || loading) {
     return (
       <Layout>
@@ -369,7 +375,15 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        <div>
+        <PatientTraitementCard
+          activeTraitementId={carePlan.active_traitement_id}
+          activeTraitementName={activeTraitementName}
+          onImportTraitement={() => setImportTraitementOpen(true)}
+          onCreateTraitement={handleCreateTraitement}
+          onRemoveTraitement={handleRemoveTraitement}
+        />
+
+        <div className="mt-6">
           <PatientCommentsCard
             comments={carePlan.comments}
             onChange={(value) => handleCarePlanChange("comments", value)}
