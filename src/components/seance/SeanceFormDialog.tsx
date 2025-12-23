@@ -311,7 +311,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                 description: ex.description?.trim() || null,
                 status: "draft",
                 pathologie_tags: [],
-                video_url: ex.video_url || null
+                video_url: ex.video_url || null,
+                author_name: userPseudo
               })
               .select()
               .single();
@@ -372,7 +373,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                 description: ex.description?.trim() || null,
                 status: "draft",
                 pathologie_tags: [],
-                video_url: ex.video_url || null
+                video_url: ex.video_url || null,
+                author_name: userPseudo
               })
               .select()
               .single();
