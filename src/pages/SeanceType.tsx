@@ -125,6 +125,26 @@ export default function SeanceType() {
     setFilteredSeances(result);
   };
 
+  const getFilterCounts = () => {
+    const userCopiedOriginalIds = seances
+      .filter((s) => s.is_copy && s.user_id === user?.id && s.original_id)
+      .map((s) => s.original_id);
+
+    const mine = seances.filter((s) => s.user_id === user?.id).length;
+    const platform = seances.filter((s) => featuredSeanceIds.includes(s.id)).length;
+    const shared = seances.filter((s) => 
+      s.is_shared && 
+      s.is_validated &&
+      s.user_id !== user?.id && 
+      !featuredSeanceIds.includes(s.id) &&
+      !userCopiedOriginalIds.includes(s.id)
+    ).length;
+
+    return { mine, platform, shared };
+  };
+
+  const filterCounts = getFilterCounts();
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -426,7 +446,7 @@ export default function SeanceType() {
                   className="gap-2"
                 >
                   <User className="w-4 h-4" />
-                  Mes séances
+                  Mes séances ({filterCounts.mine})
                 </Button>
                 <Button
                   variant={filter === "platform" ? "default" : "outline"}
@@ -435,7 +455,7 @@ export default function SeanceType() {
                   className="gap-2"
                 >
                   <Shield className="w-4 h-4" />
-                  Plateforme
+                  Plateforme ({filterCounts.platform})
                 </Button>
                 <Button
                   variant={filter === "shared" ? "default" : "outline"}
@@ -444,7 +464,7 @@ export default function SeanceType() {
                   className="gap-2"
                 >
                   <Users className="w-4 h-4" />
-                  Partagées
+                  Partagées ({filterCounts.shared})
                 </Button>
               </div>
 
