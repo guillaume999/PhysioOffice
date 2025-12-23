@@ -761,26 +761,36 @@ export type Database = {
       traitement_tests: {
         Row: {
           created_at: string
-          description: string
+          description: string | null
+          exercice_id: string | null
           id: string
           ordre: number
           traitement_type_id: string
         }
         Insert: {
           created_at?: string
-          description: string
+          description?: string | null
+          exercice_id?: string | null
           id?: string
           ordre?: number
           traitement_type_id: string
         }
         Update: {
           created_at?: string
-          description?: string
+          description?: string | null
+          exercice_id?: string | null
           id?: string
           ordre?: number
           traitement_type_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "traitement_tests_exercice_id_fkey"
+            columns: ["exercice_id"]
+            isOneToOne: false
+            referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "traitement_tests_traitement_type_id_fkey"
             columns: ["traitement_type_id"]

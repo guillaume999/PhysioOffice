@@ -16,6 +16,13 @@ interface TraitementTest {
   id: string;
   description: string;
   ordre: number;
+  exercice_id?: string;
+  exercices?: {
+    id: string;
+    title: string;
+    description: string | null;
+    thumbnail_url: string | null;
+  } | null;
 }
 
 interface TraitementSeance {
@@ -139,7 +146,7 @@ export default function TraitementType() {
         (traitementsData || []).map(async (traitement) => {
           const { data: testsData } = await supabase
             .from("traitement_tests")
-            .select("*")
+            .select("*, exercices(id, title, description, thumbnail_url)")
             .eq("traitement_type_id", traitement.id)
             .order("ordre", { ascending: true });
 
@@ -176,7 +183,17 @@ export default function TraitementType() {
       id: traitement.id,
       pathologie: traitement.pathologie,
       description: traitement.description,
-      tests: traitement.tests || [],
+      tests: (traitement.tests || []).map(t => ({
+        id: t.id,
+        exercice_id: t.exercice_id || t.exercices?.id || '',
+        exercice: t.exercices ? {
+          id: t.exercices.id,
+          title: t.exercices.title,
+          description: t.exercices.description,
+          thumbnail_url: t.exercices.thumbnail_url
+        } : null,
+        ordre: t.ordre
+      })),
       seances: (traitement.seances || []).map(s => ({
         id: s.id,
         seance_type_id: s.seance_type_id,
@@ -406,7 +423,7 @@ export default function TraitementType() {
                               <p className="text-sm text-muted-foreground">{traitement.description}</p>
                             )}
 
-                            {/* Tests */}
+                            {/* Tests (Exercices) */}
                             <div className="space-y-2">
                               <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                               {traitement.tests && traitement.tests.length > 0 ? (
@@ -419,7 +436,7 @@ export default function TraitementType() {
                                       onClick={() => setTestDetailDialog(test)}
                                     >
                                       <FileText className="w-3 h-3" />
-                                      {test.description.substring(0, 25)}...
+                                      {test.exercices?.title || test.description.substring(0, 25)}
                                     </Badge>
                                   ))}
                                 </div>
@@ -533,7 +550,27 @@ export default function TraitementType() {
               <h3 className="font-semibold">Détail du test</h3>
             </div>
             {testDetailDialog && (
-              <p className="text-sm">{testDetailDialog.description}</p>
+              <div className="space-y-4">
+                {testDetailDialog.exercices ? (
+                  <>
+                    {testDetailDialog.exercices.thumbnail_url && (
+                      <img 
+                        src={testDetailDialog.exercices.thumbnail_url} 
+                        alt={testDetailDialog.exercices.title}
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    )}
+                    <div>
+                      <h4 className="font-medium text-lg">{testDetailDialog.exercices.title}</h4>
+                      {testDetailDialog.exercices.description && (
+                        <p className="text-sm text-muted-foreground mt-2">{testDetailDialog.exercices.description}</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm">{testDetailDialog.description}</p>
+                )}
+              </div>
             )}
           </DialogContent>
         </Dialog>
