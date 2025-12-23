@@ -3,10 +3,12 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Video, Search, Play, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Video, Search, Play, X, MoreVertical, Pencil, Trash2, FileVideo, Dumbbell, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface ExerciceWithVideo {
   id: string;
@@ -17,13 +19,21 @@ interface ExerciceWithVideo {
   author_name: string | null;
 }
 
+interface VideoSize {
+  [key: string]: string;
+}
+
 export default function Videos() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [videos, setVideos] = useState<ExerciceWithVideo[]>([]);
   const [filteredVideos, setFilteredVideos] = useState<ExerciceWithVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
+  const [videoSizes, setVideoSizes] = useState<VideoSize>({});
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null; mode: 'video' | 'exercises' | 'seances' | 'all' }>({ open: false, video: null, mode: 'video' });
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -57,12 +67,130 @@ export default function Videos() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setVideos((data || []) as ExerciceWithVideo[]);
+      const videoData = (data || []) as ExerciceWithVideo[];
+      setVideos(videoData);
+
+      // Fetch video sizes
+      videoData.forEach((video) => {
+        fetchVideoSize(video.id, video.video_url);
+      });
     } catch (error) {
       console.error("Erreur lors du chargement des vidéos:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchVideoSize = async (videoId: string, url: string) => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      const contentLength = response.headers.get('content-length');
+      if (contentLength) {
+        const sizeInBytes = parseInt(contentLength, 10);
+        const sizeFormatted = formatFileSize(sizeInBytes);
+        setVideoSizes((prev) => ({ ...prev, [videoId]: sizeFormatted }));
+      }
+    } catch {
+      // Silently fail for size fetch
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!deleteDialog.video) return;
+
+    setDeleting(true);
+    try {
+      const video = deleteDialog.video;
+
+      if (deleteDialog.mode === 'exercises' || deleteDialog.mode === 'all') {
+        // Delete all exercises with this video_url
+        const { error: exError } = await supabase
+          .from("exercices")
+          .delete()
+          .eq("user_id", user?.id)
+          .eq("video_url", video.video_url);
+
+        if (exError) throw exError;
+      }
+
+      if (deleteDialog.mode === 'seances' || deleteDialog.mode === 'all') {
+        // Get all exercice_ids with this video
+        const { data: exercicesData } = await supabase
+          .from("exercices")
+          .select("id")
+          .eq("user_id", user?.id)
+          .eq("video_url", video.video_url);
+
+        if (exercicesData && exercicesData.length > 0) {
+          const exerciceIds = exercicesData.map((e) => e.id);
+
+          // Delete seance_exercices linked to these exercices
+          const { error: seError } = await supabase
+            .from("seance_exercices")
+            .delete()
+            .in("exercice_id", exerciceIds);
+
+          if (seError) throw seError;
+        }
+      }
+
+      if (deleteDialog.mode === 'video') {
+        // Just remove video_url from this exercice
+        const { error: updateError } = await supabase
+          .from("exercices")
+          .update({ video_url: null, thumbnail_url: null })
+          .eq("id", video.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Delete from storage if needed
+      if (deleteDialog.mode === 'exercises' || deleteDialog.mode === 'all') {
+        try {
+          const urlParts = video.video_url.split('/videos/');
+          if (urlParts[1]) {
+            await supabase.storage.from('videos').remove([urlParts[1]]);
+          }
+        } catch {
+          // Storage deletion failed, continue anyway
+        }
+      }
+
+      toast({
+        title: "Suppression réussie",
+        description: deleteDialog.mode === 'video' 
+          ? "La vidéo a été retirée de l'exercice"
+          : deleteDialog.mode === 'exercises'
+          ? "Tous les exercices avec cette vidéo ont été supprimés"
+          : deleteDialog.mode === 'seances'
+          ? "La vidéo a été retirée de toutes les séances"
+          : "Les exercices et séances associés ont été supprimés",
+      });
+
+      fetchVideos();
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialog({ open: false, video: null, mode: 'video' });
+    }
+  };
+
+  const handleEditExercice = (videoId: string) => {
+    window.location.href = `/exercices?edit=${videoId}`;
   };
 
   if (!user) {
@@ -131,28 +259,90 @@ export default function Videos() {
                 {filteredVideos.map((video) => (
                   <div
                     key={video.id}
-                    className="group relative aspect-video rounded-xl overflow-hidden bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                    onClick={() => setVideoToPlay(video.video_url)}
+                    className="group relative aspect-video rounded-xl overflow-hidden bg-muted"
                   >
-                    {video.thumbnail_url ? (
-                      <img
-                        src={video.thumbnail_url}
-                        alt={video.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={video.video_url}
-                        className="w-full h-full object-cover"
-                        muted
-                      />
+                    <div
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => setVideoToPlay(video.video_url)}
+                    >
+                      {video.thumbnail_url ? (
+                        <img
+                          src={video.thumbnail_url}
+                          alt={video.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={video.video_url}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      )}
+
+                      {/* Play overlay */}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                          <Play className="w-7 h-7 text-white fill-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Size badge */}
+                    {videoSizes[video.id] && (
+                      <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs flex items-center gap-1">
+                        <FileVideo className="w-3 h-3" />
+                        {videoSizes[video.id]}
+                      </div>
                     )}
 
-                    {/* Play overlay */}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <Play className="w-7 h-7 text-white fill-white" />
-                      </div>
+                    {/* Actions dropdown */}
+                    <div className="absolute top-2 right-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 bg-black/60 hover:bg-black/80 text-white"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditExercice(video.id)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Modifier l'exercice
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'video' })}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Retirer la vidéo
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'exercises' })}
+                          >
+                            <Dumbbell className="w-4 h-4 mr-2" />
+                            Supprimer les exercices liés
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'seances' })}
+                          >
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Retirer des séances
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setDeleteDialog({ open: true, video, mode: 'all' })}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Tout supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     {/* Title overlay */}
@@ -192,6 +382,34 @@ export default function Videos() {
                 className="w-full h-auto max-h-[80vh]"
               />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, video: null, mode: 'video' })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {deleteDialog.mode === 'video' && "Retirer la vidéo"}
+                {deleteDialog.mode === 'exercises' && "Supprimer les exercices liés"}
+                {deleteDialog.mode === 'seances' && "Retirer des séances"}
+                {deleteDialog.mode === 'all' && "Tout supprimer"}
+              </DialogTitle>
+              <DialogDescription>
+                {deleteDialog.mode === 'video' && "La vidéo sera retirée de cet exercice mais l'exercice sera conservé."}
+                {deleteDialog.mode === 'exercises' && "Tous les exercices utilisant cette vidéo seront supprimés définitivement."}
+                {deleteDialog.mode === 'seances' && "Cette vidéo sera retirée de toutes les séances qui l'utilisent."}
+                {deleteDialog.mode === 'all' && "Tous les exercices et références dans les séances seront supprimés. Cette action est irréversible."}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialog({ open: false, video: null, mode: 'video' })} disabled={deleting}>
+                Annuler
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteVideo} disabled={deleting}>
+                {deleting ? "Suppression..." : "Confirmer"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
