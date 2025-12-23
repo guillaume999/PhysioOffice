@@ -3,14 +3,31 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ClipboardList, Plus, Trash2, Search, Users, User, Shield, Copy, Edit, Calendar, FileText, Play, X } from "lucide-react";
+import { ClipboardList, Plus, Trash2, Video, X, Search, Users, User, Shield, Copy, Play, FileText, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+
+interface TraitementType {
+  id: string;
+  pathologie: string;
+  author_name: string | null;
+  is_shared: boolean;
+  is_copy: boolean;
+  is_validated: boolean;
+  original_id: string | null;
+  user_id: string;
+  created_at: string;
+  tests?: TraitementTest[];
+  seances?: TraitementSeance[];
+}
 
 interface TraitementTest {
   id: string;
@@ -26,27 +43,23 @@ interface TraitementSeance {
     id: string;
     pathologie: string;
     objectif_principal: string;
-    pathologies?: string[];
-    objectifs_principaux?: string[];
   };
 }
 
-interface TraitementType {
+interface VideoOption {
   id: string;
-  pathologie: string;
-  description: string | null;
-  author_name: string | null;
-  is_shared: boolean;
-  is_copy: boolean;
-  is_validated: boolean;
-  original_id: string | null;
-  user_id: string;
-  created_at: string;
-  tests?: TraitementTest[];
-  seances?: TraitementSeance[];
+  title: string;
+  thumbnail_url: string | null;
+  video_url: string;
 }
 
-type FilterType = "mine" | "platform" | "shared";
+interface SeanceOption {
+  id: string;
+  pathologie: string;
+  objectif_principal: string;
+}
+
+type FilterType = "all" | "mine" | "shared";
 
 export default function TraitementType() {
   const { user } = useAuth();
@@ -54,16 +67,23 @@ export default function TraitementType() {
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [filteredTraitements, setFilteredTraitements] = useState<TraitementType[]>([]);
+  const [pathologies, setPathologies] = useState<string[]>([]);
+  const [videos, setVideos] = useState<VideoOption[]>([]);
+  const [seancesOptions, setSeancesOptions] = useState<SeanceOption[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Filter and search state
-  const [filter, setFilter] = useState<FilterType>("mine");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [testDetailDialog, setTestDetailDialog] = useState<TraitementTest | null>(null);
+  const [videoDialog, setVideoDialog] = useState<string | null>(null);
+
+  const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Dialog state
-  const [formDialogOpen, setFormDialogOpen] = useState(false);
-  const [editingTraitement, setEditingTraitement] = useState<any>(null);
-  const [testDetailDialog, setTestDetailDialog] = useState<TraitementTest | null>(null);
+  const [formData, setFormData] = useState({
+    pathologie: "",
+    newPathologie: "",
+    tests: [] as { description: string }[],
+    seances: [] as string[]
+  });
 
   useEffect(() => {
     if (user) {
@@ -83,29 +103,31 @@ export default function TraitementType() {
       .filter((t) => t.is_copy && t.user_id === user?.id && t.original_id)
       .map((t) => t.original_id);
 
-    // Filter out originals that user has already copied (in shared view)
-    if (filter === "shared") {
-      result = result.filter((t) => !userCopiedOriginalIds.includes(t.id));
-    }
+    // Filter out originals that user has already copied
+    result = result.filter((t) => !userCopiedOriginalIds.includes(t.id));
 
-    // Apply filter type
+    // Filter out copies from other users
+    result = result.filter((t) => {
+      // Keep if not a copy
+      if (!t.is_copy) return true;
+      // Keep if it's the user's own copy
+      if (t.user_id === user?.id) return true;
+      // Hide copies from other users
+      return false;
+    });
+
     if (filter === "mine") {
       result = result.filter((t) => t.user_id === user?.id);
     } else if (filter === "shared") {
-      result = result.filter((t) => 
-        t.is_shared && 
-        t.is_validated &&
-        t.user_id !== user?.id
-      );
+      result = result.filter((t) => t.is_shared && t.user_id !== user?.id);
     }
 
-    // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter((t) =>
-        t.author_name?.toLowerCase().includes(query) ||
-        t.pathologie.toLowerCase().includes(query) ||
-        t.description?.toLowerCase().includes(query)
+      result = result.filter(
+        (t) =>
+          t.author_name?.toLowerCase().includes(query) ||
+          t.pathologie.toLowerCase().includes(query)
       );
     }
 
@@ -115,17 +137,16 @@ export default function TraitementType() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch user profile
+      // Fetch user pseudo
       const { data: profileData } = await supabase
         .from("profiles")
         .select("pseudo, can_share")
         .eq("user_id", user!.id)
-        .maybeSingle();
+        .single();
       
       setUserPseudo(profileData?.pseudo || null);
       setUserCanShare(profileData?.can_share !== false);
 
-      // Fetch traitement types
       const { data: traitementsData, error: traitementsError } = await supabase
         .from("traitement_types")
         .select("*")
@@ -133,7 +154,6 @@ export default function TraitementType() {
 
       if (traitementsError) throw traitementsError;
 
-      // Fetch details for each traitement
       const traitementsWithDetails = await Promise.all(
         (traitementsData || []).map(async (traitement) => {
           const { data: testsData } = await supabase
@@ -144,7 +164,7 @@ export default function TraitementType() {
 
           const { data: seancesData } = await supabase
             .from("traitement_seances")
-            .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux)")
+            .select("*, seance_types(id, pathologie, objectif_principal)")
             .eq("traitement_type_id", traitement.id)
             .order("ordre");
 
@@ -160,6 +180,14 @@ export default function TraitementType() {
       );
 
       setTraitements(traitementsWithDetails);
+
+      const { data: pathoData } = await supabase.from("pathologies").select("name");
+      setPathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
+
+      const { data: seancesData } = await supabase
+        .from("seance_types")
+        .select("id, pathologie, objectif_principal");
+      setSeancesOptions(seancesData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -168,24 +196,64 @@ export default function TraitementType() {
     }
   };
 
-  const openCreateDialog = () => {
-    setEditingTraitement(null);
-    setFormDialogOpen(true);
-  };
+  const handleSubmit = async () => {
+    if (!user) return;
 
-  const openEditDialog = (traitement: TraitementType) => {
-    setEditingTraitement({
-      id: traitement.id,
-      pathologie: traitement.pathologie,
-      description: traitement.description || "",
-      tests: traitement.tests || [],
-      seances: (traitement.seances || []).map(s => ({
-        ...s,
-        seance: s.seance
-      })),
-      author_name: traitement.author_name
-    });
-    setFormDialogOpen(true);
+    const pathologie = formData.newPathologie || formData.pathologie;
+
+    if (!pathologie) {
+      toast.error("Pathologie requise");
+      return;
+    }
+
+    try {
+      const { data: traitementData, error: traitementError } = await supabase
+        .from("traitement_types")
+        .insert({
+          user_id: user.id,
+          pathologie,
+          author_name: userPseudo,
+          is_shared: false
+        })
+        .select()
+        .single();
+
+      if (traitementError) throw traitementError;
+
+      if (formData.newPathologie) {
+        await supabase.from("pathologies").insert({ user_id: user.id, name: formData.newPathologie });
+      }
+
+      for (let i = 0; i < formData.tests.length; i++) {
+        const test = formData.tests[i];
+        await supabase.from("traitement_tests").insert({
+          traitement_type_id: traitementData.id,
+          description: test.description,
+          ordre: i
+        });
+      }
+
+      for (let i = 0; i < formData.seances.length; i++) {
+        await supabase.from("traitement_seances").insert({
+          traitement_type_id: traitementData.id,
+          seance_type_id: formData.seances[i],
+          ordre: i
+        });
+      }
+
+      toast.success("Traitement type créé avec succès");
+      setDialogOpen(false);
+      setFormData({
+        pathologie: "",
+        newPathologie: "",
+        tests: [],
+        seances: []
+      });
+      fetchData();
+    } catch (error) {
+      console.error("Error creating traitement:", error);
+      toast.error("Erreur lors de la création");
+    }
   };
 
   const toggleShare = async (traitementId: string, currentlyShared: boolean, isCopy: boolean, isValidated: boolean) => {
@@ -217,11 +285,6 @@ export default function TraitementType() {
 
   const deleteTraitement = async (id: string) => {
     try {
-      // Delete tests first
-      await supabase.from("traitement_tests").delete().eq("traitement_type_id", id);
-      // Delete seances
-      await supabase.from("traitement_seances").delete().eq("traitement_type_id", id);
-      // Delete traitement
       await supabase.from("traitement_types").delete().eq("id", id);
       toast.success("Traitement supprimé");
       fetchData();
@@ -231,35 +294,25 @@ export default function TraitementType() {
     }
   };
 
-  const duplicateTraitement = async (traitement: TraitementType) => {
+  const copyTraitement = async (traitement: TraitementType) => {
     if (!user) return;
 
     try {
-      // Fetch user pseudo
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("pseudo")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      // Create the traitement copy
       const { data: newTraitement, error: traitementError } = await supabase
         .from("traitement_types")
         .insert({
           user_id: user.id,
           pathologie: traitement.pathologie,
-          description: traitement.description,
-          author_name: profileData?.pseudo || traitement.author_name,
+          author_name: traitement.author_name,
           is_shared: false,
-          is_copy: traitement.user_id !== user.id,
-          original_id: traitement.user_id !== user.id ? traitement.id : null
+          is_copy: true,
+          original_id: traitement.id
         })
         .select()
         .single();
 
       if (traitementError) throw traitementError;
 
-      // Copy tests
       if (traitement.tests && traitement.tests.length > 0) {
         for (const test of traitement.tests) {
           await supabase.from("traitement_tests").insert({
@@ -270,7 +323,6 @@ export default function TraitementType() {
         }
       }
 
-      // Copy seances
       if (traitement.seances && traitement.seances.length > 0) {
         for (const seance of traitement.seances) {
           await supabase.from("traitement_seances").insert({
@@ -281,19 +333,46 @@ export default function TraitementType() {
         }
       }
 
-      toast.success(traitement.user_id !== user.id ? "Traitement copié dans votre bibliothèque" : "Traitement dupliqué");
+      toast.success("Traitement copié dans votre bibliothèque");
       fetchData();
     } catch (error) {
-      console.error("Error duplicating traitement:", error);
-      toast.error("Erreur lors de la duplication");
+      console.error("Error copying traitement:", error);
+      toast.error("Erreur lors de la copie");
     }
   };
 
-  const getSeanceDisplay = (seance: TraitementSeance["seance"]) => {
-    if (!seance) return "Séance inconnue";
-    const pathos = seance.pathologies?.length ? seance.pathologies : [seance.pathologie];
-    const objectifs = seance.objectifs_principaux?.length ? seance.objectifs_principaux : [seance.objectif_principal];
-    return `${pathos.join(", ")} - ${objectifs.join(", ")}`;
+  const addTest = () => {
+    setFormData({
+      ...formData,
+      tests: [...formData.tests, { description: "" }]
+    });
+  };
+
+  const removeTest = (index: number) => {
+    setFormData({
+      ...formData,
+      tests: formData.tests.filter((_, i) => i !== index)
+    });
+  };
+
+  const updateTest = (index: number, field: string, value: string) => {
+    const updated = [...formData.tests];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, tests: updated });
+  };
+
+  const toggleSeance = (seanceId: string) => {
+    if (formData.seances.includes(seanceId)) {
+      setFormData({
+        ...formData,
+        seances: formData.seances.filter((id) => id !== seanceId)
+      });
+    } else {
+      setFormData({
+        ...formData,
+        seances: [...formData.seances, seanceId]
+      });
+    }
   };
 
   if (!user) {
@@ -319,47 +398,136 @@ export default function TraitementType() {
               <p className="text-muted-foreground">Gérez vos modèles de traitements standardisés</p>
             </div>
           </div>
-          <Button onClick={openCreateDialog} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nouveau traitement
-          </Button>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nouveau traitement
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Créer un traitement type</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {userPseudo ? (
+                  <p className="text-sm text-muted-foreground">Auteur: <span className="font-medium text-foreground">{userPseudo}</span></p>
+                ) : (
+                  <p className="text-sm text-amber-600">Définissez votre pseudo dans votre profil pour qu'il apparaisse comme auteur</p>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Pathologie</Label>
+                  <Select value={formData.pathologie} onValueChange={(v) => setFormData({ ...formData, pathologie: v, newPathologie: "" })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner ou créer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pathologies.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                      <SelectItem value="__new__">+ Créer nouveau</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formData.pathologie === "__new__" && (
+                    <Input
+                      placeholder="Nouvelle pathologie"
+                      value={formData.newPathologie}
+                      onChange={(e) => setFormData({ ...formData, newPathologie: e.target.value })}
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Tests</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addTest}>
+                      <Plus className="w-4 h-4 mr-1" /> Ajouter test
+                    </Button>
+                  </div>
+                  {formData.tests.map((test, index) => (
+                    <div key={index} className="flex gap-2 items-start p-3 border rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <Textarea
+                          placeholder="Description du test"
+                          value={test.description}
+                          onChange={(e) => updateTest(index, "description", e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => removeTest(index)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Séances associées</Label>
+                  <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-1">
+                    {seancesOptions.map((seance) => (
+                      <div key={seance.id} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded">
+                        <Checkbox
+                          checked={formData.seances.includes(seance.id)}
+                          onCheckedChange={() => toggleSeance(seance.id)}
+                        />
+                        <span className="text-sm">
+                          {seance.pathologie} - {seance.objectif_principal}
+                        </span>
+                      </div>
+                    ))}
+                    {seancesOptions.length === 0 && (
+                      <p className="text-sm text-muted-foreground p-2">Aucune séance disponible</p>
+                    )}
+                  </div>
+                </div>
+
+                <Button onClick={handleSubmit} className="w-full">
+                  Créer le traitement
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Filters and Search */}
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
-              {/* Filter Buttons */}
-              <div className="flex gap-2 flex-wrap">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par pathologie ou auteur..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={filter === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("all")}
+                  className="gap-1"
+                >
+                  <Users className="w-4 h-4" /> Tous
+                </Button>
                 <Button
                   variant={filter === "mine" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setFilter("mine")}
-                  className="gap-2"
+                  className="gap-1"
                 >
-                  <User className="w-4 h-4" />
-                  Mes traitements
+                  <User className="w-4 h-4" /> Mes traitements
                 </Button>
                 <Button
                   variant={filter === "shared" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setFilter("shared")}
-                  className="gap-2"
+                  className="gap-1"
                 >
-                  <Users className="w-4 h-4" />
-                  Partagés
+                  <Shield className="w-4 h-4" /> Partagés
                 </Button>
-              </div>
-
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par pathologie, description ou auteur..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
               </div>
             </div>
           </CardContent>
@@ -373,170 +541,111 @@ export default function TraitementType() {
             {loading ? (
               <p className="text-muted-foreground">Chargement...</p>
             ) : filteredTraitements.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">Aucun traitement type trouvé.</p>
-                {filter === "mine" && (
-                  <Button onClick={openCreateDialog} variant="outline" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Créer votre premier traitement
-                  </Button>
-                )}
-              </div>
+              <p className="text-muted-foreground">Aucun traitement trouvé.</p>
             ) : (
-              <div className="grid gap-4">
-                {filteredTraitements.map((traitement) => {
-                  const isOwner = traitement.user_id === user?.id;
-                  const canShare = isOwner && !traitement.is_copy;
-
-                  return (
-                    <Card key={traitement.id} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex flex-col lg:flex-row gap-4">
-                          {/* Main content */}
-                          <div className="flex-1 space-y-3">
-                            {/* Pathologie & status */}
-                            <div className="flex flex-wrap gap-2 items-center">
-                              <Badge variant="outline" className="text-sm">{traitement.pathologie}</Badge>
-                              {traitement.is_copy && (
-                                <Badge variant="secondary" className="text-xs">Copie</Badge>
-                              )}
-                            </div>
-
-                            {/* Description */}
-                            {traitement.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {traitement.description}
-                              </p>
-                            )}
-
-                            {/* Tests */}
-                            {traitement.tests && traitement.tests.length > 0 && (
-                              <div className="space-y-2">
-                                <p className="text-sm font-semibold">
-                                  Tests ({traitement.tests.length})
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {traitement.tests.map((test) => (
-                                    <Badge
-                                      key={test.id}
-                                      variant="outline"
-                                      className="cursor-pointer hover:bg-muted flex items-center gap-1"
-                                      onClick={() => setTestDetailDialog(test)}
-                                    >
-                                      <FileText className="w-3 h-3" />
-                                      {test.description.length > 25 
-                                        ? test.description.substring(0, 25) + "..." 
-                                        : test.description}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Séances */}
-                            <div className="space-y-2">
-                              <p className="text-sm font-semibold">
-                                Séances ({traitement.seances?.length || 0})
-                              </p>
-                              {traitement.seances && traitement.seances.length > 0 ? (
-                                <div className="space-y-2">
-                                  {traitement.seances.map((seance, i) => (
-                                    <div 
-                                      key={seance.id} 
-                                      className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50"
-                                    >
-                                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-xs font-bold text-primary">{i + 1}</span>
-                                      </div>
-                                      <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                      <span className="text-sm truncate">
-                                        {getSeanceDisplay(seance.seance)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">Aucune séance</p>
-                              )}
-                            </div>
-
-                            {/* Author */}
-                            <p className="text-xs text-muted-foreground">
-                              Par <span className="font-medium">{traitement.author_name || "Anonyme"}</span>
-                            </p>
-                          </div>
-
-                          {/* Side panel - Actions */}
-                          <div className="flex flex-col gap-3 lg:w-48">
-                            {/* Share status */}
-                            {canShare && (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={traitement.is_shared}
-                                  onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
-                                  disabled={traitement.is_validated && traitement.is_shared}
-                                />
-                                <span className="text-xs">Partager</span>
-                                {traitement.is_shared && traitement.is_validated && (
-                                  <Badge className="text-xs bg-green-500">Validé</Badge>
-                                )}
-                                {traitement.is_shared && !traitement.is_validated && (
-                                  <Badge variant="secondary" className="text-xs">En attente</Badge>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Actions */}
-                            <div className="flex gap-1 flex-wrap">
-                              {isOwner && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditDialog(traitement)}
-                                  className="gap-1"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                  Modifier
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => duplicateTraitement(traitement)}
-                                className="gap-1"
-                              >
-                                <Copy className="w-3 h-3" />
-                                {isOwner ? "Dupliquer" : "Copier"}
-                              </Button>
-                              {isOwner && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() => deleteTraitement(traitement.id)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pathologie</TableHead>
+                    <TableHead>Tests</TableHead>
+                    <TableHead>Séances</TableHead>
+                    <TableHead>Auteur</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTraitements.map((traitement) => (
+                    <TableRow key={traitement.id}>
+                      <TableCell className="font-medium">{traitement.pathologie}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {traitement.tests?.map((test) => (
+                            <Badge
+                              key={test.id}
+                              variant="outline"
+                              className="cursor-pointer hover:bg-muted flex items-center gap-1"
+                              onClick={() => setTestDetailDialog(test)}
+                            >
+                              <FileText className="w-3 h-3" />
+                              {test.description.substring(0, 20)}...
+                            </Badge>
+                          ))}
+                          {(!traitement.tests || traitement.tests.length === 0) && (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {traitement.seances?.map((s) => (
+                            <Badge key={s.id} variant="secondary" className="text-xs">
+                              <Calendar className="w-3 h-3 mr-1" />
+                              {s.seance?.objectif_principal?.substring(0, 15) || "Séance"}
+                            </Badge>
+                          ))}
+                          {(!traitement.seances || traitement.seances.length === 0) && (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{traitement.author_name || "-"}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                          {traitement.is_copy && (
+                            <Badge variant="outline" className="text-xs">Copie</Badge>
+                          )}
+                          {traitement.is_shared && traitement.is_validated && (
+                            <Badge className="text-xs bg-green-500">Validé</Badge>
+                          )}
+                          {traitement.is_shared && !traitement.is_validated && (
+                            <Badge variant="secondary" className="text-xs bg-orange-500">En attente</Badge>
+                          )}
+                          {traitement.user_id === user?.id && (
+                            <Badge className="text-xs">Propriétaire</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {traitement.user_id === user?.id ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
+                                title={traitement.is_copy ? "Les copies ne peuvent pas être partagées" : traitement.is_validated && traitement.is_shared ? "Validé - non modifiable" : (traitement.is_shared ? "Retirer du partage" : "Partager")}
+                                disabled={(traitement.is_copy || false) || (traitement.is_validated && traitement.is_shared)}
+                              >
+                                <Users className={`w-4 h-4 ${traitement.is_shared ? "text-primary" : ""}`} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteTraitement(traitement.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => copyTraitement(traitement)}
+                              title="Copier dans ma bibliothèque"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
-
-        {/* Form Dialog */}
-        <TraitementFormDialog
-          open={formDialogOpen}
-          onOpenChange={setFormDialogOpen}
-          traitement={editingTraitement}
-          onSuccess={fetchData}
-        />
 
         {/* Test Detail Dialog */}
         <Dialog open={!!testDetailDialog} onOpenChange={() => setTestDetailDialog(null)}>
@@ -546,8 +655,25 @@ export default function TraitementType() {
             </DialogHeader>
             {testDetailDialog && (
               <div className="space-y-4">
-                <p className="text-sm whitespace-pre-wrap">{testDetailDialog.description}</p>
+                <p className="text-sm">{testDetailDialog.description}</p>
               </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Video Player Dialog */}
+        <Dialog open={!!videoDialog} onOpenChange={() => setVideoDialog(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Vidéo</DialogTitle>
+            </DialogHeader>
+            {videoDialog && (
+              <video
+                src={videoDialog}
+                controls
+                autoPlay
+                className="w-full rounded-lg"
+              />
             )}
           </DialogContent>
         </Dialog>
