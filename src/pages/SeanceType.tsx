@@ -41,6 +41,7 @@ interface SeanceType {
   is_shared: boolean;
   is_copy: boolean;
   is_validated: boolean;
+  is_hidden_from_list: boolean;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -95,7 +96,8 @@ export default function SeanceType() {
 
     // Apply filter type
     if (filter === "mine") {
-      result = result.filter((s) => s.user_id === user?.id);
+      // Filter out hidden seances for "mine" view
+      result = result.filter((s) => s.user_id === user?.id && !s.is_hidden_from_list);
     } else if (filter === "platform") {
       result = result.filter((s) => featuredSeanceIds.includes(s.id));
     } else if (filter === "shared") {
@@ -130,7 +132,8 @@ export default function SeanceType() {
       .filter((s) => s.is_copy && s.user_id === user?.id && s.original_id)
       .map((s) => s.original_id);
 
-    const mine = seances.filter((s) => s.user_id === user?.id).length;
+    // Count only non-hidden seances for "mine"
+    const mine = seances.filter((s) => s.user_id === user?.id && !s.is_hidden_from_list).length;
     const platform = seances.filter((s) => featuredSeanceIds.includes(s.id)).length;
     const shared = seances.filter((s) => 
       s.is_shared && 

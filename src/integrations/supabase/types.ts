@@ -708,6 +708,7 @@ export type Database = {
           created_at: string
           id: string
           is_copy: boolean | null
+          is_hidden_from_list: boolean | null
           is_shared: boolean
           is_validated: boolean | null
           objectif_principal: string
@@ -725,6 +726,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_copy?: boolean | null
+          is_hidden_from_list?: boolean | null
           is_shared?: boolean
           is_validated?: boolean | null
           objectif_principal: string
@@ -742,6 +744,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_copy?: boolean | null
+          is_hidden_from_list?: boolean | null
           is_shared?: boolean
           is_validated?: boolean | null
           objectif_principal?: string

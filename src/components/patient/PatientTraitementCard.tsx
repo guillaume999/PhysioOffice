@@ -4,12 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2 } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCodeDialog";
+import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+
+interface SeanceExercice {
+  id: string;
+  name: string | null;
+  description: string | null;
+  repetitions: number | null;
+  duration_seconds: number | null;
+  series: number;
+  ordre: number;
+  exercice_id: string | null;
+  exercice?: {
+    id: string;
+    title: string;
+    video_url: string | null;
+    thumbnail_url: string | null;
+  } | null;
+}
 
 interface TraitementTest {
   id: string;
@@ -34,7 +52,10 @@ interface TraitementSeance {
     objectif_principal: string;
     pathologies?: string[];
     objectifs_principaux?: string[];
+    objectifs_secondaires?: string[];
+    is_hidden_from_list?: boolean;
   } | null;
+  exercices?: SeanceExercice[];
 }
 
 interface TraitementDetails {
@@ -76,6 +97,10 @@ export function PatientTraitementCard({
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
   const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
   const [selectedSeanceForAccess, setSelectedSeanceForAccess] = useState<{id: string; name: string} | null>(null);
+  const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
+  const [seanceFormDialogOpen, setSeanceFormDialogOpen] = useState(false);
+  const [editingSeance, setEditingSeance] = useState<any>(null);
+  const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -105,15 +130,34 @@ export function PatientTraitementCard({
 
         const { data: seancesData } = await supabase
           .from("traitement_seances")
-          .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux)")
+          .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, is_hidden_from_list)")
           .eq("traitement_type_id", activeTraitementId)
           .order("ordre", { ascending: true });
+
+        // Fetch exercices for each seance
+        const seancesWithExercices = await Promise.all(
+          (seancesData || []).map(async (seance) => {
+            const { data: exercicesData } = await supabase
+              .from("seance_exercices")
+              .select("*, exercices:exercice_id(id, title, video_url, thumbnail_url)")
+              .eq("seance_type_id", seance.seance_type_id)
+              .order("ordre", { ascending: true });
+            
+            return {
+              ...seance,
+              exercices: (exercicesData || []).map(ex => ({
+                ...ex,
+                exercice: ex.exercices
+              }))
+            };
+          })
+        );
 
         setTraitement({
           ...traitementData,
           is_hidden_from_list: traitementData.is_hidden_from_list || false,
           tests: testsData || [],
-          seances: seancesData || [],
+          seances: seancesWithExercices,
         });
       }
     } catch (error) {
@@ -132,6 +176,116 @@ export function PatientTraitementCard({
       ? seance.seance_types.objectifs_principaux 
       : [seance.seance_types.objectif_principal];
     return `${pathologies[0]} - ${objectifs[0]}`;
+  };
+
+  const toggleSeanceExpand = (seanceId: string) => {
+    setExpandedSeances(prev => {
+      const next = new Set(prev);
+      if (next.has(seanceId)) {
+        next.delete(seanceId);
+      } else {
+        next.add(seanceId);
+      }
+      return next;
+    });
+  };
+
+  const handleEditSeance = (seance: TraitementSeance, index: number) => {
+    if (!seance.seance_types) return;
+    
+    setEditingSeance({
+      // Don't pass id to create a new copy
+      pathologies: seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie],
+      objectifs_principaux: seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal],
+      objectifs_secondaires: seance.seance_types.objectifs_secondaires || [],
+      exercices: (seance.exercices || []).map(ex => ({
+        id: ex.id,
+        exercice_id: ex.exercice_id,
+        name: ex.name || "",
+        description: ex.description || "",
+        repetitions: ex.repetitions,
+        duration_seconds: ex.duration_seconds,
+        series: ex.series || 1,
+        ordre: ex.ordre,
+        video_url: ex.exercice?.video_url || null
+      })),
+      author_name: null
+    });
+    setEditingSeanceIndex(index);
+    setSeanceFormDialogOpen(true);
+  };
+
+  const handleEditSeanceOriginal = (seance: TraitementSeance) => {
+    if (!seance.seance_types) return;
+    
+    setEditingSeance({
+      id: seance.seance_type_id, // Pass id to edit original
+      pathologies: seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie],
+      objectifs_principaux: seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal],
+      objectifs_secondaires: seance.seance_types.objectifs_secondaires || [],
+      exercices: (seance.exercices || []).map(ex => ({
+        id: ex.id,
+        exercice_id: ex.exercice_id,
+        name: ex.name || "",
+        description: ex.description || "",
+        repetitions: ex.repetitions,
+        duration_seconds: ex.duration_seconds,
+        series: ex.series || 1,
+        ordre: ex.ordre,
+        video_url: ex.exercice?.video_url || null
+      })),
+      author_name: null
+    });
+    setEditingSeanceIndex(null);
+    setSeanceFormDialogOpen(true);
+  };
+
+  const handleSeanceFormSuccess = async () => {
+    if (!user || !traitement) return;
+    
+    // If we created a new copy, we need to update the traitement_seances
+    if (editingSeanceIndex !== null) {
+      // Fetch the latest seance created by this user
+      const { data: latestSeance } = await supabase
+        .from("seance_types")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (latestSeance && traitement.seances[editingSeanceIndex]) {
+        // Update the traitement_seances to point to the new seance
+        await supabase
+          .from("traitement_seances")
+          .update({ seance_type_id: latestSeance.id })
+          .eq("id", traitement.seances[editingSeanceIndex].id);
+        
+        // Mark the new seance as hidden from list
+        await supabase
+          .from("seance_types")
+          .update({ is_hidden_from_list: true })
+          .eq("id", latestSeance.id);
+      }
+    }
+    
+    setEditingSeanceIndex(null);
+    fetchTraitementDetails();
+  };
+
+  const toggleSeanceVisibility = async (seanceTypeId: string, currentlyHidden: boolean) => {
+    const { error } = await supabase
+      .from("seance_types")
+      .update({ is_hidden_from_list: !currentlyHidden })
+      .eq("id", seanceTypeId);
+    
+    if (error) {
+      toast.error("Erreur lors de la mise à jour");
+      return;
+    }
+    
+    toast.success(!currentlyHidden ? "Séance masquée de la liste" : "Séance visible dans la liste");
+    fetchTraitementDetails();
   };
 
   const handleEdit = () => {
@@ -310,39 +464,141 @@ export function PatientTraitementCard({
                     </div>
 
                     {/* Séances */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
                       {traitement.seances && traitement.seances.length > 0 ? (
-                        <div className="space-y-2">
-                          {traitement.seances.map((seance, i) => (
-                            <div 
-                              key={seance.id} 
-                              className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded-lg border border-border/50"
-                            >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                  <span className="text-xs font-bold text-primary">{i + 1}</span>
-                                </div>
-                                <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                <span className="text-sm truncate">{getSeanceDisplay(seance)}</span>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="flex-shrink-0 h-8 w-8"
-                                title="Partager cette séance avec le patient"
-                                onClick={() => {
-                                  setSelectedSeanceForAccess({
-                                    id: seance.seance_type_id,
-                                    name: getSeanceDisplay(seance)
-                                  });
-                                  setAccessCodeDialogOpen(true);
-                                }}
+                        <div className="space-y-3">
+                          {traitement.seances.map((seance, i) => {
+                            const isExpanded = expandedSeances.has(seance.id);
+                            const exercices = seance.exercices || [];
+                            
+                            return (
+                              <div 
+                                key={seance.id} 
+                                className="bg-muted/30 rounded-lg border border-border/50 overflow-hidden"
                               >
-                                <Share2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ))}
+                                {/* Seance header */}
+                                <div className="flex items-center justify-between gap-3 p-3">
+                                  <div 
+                                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                                    onClick={() => toggleSeanceExpand(seance.id)}
+                                  >
+                                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                    </div>
+                                    <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-sm truncate">{getSeanceDisplay(seance)}</span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
+                                    </Badge>
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      title="Modifier (crée une copie)"
+                                      onClick={() => handleEditSeance(seance, i)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      title="Partager cette séance"
+                                      onClick={() => {
+                                        setSelectedSeanceForAccess({
+                                          id: seance.seance_type_id,
+                                          name: getSeanceDisplay(seance)
+                                        });
+                                        setAccessCodeDialogOpen(true);
+                                      }}
+                                    >
+                                      <Share2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                
+                                {/* Expanded content */}
+                                {isExpanded && (
+                                  <div className="px-3 pb-3 space-y-3">
+                                    {/* Exercices list */}
+                                    {exercices.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {exercices.map((ex, j) => (
+                                          <div 
+                                            key={ex.id}
+                                            className="flex items-center gap-3 p-2 bg-background/50 rounded-md border border-border/30"
+                                          >
+                                            <span className="text-xs text-muted-foreground w-5">{j + 1}.</span>
+                                            {ex.exercice?.thumbnail_url && (
+                                              <img 
+                                                src={ex.exercice.thumbnail_url} 
+                                                alt="" 
+                                                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                              />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-sm font-medium truncate">
+                                                {ex.exercice?.title || ex.name || "Exercice"}
+                                              </p>
+                                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                {ex.series > 1 && <span>{ex.series} séries</span>}
+                                                {ex.repetitions && <span>× {ex.repetitions} reps</span>}
+                                                {ex.duration_seconds && <span>{ex.duration_seconds}s</span>}
+                                              </div>
+                                            </div>
+                                            {ex.exercice?.video_url && (
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                                                <Play className="w-4 h-4" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">Aucun exercice</p>
+                                    )}
+                                    
+                                    {/* Seance actions */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                                      <div className="flex items-center gap-2">
+                                        <Switch
+                                          id={`seance-visibility-${seance.id}`}
+                                          checked={!seance.seance_types?.is_hidden_from_list}
+                                          onCheckedChange={() => toggleSeanceVisibility(
+                                            seance.seance_type_id, 
+                                            seance.seance_types?.is_hidden_from_list || false
+                                          )}
+                                        />
+                                        <Label 
+                                          htmlFor={`seance-visibility-${seance.id}`} 
+                                          className="text-xs cursor-pointer"
+                                        >
+                                          Visible dans Séances
+                                        </Label>
+                                      </div>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="text-xs gap-1"
+                                        onClick={() => handleEditSeanceOriginal(seance)}
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                        Modifier l'originale
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">Aucune séance</p>
@@ -400,6 +656,13 @@ export function PatientTraitementCard({
           patientName={patientName}
         />
       )}
+
+      <SeanceFormDialog
+        open={seanceFormDialogOpen}
+        onOpenChange={setSeanceFormDialogOpen}
+        seance={editingSeance}
+        onSuccess={handleSeanceFormSuccess}
+      />
     </>
   );
 }
