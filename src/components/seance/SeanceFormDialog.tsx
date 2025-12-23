@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, X, GripVertical, Trash2 } from "lucide-react";
+import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -28,6 +28,8 @@ interface SeanceExerciceItem {
   duration_seconds: number | null;
   series: number;
   ordre: number;
+  video_url?: string | null;
+  video_file?: File | null;
 }
 
 interface SeanceFormData {
@@ -50,6 +52,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState<number | null>(null);
+  const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   
   // Available options
   const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
@@ -161,9 +165,51 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
         repetitions: null,
         duration_seconds: null,
         series: 1,
-        ordre: exercices.length
+        ordre: exercices.length,
+        video_url: null,
+        video_file: null
       }
     ]);
+  };
+
+  const handleVideoUpload = async (index: number, file: File) => {
+    if (!user) return;
+    
+    setUploadingVideo(index);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('videos')
+        .getPublicUrl(fileName);
+      
+      const updated = [...exercices];
+      updated[index] = { ...updated[index], video_url: publicUrl, video_file: null };
+      setExercices(updated);
+      
+      toast.success("Vidéo uploadée avec succès");
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      toast.error("Erreur lors de l'upload de la vidéo");
+    } finally {
+      setUploadingVideo(null);
+    }
+  };
+
+  const removeVideo = (index: number) => {
+    const updated = [...exercices];
+    updated[index] = { ...updated[index], video_url: null, video_file: null };
+    setExercices(updated);
   };
 
   const updateExercice = (index: number, field: keyof SeanceExerciceItem, value: any) => {
@@ -258,7 +304,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                 title: ex.name.trim(),
                 description: ex.description?.trim() || null,
                 status: "draft",
-                pathologie_tags: []
+                pathologie_tags: [],
+                video_url: ex.video_url || null
               })
               .select()
               .single();
@@ -318,7 +365,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                 title: ex.name.trim(),
                 description: ex.description?.trim() || null,
                 status: "draft",
-                pathologie_tags: []
+                pathologie_tags: [],
+                video_url: ex.video_url || null
               })
               .select()
               .single();
@@ -528,6 +576,61 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                             placeholder="Description optionnelle"
                           />
                         </div>
+
+                        {/* Video upload - only for custom exercices */}
+                        {!ex.exercice_id && (
+                          <div className="space-y-2">
+                            <Label className="text-xs">Vidéo</Label>
+                            {ex.video_url ? (
+                              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                                <Video className="w-4 h-4 text-primary" />
+                                <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeVideo(index)}
+                                  className="h-6 px-2"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div>
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  ref={(el) => { fileInputRefs.current[index] = el; }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleVideoUpload(index, file);
+                                  }}
+                                  className="hidden"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => fileInputRefs.current[index]?.click()}
+                                  disabled={uploadingVideo === index}
+                                  className="gap-2"
+                                >
+                                  {uploadingVideo === index ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Upload en cours...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-4 h-4" />
+                                      Ajouter une vidéo
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-3 gap-3">
                           <div>
