@@ -28,9 +28,17 @@ interface TraitementSeanceItem {
   seance?: SeanceOption;
 }
 
+interface ExerciceOption {
+  id: string;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
+}
+
 interface TraitementTest {
   id?: string;
-  description: string;
+  exercice_id: string;
+  exercice?: ExerciceOption;
   ordre: number;
 }
 
@@ -58,6 +66,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
   // Available options
   const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
   const [availableSeances, setAvailableSeances] = useState<SeanceOption[]>([]);
+  const [availableExercices, setAvailableExercices] = useState<ExerciceOption[]>([]);
   
   // Form state
   const [pathologie, setPathologie] = useState("");
@@ -110,6 +119,15 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
       pathologies: s.pathologies || [],
       objectifs_principaux: s.objectifs_principaux || []
     })) || []);
+
+    // Fetch exercices (user's own + platform exercices)
+    const { data: exercicesData } = await supabase
+      .from("exercices")
+      .select("id, title, description, thumbnail_url")
+      .or(`user_id.eq.${user.id},status.eq.shared`)
+      .order("title", { ascending: true });
+    
+    setAvailableExercices(exercicesData || []);
   };
 
   const resetForm = () => {
@@ -120,24 +138,26 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     setSelectedSeances([]);
   };
 
-  const addTest = () => {
-    setTests([
-      ...tests,
-      {
-        description: "",
-        ordre: tests.length
-      }
-    ]);
+  const toggleExercice = (exercice: ExerciceOption) => {
+    const exists = tests.find(t => t.exercice_id === exercice.id);
+    if (exists) {
+      const updated = tests.filter(t => t.exercice_id !== exercice.id);
+      updated.forEach((t, i) => t.ordre = i);
+      setTests(updated);
+    } else {
+      setTests([
+        ...tests,
+        {
+          exercice_id: exercice.id,
+          exercice,
+          ordre: tests.length
+        }
+      ]);
+    }
   };
 
-  const updateTest = (index: number, value: string) => {
-    const updated = [...tests];
-    updated[index] = { ...updated[index], description: value };
-    setTests(updated);
-  };
-
-  const removeTest = (index: number) => {
-    const updated = tests.filter((_, i) => i !== index);
+  const removeTest = (exerciceId: string) => {
+    const updated = tests.filter(t => t.exercice_id !== exerciceId);
     updated.forEach((t, i) => t.ordre = i);
     setTests(updated);
   };
@@ -206,13 +226,11 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
 
         // Insert new tests
         for (const test of tests) {
-          if (test.description.trim()) {
-            await supabase.from("traitement_tests").insert({
-              traitement_type_id: traitement.id,
-              description: test.description,
-              ordre: test.ordre
-            });
-          }
+          await supabase.from("traitement_tests").insert({
+            traitement_type_id: traitement.id,
+            exercice_id: test.exercice_id,
+            ordre: test.ordre
+          });
         }
 
         // Delete old seances
@@ -247,13 +265,11 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
 
         // Insert tests
         for (const test of tests) {
-          if (test.description.trim()) {
-            await supabase.from("traitement_tests").insert({
-              traitement_type_id: newTraitement.id,
-              description: test.description,
-              ordre: test.ordre
-            });
-          }
+          await supabase.from("traitement_tests").insert({
+            traitement_type_id: newTraitement.id,
+            exercice_id: test.exercice_id,
+            ordre: test.ordre
+          });
         }
 
         // Insert seances
@@ -327,37 +343,74 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
             />
           </div>
 
-          {/* Tests */}
+          {/* Tests (Exercices) */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Tests à effectuer</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addTest}>
-                <Plus className="w-4 h-4 mr-1" /> Ajouter test
-              </Button>
-            </div>
-            {tests.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">Aucun test ajouté</p>
-            ) : (
-              <div className="space-y-2">
-                {tests.map((test, index) => (
-                  <div key={index} className="flex gap-2 items-start p-3 border rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-medium flex-shrink-0 mt-1">
-                      {index + 1}
-                    </div>
-                    <Textarea
-                      placeholder="Description du test"
-                      value={test.description}
-                      onChange={(e) => updateTest(index, e.target.value)}
-                      rows={2}
-                      className="flex-1"
-                    />
-                    <Button variant="ghost" size="icon" onClick={() => removeTest(index)} className="flex-shrink-0">
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+            <Label>Tests à effectuer (exercices)</Label>
+            
+            {/* Selected tests */}
+            {tests.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <p className="text-sm font-medium text-muted-foreground">Exercices sélectionnés ({tests.length})</p>
+                {tests.map((item, index) => (
+                  <Card key={item.exercice_id} className="bg-secondary/30 border-secondary/50">
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground font-bold">
+                        {index + 1}
+                      </div>
+                      {item.exercice?.thumbnail_url && (
+                        <img 
+                          src={item.exercice.thumbnail_url} 
+                          alt={item.exercice.title} 
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.exercice?.title}</p>
+                        {item.exercice?.description && (
+                          <p className="text-sm text-muted-foreground truncate">{item.exercice.description}</p>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => removeTest(item.exercice_id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
+
+            {/* Available exercices */}
+            <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-1">
+              {availableExercices.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-2 text-center">Aucun exercice disponible. Créez d'abord des exercices.</p>
+              ) : (
+                availableExercices.map((exercice) => {
+                  const isSelected = tests.some(t => t.exercice_id === exercice.id);
+                  return (
+                    <div 
+                      key={exercice.id} 
+                      className={`flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer ${isSelected ? 'bg-secondary/20' : ''}`}
+                      onClick={() => toggleExercice(exercice)}
+                    >
+                      <Checkbox checked={isSelected} />
+                      {exercice.thumbnail_url && (
+                        <img 
+                          src={exercice.thumbnail_url} 
+                          alt={exercice.title} 
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{exercice.title}</p>
+                        {exercice.description && (
+                          <p className="text-xs text-muted-foreground truncate">{exercice.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           {/* Séances */}
