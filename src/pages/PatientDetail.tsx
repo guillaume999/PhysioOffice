@@ -378,6 +378,8 @@ export default function PatientDetail() {
         <PatientTraitementCard
           activeTraitementId={carePlan.active_traitement_id}
           activeTraitementName={activeTraitementName}
+          patientId={id || ""}
+          patientName={patient.name}
           onImportTraitement={() => setImportTraitementOpen(true)}
           onCreateTraitement={handleCreateTraitement}
           onRemoveTraitement={handleRemoveTraitement}

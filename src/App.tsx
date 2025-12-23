@@ -18,6 +18,7 @@ import SeanceType from "./pages/SeanceType";
 import Exercices from "./pages/Exercices";
 import Videos from "./pages/Videos";
 import Admin from "./pages/Admin";
+import PatientSessionView from "./pages/PatientSessionView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/exercices" element={<Exercices />} />
             <Route path="/videos" element={<Videos />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/patient-session" element={<PatientSessionView />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

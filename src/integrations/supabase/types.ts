@@ -434,6 +434,51 @@ export type Database = {
           },
         ]
       }
+      patient_session_access: {
+        Row: {
+          access_code: string
+          created_at: string
+          expires_at: string
+          id: string
+          patient_id: string
+          traitement_id: string
+          user_id: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          patient_id: string
+          traitement_id: string
+          user_id: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          patient_id?: string
+          traitement_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_session_access_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_session_access_traitement_id_fkey"
+            columns: ["traitement_id"]
+            isOneToOne: false
+            referencedRelation: "traitement_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patients: {
         Row: {
           address: string | null

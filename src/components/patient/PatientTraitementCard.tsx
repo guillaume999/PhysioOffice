@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCodeDialog";
 
 interface TraitementTest {
   id: string;
@@ -49,6 +50,8 @@ interface TraitementDetails {
 interface PatientTraitementCardProps {
   activeTraitementId: string | null;
   activeTraitementName: string | null;
+  patientId: string;
+  patientName: string;
   onImportTraitement: () => void;
   onCreateTraitement: () => void;
   onRemoveTraitement: () => void;
@@ -58,6 +61,8 @@ interface PatientTraitementCardProps {
 export function PatientTraitementCard({
   activeTraitementId,
   activeTraitementName,
+  patientId,
+  patientName,
   onImportTraitement,
   onCreateTraitement,
   onRemoveTraitement,
@@ -69,6 +74,7 @@ export function PatientTraitementCard({
   const [expanded, setExpanded] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
+  const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -326,20 +332,33 @@ export function PatientTraitementCard({
                     </div>
 
                     {/* Actions */}
-                    <div className="pt-4 border-t flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id="visibility"
-                          checked={!traitement.is_hidden_from_list}
-                          onCheckedChange={toggleVisibility}
-                        />
-                        <Label htmlFor="visibility" className="text-sm cursor-pointer">
-                          Visible dans la page Traitements
-                        </Label>
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id="visibility"
+                            checked={!traitement.is_hidden_from_list}
+                            onCheckedChange={toggleVisibility}
+                          />
+                          <Label htmlFor="visibility" className="text-sm cursor-pointer">
+                            Visible dans la page Traitements
+                          </Label>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
+                          <Edit className="w-4 h-4" />
+                          Modifier et sauvegarder
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
-                        <Edit className="w-4 h-4" />
-                        Modifier et sauvegarder
+                      
+                      {/* Share with patient button */}
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={() => setAccessCodeDialogOpen(true)}
+                        className="w-full gap-2"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Générer un accès temporaire pour le patient
                       </Button>
                     </div>
                   </div>
@@ -360,6 +379,16 @@ export function PatientTraitementCard({
         traitement={editingTraitement}
         onSuccess={handleEditSuccess}
       />
+
+      {traitement && (
+        <GenerateAccessCodeDialog
+          open={accessCodeDialogOpen}
+          onOpenChange={setAccessCodeDialogOpen}
+          traitementId={traitement.id}
+          patientId={patientId}
+          patientName={patientName}
+        />
+      )}
     </>
   );
 }
