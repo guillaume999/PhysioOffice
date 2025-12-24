@@ -565,59 +565,69 @@ export default function TraitementType() {
                                   <p className="text-sm text-muted-foreground">{traitement.description}</p>
                                 )}
 
-                                {/* Tests (Exercices) */}
+                                {/* Tests (Exercices) - Table format like Exercices page */}
                                 <div className="space-y-2">
                                   <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                                   {traitement.tests && traitement.tests.length > 0 ? (
-                                    <div className="space-y-2">
-                                      {traitement.tests.map((test, j) => (
-                                        <div
-                                          key={test.id}
-                                          className={`flex items-center gap-3 p-2 rounded-lg ${
-                                            test.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50 bg-muted/30' : 'bg-muted/20'
-                                          } border border-border/50`}
-                                          onClick={() => {
-                                            if (test.exercices?.video_url) {
-                                              openVideoDialog(
-                                                test.exercices.video_url,
-                                                test.exercices.title || `Test ${j + 1}`
-                                              );
-                                            }
-                                          }}
-                                        >
-                                          {test.exercices?.thumbnail_url ? (
-                                            <div className="relative w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                                              <img
-                                                src={test.exercices.thumbnail_url}
-                                                alt={test.exercices.title}
-                                                className="w-full h-full object-cover"
-                                              />
-                                              {test.exercices.video_url && (
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                                  <Play className="w-3 h-3 text-white" />
-                                                </div>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                              <FileText className="w-5 h-5 text-primary" />
-                                            </div>
-                                          )}
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">
-                                              {test.exercices?.title || test.description.substring(0, 30)}
-                                            </p>
-                                            {test.exercices?.description && (
-                                              <p className="text-xs text-muted-foreground truncate">
-                                                {test.exercices.description}
-                                              </p>
-                                            )}
-                                          </div>
-                                          {test.exercices?.video_url && (
-                                            <Play className="w-4 h-4 text-primary flex-shrink-0" />
-                                          )}
-                                        </div>
-                                      ))}
+                                    <div className="border rounded-lg overflow-hidden">
+                                      <table className="w-full">
+                                        <thead className="bg-muted/50">
+                                          <tr className="text-left text-xs text-muted-foreground">
+                                            <th className="p-2 w-20">Vidéo</th>
+                                            <th className="p-2">Titre</th>
+                                            <th className="p-2 hidden md:table-cell">Description</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                          {traitement.tests.map((test, j) => (
+                                            <tr
+                                              key={test.id}
+                                              className={`${
+                                                test.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50' : ''
+                                              } transition-colors`}
+                                              onClick={() => {
+                                                if (test.exercices?.video_url) {
+                                                  openVideoDialog(
+                                                    test.exercices.video_url,
+                                                    test.exercices.title || `Test ${j + 1}`
+                                                  );
+                                                }
+                                              }}
+                                            >
+                                              <td className="p-2">
+                                                {test.exercices?.thumbnail_url ? (
+                                                  <div className="relative w-16 h-12 rounded overflow-hidden">
+                                                    <img
+                                                      src={test.exercices.thumbnail_url}
+                                                      alt={test.exercices.title}
+                                                      className="w-full h-full object-cover"
+                                                    />
+                                                    {test.exercices.video_url && (
+                                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                                        <Play className="w-4 h-4 text-white" />
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                ) : (
+                                                  <div className="w-16 h-12 rounded bg-muted flex items-center justify-center">
+                                                    <FileText className="w-5 h-5 text-muted-foreground" />
+                                                  </div>
+                                                )}
+                                              </td>
+                                              <td className="p-2">
+                                                <p className="font-medium text-sm">
+                                                  {test.exercices?.title || `Test ${j + 1}`}
+                                                </p>
+                                              </td>
+                                              <td className="p-2 hidden md:table-cell">
+                                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                                  {test.exercices?.description || test.description || "-"}
+                                                </p>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
                                     </div>
                                   ) : (
                                     <p className="text-xs text-muted-foreground">Aucun test</p>
