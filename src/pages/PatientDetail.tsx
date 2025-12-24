@@ -401,6 +401,7 @@ export default function PatientDetail() {
               objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
             }}
             onChange={handleCarePlanChange}
+            onBilanInitial={() => navigate(`/patients/${id}/bilan-initial`)}
           />
         </div>
 

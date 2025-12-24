@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Patients from "./pages/Patients";
 import PatientDetail from "./pages/PatientDetail";
+import PatientBilanInitial from "./pages/PatientBilanInitial";
 import IADiagnostic from "./pages/IADiagnostic";
 import Notes from "./pages/Notes";
 import Profile from "./pages/Profile";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/patients" element={<Patients />} />
             <Route path="/patients/:id" element={<PatientDetail />} />
+            <Route path="/patients/:id/bilan-initial" element={<PatientBilanInitial />} />
             <Route path="/ia-diagnostic" element={<IADiagnostic />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/profile" element={<Profile />} />
