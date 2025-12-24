@@ -292,7 +292,8 @@ export default function PatientDetail() {
   };
 
   const handleSelectTraitement = async (traitementId: string) => {
-    setCarePlan({ ...carePlan, active_traitement_id: traitementId });
+    const newCarePlan = { ...carePlan, active_traitement_id: traitementId };
+    setCarePlan(newCarePlan);
     
     // Set the treatment visibility to hidden by default when assigned to a patient
     await supabase
@@ -309,6 +310,34 @@ export default function PatientDetail() {
     if (traitement) {
       setActiveTraitementName(traitement.pathologie);
     }
+
+    // Auto-save the care plan with the new treatment
+    if (newCarePlan.id) {
+      await supabase
+        .from("patient_care_plans")
+        .update({ active_traitement_id: traitementId })
+        .eq("id", newCarePlan.id);
+    } else if (user && id) {
+      const { data: newPlan } = await supabase
+        .from("patient_care_plans")
+        .insert({
+          patient_id: id,
+          user_id: user.id,
+          comments: newCarePlan.comments,
+          motif_consultation: newCarePlan.motif_consultation,
+          bilan_kine: newCarePlan.bilan_kine,
+          objectifs_prise_en_charge: newCarePlan.objectifs_prise_en_charge,
+          active_traitement_id: traitementId,
+        })
+        .select()
+        .single();
+      
+      if (newPlan) {
+        setCarePlan({ ...newCarePlan, id: newPlan.id });
+      }
+    }
+    
+    toast({ title: "Traitement enregistré" });
   };
 
 
@@ -330,14 +359,23 @@ export default function PatientDetail() {
       .maybeSingle();
     
     if (latestTraitement) {
-      setCarePlan({ ...carePlan, active_traitement_id: latestTraitement.id });
-      setActiveTraitementName(latestTraitement.pathologie);
+      // Use handleSelectTraitement to both update state and save to DB
+      await handleSelectTraitement(latestTraitement.id);
     }
   };
 
-  const handleRemoveTraitement = () => {
+  const handleRemoveTraitement = async () => {
     setCarePlan({ ...carePlan, active_traitement_id: null });
     setActiveTraitementName(null);
+    
+    // Auto-save the removal
+    if (carePlan.id) {
+      await supabase
+        .from("patient_care_plans")
+        .update({ active_traitement_id: null })
+        .eq("id", carePlan.id);
+      toast({ title: "Traitement retiré" });
+    }
   };
 
   if (authLoading || loading) {
