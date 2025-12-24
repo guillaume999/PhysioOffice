@@ -6,10 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Printer, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, FileText, Edit, Save, X, BookTemplate, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Certificat {
   id: string;
@@ -18,25 +26,37 @@ interface Certificat {
   created_at: string;
 }
 
+interface CertificatModel {
+  id: string;
+  title: string;
+  content: string;
+  is_platform: boolean;
+  user_id: string;
+}
+
 export default function PatientCertificats() {
   const { id: patientId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [patientName, setPatientName] = useState("");
   const [certificats, setCertificats] = useState<Certificat[]>([]);
+  const [models, setModels] = useState<CertificatModel[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
 
   useEffect(() => {
     if (patientId && user) {
       fetchPatientAndCertificats();
+      fetchModels();
     }
   }, [patientId, user]);
 
   const fetchPatientAndCertificats = async () => {
     try {
-      // Fetch patient name
       const { data: patient } = await supabase
         .from("patients")
         .select("name")
@@ -47,7 +67,6 @@ export default function PatientCertificats() {
         setPatientName(patient.name);
       }
 
-      // Fetch notes linked to this patient (used as certificats)
       const { data: notes, error } = await supabase
         .from("notes")
         .select("*")
@@ -69,6 +88,21 @@ export default function PatientCertificats() {
       toast.error("Erreur lors du chargement des données");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("certificat_models")
+        .select("*")
+        .order("is_platform", { ascending: false })
+        .order("title");
+
+      if (error) throw error;
+      setModels(data || []);
+    } catch (error) {
+      console.error("Error fetching models:", error);
     }
   };
 
@@ -118,6 +152,76 @@ export default function PatientCertificats() {
     } catch (error) {
       console.error("Error deleting certificat:", error);
       toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const handleStartEdit = (certificat: Certificat) => {
+    setEditingId(certificat.id);
+    setEditTitle(certificat.title);
+    setEditContent(certificat.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle("");
+    setEditContent("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editTitle.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from("notes")
+        .update({
+          title: editTitle,
+          content: editContent,
+        })
+        .eq("id", editingId);
+
+      if (error) throw error;
+
+      setCertificats(
+        certificats.map((c) =>
+          c.id === editingId
+            ? { ...c, title: editTitle, content: editContent }
+            : c
+        )
+      );
+      setEditingId(null);
+      setEditTitle("");
+      setEditContent("");
+      toast.success("Certificat modifié");
+    } catch (error) {
+      console.error("Error updating certificat:", error);
+      toast.error("Erreur lors de la modification");
+    }
+  };
+
+  const handleSelectModel = (model: CertificatModel) => {
+    setNewTitle(model.title);
+    setNewContent(model.content);
+    toast.success("Modèle appliqué");
+  };
+
+  const handleSaveAsModel = async (certificat: Certificat) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from("certificat_models").insert({
+        user_id: user.id,
+        title: certificat.title,
+        content: certificat.content,
+        is_platform: false,
+      });
+
+      if (error) throw error;
+
+      await fetchModels();
+      toast.success("Certificat enregistré comme modèle");
+    } catch (error) {
+      console.error("Error saving as model:", error);
+      toast.error("Erreur lors de l'enregistrement du modèle");
     }
   };
 
@@ -179,6 +283,9 @@ export default function PatientCertificats() {
     printWindow.print();
   };
 
+  const userModels = models.filter((m) => !m.is_platform && m.user_id === user?.id);
+  const platformModels = models.filter((m) => m.is_platform);
+
   if (isLoading) {
     return (
       <Layout>
@@ -192,14 +299,62 @@ export default function PatientCertificats() {
   return (
     <Layout>
       <div className="container max-w-4xl py-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Certificats & Constats</h1>
-            <p className="text-muted-foreground">{patientName}</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Certificats & Constats</h1>
+              <p className="text-muted-foreground">{patientName}</p>
+            </div>
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <BookTemplate className="w-4 h-4 mr-2" />
+                Modèles
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {platformModels.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Modèles plateforme
+                  </DropdownMenuLabel>
+                  {platformModels.map((model) => (
+                    <DropdownMenuItem
+                      key={model.id}
+                      onClick={() => handleSelectModel(model)}
+                    >
+                      {model.title}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {userModels.length > 0 && (
+                <>
+                  <DropdownMenuLabel>Mes modèles</DropdownMenuLabel>
+                  {userModels.map((model) => (
+                    <DropdownMenuItem
+                      key={model.id}
+                      onClick={() => handleSelectModel(model)}
+                    >
+                      {model.title}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              {platformModels.length === 0 && userModels.length === 0 && (
+                <DropdownMenuItem disabled>
+                  Aucun modèle disponible
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Nouveau certificat */}
@@ -249,37 +404,98 @@ export default function PatientCertificats() {
           ) : (
             certificats.map((certificat) => (
               <Card key={certificat.id}>
-                <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                  <div>
-                    <CardTitle className="text-base">{certificat.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(certificat.created_at).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handlePrint(certificat)}
-                    >
-                      <Printer className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleDeleteCertificat(certificat.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{certificat.content}</p>
-                </CardContent>
+                {editingId === certificat.id ? (
+                  <>
+                    <CardHeader>
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Titre du certificat"
+                      />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        placeholder="Contenu du certificat"
+                        className="min-h-[150px]"
+                      />
+                      <div className="flex gap-2">
+                        <Button onClick={handleSaveEdit} size="sm">
+                          <Save className="w-4 h-4 mr-2" />
+                          Enregistrer
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          size="sm"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Annuler
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </>
+                ) : (
+                  <>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                      <div>
+                        <CardTitle className="text-base">
+                          {certificat.title}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(certificat.created_at).toLocaleDateString(
+                            "fr-FR",
+                            {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            }
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleSaveAsModel(certificat)}
+                          title="Enregistrer comme modèle"
+                        >
+                          <BookTemplate className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleStartEdit(certificat)}
+                          title="Modifier"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handlePrint(certificat)}
+                          title="Imprimer"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleDeleteCertificat(certificat.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm whitespace-pre-wrap">
+                        {certificat.content}
+                      </p>
+                    </CardContent>
+                  </>
+                )}
               </Card>
             ))
           )}

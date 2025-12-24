@@ -26,6 +26,11 @@ import {
   ClipboardList,
   Dumbbell,
   XCircle,
+  BookTemplate,
+  Plus,
+  Edit,
+  Save,
+  X,
 } from "lucide-react";
 
 interface UserProfile {
@@ -83,6 +88,15 @@ interface ExerciceType {
   rejection_reason?: string | null;
 }
 
+interface CertificatModel {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  is_platform: boolean;
+  created_at: string;
+}
+
 interface Stats {
   totalUsers: number;
   premiumUsers: number;
@@ -106,6 +120,7 @@ export default function Admin() {
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [exercices, setExercices] = useState<ExerciceType[]>([]);
+  const [certificatModels, setCertificatModels] = useState<CertificatModel[]>([]);
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
   const [selectedExercice, setSelectedExercice] = useState<ExerciceType | null>(null);
@@ -127,6 +142,13 @@ export default function Admin() {
   const [exerciceSearch, setExerciceSearch] = useState("");
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
+
+  // Certificat model form state
+  const [newModelTitle, setNewModelTitle] = useState("");
+  const [newModelContent, setNewModelContent] = useState("");
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [editModelTitle, setEditModelTitle] = useState("");
+  const [editModelContent, setEditModelContent] = useState("");
   
   // Admin role confirmation dialog state
   const [adminConfirmDialog, setAdminConfirmDialog] = useState<{
@@ -227,6 +249,15 @@ export default function Admin() {
         .eq("is_consulted", true);
       
       setConsultedExerciceIds(new Set(consultedData?.map(c => c.exercice_id) || []));
+
+      // Fetch platform certificat models
+      const { data: modelsData } = await supabase
+        .from("certificat_models")
+        .select("*")
+        .eq("is_platform", true)
+        .order("created_at", { ascending: false });
+      
+      setCertificatModels(modelsData || []);
 
       // Calculate stats
       const now = new Date();
@@ -570,6 +601,108 @@ export default function Admin() {
     }
   };
 
+  // Certificat model functions
+  const handleAddModel = async () => {
+    if (!newModelTitle.trim() || !newModelContent.trim() || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("certificat_models")
+        .insert({
+          user_id: user.id,
+          title: newModelTitle,
+          content: newModelContent,
+          is_platform: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCertificatModels([data, ...certificatModels]);
+      setNewModelTitle("");
+      setNewModelContent("");
+      toast({ title: "Modèle ajouté" });
+    } catch (error) {
+      console.error("Error adding model:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter le modèle.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleStartEditModel = (model: CertificatModel) => {
+    setEditingModelId(model.id);
+    setEditModelTitle(model.title);
+    setEditModelContent(model.content);
+  };
+
+  const handleCancelEditModel = () => {
+    setEditingModelId(null);
+    setEditModelTitle("");
+    setEditModelContent("");
+  };
+
+  const handleSaveEditModel = async () => {
+    if (!editingModelId || !editModelTitle.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from("certificat_models")
+        .update({
+          title: editModelTitle,
+          content: editModelContent,
+        })
+        .eq("id", editingModelId);
+
+      if (error) throw error;
+
+      setCertificatModels(
+        certificatModels.map((m) =>
+          m.id === editingModelId
+            ? { ...m, title: editModelTitle, content: editModelContent }
+            : m
+        )
+      );
+      setEditingModelId(null);
+      setEditModelTitle("");
+      setEditModelContent("");
+      toast({ title: "Modèle modifié" });
+    } catch (error) {
+      console.error("Error updating model:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le modèle.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteModel = async (modelId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce modèle ?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("certificat_models")
+        .delete()
+        .eq("id", modelId);
+
+      if (error) throw error;
+
+      setCertificatModels(certificatModels.filter((m) => m.id !== modelId));
+      toast({ title: "Modèle supprimé" });
+    } catch (error) {
+      console.error("Error deleting model:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le modèle.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("fr-FR", {
       day: "2-digit",
@@ -749,6 +882,10 @@ export default function Admin() {
               {pendingExercices.length > 0 && (
                 <Badge variant="destructive" className="ml-1">{pendingExercices.length}</Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="certificats" className="flex items-center gap-2">
+              <BookTemplate className="w-4 h-4" />
+              Modèles certificats
             </TabsTrigger>
           </TabsList>
 
@@ -1180,6 +1317,119 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Certificat Models Tab */}
+          <TabsContent value="certificats">
+            <Card>
+              <CardHeader>
+                <CardTitle>Modèles de certificats plateforme</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Ces modèles seront disponibles pour tous les utilisateurs de la plateforme.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Add new model form */}
+                <div className="border rounded-lg p-4 space-y-4">
+                  <h3 className="font-medium flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Ajouter un nouveau modèle
+                  </h3>
+                  <div>
+                    <label className="text-sm font-medium">Titre</label>
+                    <Input
+                      placeholder="Ex: Certificat médical type"
+                      value={newModelTitle}
+                      onChange={(e) => setNewModelTitle(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Contenu</label>
+                    <textarea
+                      placeholder="Rédigez le contenu du modèle..."
+                      value={newModelContent}
+                      onChange={(e) => setNewModelContent(e.target.value)}
+                      className="mt-1 w-full min-h-[150px] p-3 border rounded-md bg-background"
+                    />
+                  </div>
+                  <Button onClick={handleAddModel} disabled={!newModelTitle.trim() || !newModelContent.trim()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter le modèle
+                  </Button>
+                </div>
+
+                {/* Models list */}
+                <div className="space-y-4">
+                  <h3 className="font-medium">Modèles existants ({certificatModels.length})</h3>
+                  {certificatModels.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      Aucun modèle de certificat plateforme
+                    </p>
+                  ) : (
+                    certificatModels.map((model) => (
+                      <div key={model.id} className="border rounded-lg p-4">
+                        {editingModelId === model.id ? (
+                          <div className="space-y-4">
+                            <Input
+                              value={editModelTitle}
+                              onChange={(e) => setEditModelTitle(e.target.value)}
+                              placeholder="Titre du modèle"
+                            />
+                            <textarea
+                              value={editModelContent}
+                              onChange={(e) => setEditModelContent(e.target.value)}
+                              placeholder="Contenu du modèle"
+                              className="w-full min-h-[150px] p-3 border rounded-md bg-background"
+                            />
+                            <div className="flex gap-2">
+                              <Button onClick={handleSaveEditModel} size="sm">
+                                <Save className="w-4 h-4 mr-2" />
+                                Enregistrer
+                              </Button>
+                              <Button variant="outline" onClick={handleCancelEditModel} size="sm">
+                                <X className="w-4 h-4 mr-2" />
+                                Annuler
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="font-medium">{model.title}</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  Créé le {new Date(model.created_at).toLocaleDateString("fr-FR")}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleStartEditModel(model)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleDeleteModel(model.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-sm whitespace-pre-wrap border-t pt-2 mt-2">
+                              {model.content}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
