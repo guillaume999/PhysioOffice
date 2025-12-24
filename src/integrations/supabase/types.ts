@@ -370,6 +370,7 @@ export type Database = {
       }
       patient_bilans: {
         Row: {
+          bilan_date: string | null
           content: string | null
           created_at: string
           id: string
@@ -380,6 +381,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bilan_date?: string | null
           content?: string | null
           created_at?: string
           id?: string
@@ -390,6 +392,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bilan_date?: string | null
           content?: string | null
           created_at?: string
           id?: string
@@ -419,6 +422,7 @@ export type Database = {
       patient_care_plans: {
         Row: {
           active_traitement_id: string | null
+          bilan_initial_date: string | null
           bilan_kine: string | null
           comments: string | null
           created_at: string
@@ -426,11 +430,13 @@ export type Database = {
           motif_consultation: string | null
           objectifs_prise_en_charge: string | null
           patient_id: string
+          traitement_start_date: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           active_traitement_id?: string | null
+          bilan_initial_date?: string | null
           bilan_kine?: string | null
           comments?: string | null
           created_at?: string
@@ -438,11 +444,13 @@ export type Database = {
           motif_consultation?: string | null
           objectifs_prise_en_charge?: string | null
           patient_id: string
+          traitement_start_date?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           active_traitement_id?: string | null
+          bilan_initial_date?: string | null
           bilan_kine?: string | null
           comments?: string | null
           created_at?: string
@@ -450,6 +458,7 @@ export type Database = {
           motif_consultation?: string | null
           objectifs_prise_en_charge?: string | null
           patient_id?: string
+          traitement_start_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -553,6 +562,54 @@ export type Database = {
             columns: ["seance_type_id"]
             isOneToOne: false
             referencedRelation: "seance_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_traitement_seance_dates: {
+        Row: {
+          created_at: string
+          id: string
+          patient_id: string
+          seance_date: string | null
+          seance_ordre: number
+          traitement_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          patient_id: string
+          seance_date?: string | null
+          seance_ordre: number
+          traitement_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          patient_id?: string
+          seance_date?: string | null
+          seance_ordre?: number
+          traitement_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_traitement_seance_dates_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_traitement_seance_dates_traitement_id_fkey"
+            columns: ["traitement_id"]
+            isOneToOne: false
+            referencedRelation: "traitement_types"
             referencedColumns: ["id"]
           },
         ]

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -13,6 +14,8 @@ import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCodeDialog";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,6 +77,13 @@ interface PatientBilan {
   id: string;
   position_after_seance: number;
   content: string | null;
+  bilan_date: string | null;
+}
+
+interface SeanceDate {
+  id: string;
+  seance_ordre: number;
+  seance_date: string | null;
 }
 
 interface TraitementDetails {
@@ -85,6 +95,8 @@ interface TraitementDetails {
   tests: TraitementTest[];
   seances: TraitementSeance[];
   bilans: PatientBilan[];
+  seanceDates: SeanceDate[];
+  traitement_start_date: string | null;
 }
 
 interface PatientTraitementCardProps {
@@ -157,10 +169,25 @@ export function PatientTraitementCard({
         // Fetch bilans for this patient and traitement
         const { data: bilansData } = await supabase
           .from("patient_bilans")
-          .select("id, position_after_seance, content")
+          .select("id, position_after_seance, content, bilan_date")
           .eq("patient_id", patientId)
           .eq("traitement_id", activeTraitementId)
           .order("position_after_seance", { ascending: true });
+
+        // Fetch seance dates for this patient and traitement
+        const { data: seanceDatesData } = await supabase
+          .from("patient_traitement_seance_dates")
+          .select("id, seance_ordre, seance_date")
+          .eq("patient_id", patientId)
+          .eq("traitement_id", activeTraitementId)
+          .order("seance_ordre", { ascending: true });
+
+        // Fetch traitement_start_date from patient_care_plans
+        const { data: carePlanData } = await supabase
+          .from("patient_care_plans")
+          .select("traitement_start_date")
+          .eq("patient_id", patientId)
+          .maybeSingle();
 
         // Fetch exercices for each seance
         const seancesWithExercices = await Promise.all(
@@ -187,6 +214,8 @@ export function PatientTraitementCard({
           tests: testsData || [],
           seances: seancesWithExercices,
           bilans: bilansData || [],
+          seanceDates: seanceDatesData || [],
+          traitement_start_date: carePlanData?.traitement_start_date || null,
         });
       }
     } catch (error) {
@@ -427,6 +456,95 @@ export function PatientTraitementCard({
     toast.success(newValue ? "Traitement masqué de la liste" : "Traitement visible dans la liste");
   };
 
+  const handleTraitementDateChange = async (date: string) => {
+    if (!traitement) return;
+    
+    const { error } = await supabase
+      .from("patient_care_plans")
+      .update({ traitement_start_date: date || null })
+      .eq("patient_id", patientId);
+    
+    if (error) {
+      toast.error("Erreur lors de la mise à jour de la date");
+      return;
+    }
+    
+    setTraitement({ ...traitement, traitement_start_date: date || null });
+  };
+
+  const handleSeanceDateChange = async (seanceOrdre: number, date: string) => {
+    if (!traitement || !user) return;
+    
+    const existingDate = traitement.seanceDates.find(sd => sd.seance_ordre === seanceOrdre);
+    
+    if (existingDate) {
+      const { error } = await supabase
+        .from("patient_traitement_seance_dates")
+        .update({ seance_date: date || null })
+        .eq("id", existingDate.id);
+      
+      if (error) {
+        toast.error("Erreur lors de la mise à jour de la date");
+        return;
+      }
+      
+      setTraitement({
+        ...traitement,
+        seanceDates: traitement.seanceDates.map(sd =>
+          sd.seance_ordre === seanceOrdre ? { ...sd, seance_date: date || null } : sd
+        )
+      });
+    } else {
+      const { data: newDate, error } = await supabase
+        .from("patient_traitement_seance_dates")
+        .insert({
+          patient_id: patientId,
+          traitement_id: traitement.id,
+          seance_ordre: seanceOrdre,
+          seance_date: date || null,
+          user_id: user.id
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error("Erreur lors de l'enregistrement de la date");
+        return;
+      }
+      
+      setTraitement({
+        ...traitement,
+        seanceDates: [...traitement.seanceDates, { id: newDate.id, seance_ordre: seanceOrdre, seance_date: date }]
+      });
+    }
+  };
+
+  const handleBilanDateChange = async (bilanId: string, date: string) => {
+    if (!traitement) return;
+    
+    const { error } = await supabase
+      .from("patient_bilans")
+      .update({ bilan_date: date || null })
+      .eq("id", bilanId);
+    
+    if (error) {
+      toast.error("Erreur lors de la mise à jour de la date");
+      return;
+    }
+    
+    setTraitement({
+      ...traitement,
+      bilans: traitement.bilans.map(b =>
+        b.id === bilanId ? { ...b, bilan_date: date || null } : b
+      )
+    });
+  };
+
+  const getSeanceDate = (seanceOrdre: number): string => {
+    const date = traitement?.seanceDates.find(sd => sd.seance_ordre === seanceOrdre);
+    return date?.seance_date || "";
+  };
+
   return (
     <>
       <Card>
@@ -461,6 +579,13 @@ export function PatientTraitementCard({
                     <Badge variant="outline" className="text-sm flex-shrink-0">
                       {traitement.pathologie}
                     </Badge>
+                    <Input
+                      type="date"
+                      value={traitement.traitement_start_date || ""}
+                      onChange={(e) => handleTraitementDateChange(e.target.value)}
+                      className="w-32 h-7 text-xs"
+                      title="Date de début du traitement"
+                    />
                     <span className="text-xs text-muted-foreground truncate">
                       par {traitement.author_name || "Anonyme"}
                     </span>
@@ -551,7 +676,17 @@ export function PatientTraitementCard({
                                       <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                                         <span className="text-xs font-bold text-primary">{i + 1}</span>
                                       </div>
-                                      <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                      <Input
+                                        type="date"
+                                        value={getSeanceDate(i + 1)}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          handleSeanceDateChange(i + 1, e.target.value);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-32 h-7 text-xs"
+                                        title="Date de la séance"
+                                      />
                                       <span className="text-sm truncate">{getSeanceDisplay(seance)}</span>
                                       <Badge variant="secondary" className="text-xs">
                                         {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
@@ -667,10 +802,17 @@ export function PatientTraitementCard({
                                 <div className="ml-3 mt-2 mb-2 pl-3 border-l-2 border-dashed border-primary/30">
                                   {bilanAfterSeance ? (
                                     <div className="bg-primary/5 rounded-md p-3 space-y-2">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                           <ClipboardCheck className="w-4 h-4" />
-                                          Bilan après séance {i + 1}
+                                          <Input
+                                            type="date"
+                                            value={bilanAfterSeance.bilan_date || ""}
+                                            onChange={(e) => handleBilanDateChange(bilanAfterSeance.id, e.target.value)}
+                                            className="w-32 h-7 text-xs"
+                                            title="Date du bilan"
+                                          />
+                                          <span>Bilan après séance {i + 1}</span>
                                         </div>
                                         <Button
                                           variant="ghost"
