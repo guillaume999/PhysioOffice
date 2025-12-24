@@ -390,7 +390,12 @@ export function PatientTraitementCard({
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-base font-semibold">Traitement actif</Label>
-            <Button variant="outline" size="sm" onClick={onSelectTraitement}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onSelectTraitement}
+              disabled={!!activeTraitementId}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Ajouter
             </Button>
