@@ -5,10 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, FileText, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Save, ClipboardList, Loader2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+
+interface BilanData {
+  douleur_localisation: string;
+  douleur_intensite: string;
+  douleur_type: string;
+  amplitude_articulaire: string;
+  force_musculaire: string;
+  tests_specifiques: string;
+  observations: string;
+}
 
 export default function PatientBilanIntermediaire() {
   const { id: patientId } = useParams<{ id: string }>();
@@ -21,10 +32,19 @@ export default function PatientBilanIntermediaire() {
   const bilanId = searchParams.get("bilan");
 
   const [patientName, setPatientName] = useState("");
-  const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [existingBilanId, setExistingBilanId] = useState<string | null>(bilanId);
+
+  const [bilan, setBilan] = useState<BilanData>({
+    douleur_localisation: "",
+    douleur_intensite: "",
+    douleur_type: "",
+    amplitude_articulaire: "",
+    force_musculaire: "",
+    tests_specifiques: "",
+    observations: "",
+  });
 
   useEffect(() => {
     if (patientId && user) {
@@ -47,15 +67,34 @@ export default function PatientBilanIntermediaire() {
 
       // Fetch existing bilan if we have an id
       if (bilanId) {
-        const { data: bilan } = await supabase
+        const { data: bilanData } = await supabase
           .from("patient_bilans")
           .select("*")
           .eq("id", bilanId)
           .single();
 
-        if (bilan) {
-          setContent(bilan.content || "");
-          setExistingBilanId(bilan.id);
+        if (bilanData) {
+          setExistingBilanId(bilanData.id);
+          // Try to parse existing data if it's JSON
+          if (bilanData.content) {
+            try {
+              const parsed = JSON.parse(bilanData.content);
+              if (typeof parsed === "object") {
+                setBilan({
+                  douleur_localisation: parsed.douleur_localisation || "",
+                  douleur_intensite: parsed.douleur_intensite || "",
+                  douleur_type: parsed.douleur_type || "",
+                  amplitude_articulaire: parsed.amplitude_articulaire || "",
+                  force_musculaire: parsed.force_musculaire || "",
+                  tests_specifiques: parsed.tests_specifiques || "",
+                  observations: parsed.observations || "",
+                });
+              }
+            } catch {
+              // If not JSON, put it in observations
+              setBilan(prev => ({ ...prev, observations: bilanData.content || "" }));
+            }
+          }
         }
       } else if (traitementId && patientId) {
         // Check if there's already a bilan at this position
@@ -68,8 +107,27 @@ export default function PatientBilanIntermediaire() {
           .maybeSingle();
 
         if (existingBilan) {
-          setContent(existingBilan.content || "");
           setExistingBilanId(existingBilan.id);
+          // Try to parse existing data if it's JSON
+          if (existingBilan.content) {
+            try {
+              const parsed = JSON.parse(existingBilan.content);
+              if (typeof parsed === "object") {
+                setBilan({
+                  douleur_localisation: parsed.douleur_localisation || "",
+                  douleur_intensite: parsed.douleur_intensite || "",
+                  douleur_type: parsed.douleur_type || "",
+                  amplitude_articulaire: parsed.amplitude_articulaire || "",
+                  force_musculaire: parsed.force_musculaire || "",
+                  tests_specifiques: parsed.tests_specifiques || "",
+                  observations: parsed.observations || "",
+                });
+              }
+            } catch {
+              // If not JSON, put it in observations
+              setBilan(prev => ({ ...prev, observations: existingBilan.content || "" }));
+            }
+          }
         }
       }
     } catch (error) {
@@ -84,12 +142,15 @@ export default function PatientBilanIntermediaire() {
     if (!user || !patientId) return;
     setIsSaving(true);
 
+    // Store bilan as JSON string
+    const bilanJson = JSON.stringify(bilan);
+
     try {
       if (existingBilanId) {
         // Update existing bilan
         const { error } = await supabase
           .from("patient_bilans")
-          .update({ content })
+          .update({ content: bilanJson })
           .eq("id", existingBilanId);
 
         if (error) throw error;
@@ -102,7 +163,7 @@ export default function PatientBilanIntermediaire() {
             traitement_id: traitementId,
             user_id: user.id,
             position_after_seance: position,
-            content,
+            content: bilanJson,
           })
           .select()
           .single();
@@ -121,11 +182,15 @@ export default function PatientBilanIntermediaire() {
     }
   };
 
+  const handleChange = (field: keyof BilanData, value: string) => {
+    setBilan(prev => ({ ...prev, [field]: value }));
+  };
+
   if (isLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </Layout>
     );
@@ -133,52 +198,125 @@ export default function PatientBilanIntermediaire() {
 
   return (
     <Layout>
-      <div className="container max-w-3xl py-6 space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Bilan intermédiaire</h1>
-            <p className="text-muted-foreground">
-              {patientName} • Après séance {position}
-            </p>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="p-3 rounded-xl bg-amber-500/10">
+              <ClipboardList className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-display font-bold">Bilan intermédiaire</h1>
+              <p className="text-muted-foreground flex items-center gap-1">
+                <User className="w-4 h-4" />
+                {patientName} • Après séance {position}
+              </p>
+            </div>
           </div>
+          <Button onClick={handleSave} disabled={isSaving} className="gradient-primary text-primary-foreground">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            Enregistrer
+          </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Observations et notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Contenu du bilan</Label>
-              <Textarea
-                placeholder="Notez vos observations sur l'évolution du patient, les progrès, les difficultés rencontrées, les ajustements à prévoir..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="mt-1 min-h-[300px]"
-              />
-            </div>
+        <div className="space-y-6">
+          {/* Évaluation de la douleur */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Évaluation de la douleur</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Localisation</Label>
+                <Input
+                  placeholder="Ex: Épaule droite, lombaires..."
+                  value={bilan.douleur_localisation}
+                  onChange={(e) => handleChange("douleur_localisation", e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Intensité (EVA 0-10)</Label>
+                  <Input
+                    placeholder="Ex: 6/10"
+                    value={bilan.douleur_intensite}
+                    onChange={(e) => handleChange("douleur_intensite", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Type de douleur</Label>
+                  <Input
+                    placeholder="Ex: Mécanique, inflammatoire, mixte..."
+                    value={bilan.douleur_type}
+                    onChange={(e) => handleChange("douleur_type", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => navigate(-1)}>
-                Annuler
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                Enregistrer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Bilan articulaire et musculaire */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Bilan articulaire et musculaire</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Amplitudes articulaires</Label>
+                <Textarea
+                  placeholder="Décrivez les limitations d'amplitude..."
+                  value={bilan.amplitude_articulaire}
+                  onChange={(e) => handleChange("amplitude_articulaire", e.target.value)}
+                  className="mt-1 min-h-[100px]"
+                />
+              </div>
+              <div>
+                <Label>Force musculaire</Label>
+                <Textarea
+                  placeholder="Testing musculaire, déficits observés..."
+                  value={bilan.force_musculaire}
+                  onChange={(e) => handleChange("force_musculaire", e.target.value)}
+                  className="mt-1 min-h-[100px]"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tests spécifiques */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Tests spécifiques</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Tests orthopédiques réalisés et résultats..."
+                value={bilan.tests_specifiques}
+                onChange={(e) => handleChange("tests_specifiques", e.target.value)}
+                className="min-h-[120px]"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Observations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Observations complémentaires</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Évolution depuis le dernier bilan, progrès, difficultés..."
+                value={bilan.observations}
+                onChange={(e) => handleChange("observations", e.target.value)}
+                className="min-h-[120px]"
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );
