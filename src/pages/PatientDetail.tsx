@@ -20,6 +20,7 @@ import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjec
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
+import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 
 interface PatientData {
   id: string;
@@ -82,6 +83,7 @@ export default function PatientDetail() {
   
   
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
+  const [createTraitementDialogOpen, setCreateTraitementDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateOptions, setDuplicateOptions] = useState({
@@ -306,7 +308,25 @@ export default function PatientDetail() {
 
   const handleCreateTraitement = () => {
     setSelectTraitementDialogOpen(false);
-    navigate("/traitement-type/new");
+    setCreateTraitementDialogOpen(true);
+  };
+
+  const handleCreateTraitementSuccess = async () => {
+    // Fetch the latest traitement created by this user to set as active
+    if (!user) return;
+    
+    const { data: latestTraitement } = await supabase
+      .from("traitement_types")
+      .select("id, pathologie")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (latestTraitement) {
+      setCarePlan({ ...carePlan, active_traitement_id: latestTraitement.id });
+      setActiveTraitementName(latestTraitement.pathologie);
+    }
   };
 
   const handleRemoveTraitement = () => {
@@ -513,6 +533,14 @@ export default function PatientDetail() {
           onOpenChange={setSelectTraitementDialogOpen}
           onSelect={handleSelectTraitement}
           onCreate={handleCreateTraitement}
+        />
+
+        <TraitementFormDialog
+          open={createTraitementDialogOpen}
+          onOpenChange={setCreateTraitementDialogOpen}
+          traitement={null}
+          onSuccess={handleCreateTraitementSuccess}
+          isHiddenFromList={true}
         />
 
 
