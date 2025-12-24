@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Target, ClipboardList } from "lucide-react";
+import { Target, ClipboardList, FileText } from "lucide-react";
 
 interface CarePlanData {
   motif_consultation: string;
@@ -14,12 +14,14 @@ interface PatientCareObjectivesCardProps {
   carePlan: CarePlanData;
   onChange: (field: keyof CarePlanData, value: string) => void;
   onBilanInitial?: () => void;
+  onCertificats?: () => void;
 }
 
 export function PatientCareObjectivesCard({
   carePlan,
   onChange,
   onBilanInitial,
+  onCertificats,
 }: PatientCareObjectivesCardProps) {
   return (
     <Card>
@@ -28,12 +30,20 @@ export function PatientCareObjectivesCard({
           <Target className="w-5 h-5" />
           Objectifs soins
         </CardTitle>
-        {onBilanInitial && (
-          <Button variant="outline" size="sm" onClick={onBilanInitial}>
-            <ClipboardList className="w-4 h-4 mr-2" />
-            Bilan initial
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {onBilanInitial && (
+            <Button variant="outline" size="sm" onClick={onBilanInitial}>
+              <ClipboardList className="w-4 h-4 mr-2" />
+              Bilan initial
+            </Button>
+          )}
+          {onCertificats && (
+            <Button variant="outline" size="sm" onClick={onCertificats}>
+              <FileText className="w-4 h-4 mr-2" />
+              Certificat constat
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>

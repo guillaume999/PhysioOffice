@@ -402,6 +402,7 @@ export default function PatientDetail() {
             }}
             onChange={handleCarePlanChange}
             onBilanInitial={() => navigate(`/patients/${id}/bilan-initial`)}
+            onCertificats={() => navigate(`/patients/${id}/certificats`)}
           />
         </div>
 
