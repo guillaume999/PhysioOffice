@@ -51,6 +51,7 @@ interface TraitementType {
   created_at: string;
   tests?: TraitementTest[];
   seances?: TraitementSeance[];
+  is_used_by_patient?: boolean;
 }
 
 type FilterType = "mine" | "shared";
@@ -160,6 +161,16 @@ export default function TraitementType() {
 
       if (traitementsError) throw traitementsError;
 
+      // Fetch which traitements are used by patients
+      const { data: usedTraitements } = await supabase
+        .from("patient_care_plans")
+        .select("active_traitement_id")
+        .not("active_traitement_id", "is", null);
+
+      const usedTraitementIds = new Set(
+        (usedTraitements || []).map((p) => p.active_traitement_id)
+      );
+
       // Fetch tests and seances for each traitement
       const traitementsWithDetails = await Promise.all(
         (traitementsData || []).map(async (traitement) => {
@@ -178,7 +189,8 @@ export default function TraitementType() {
           return {
             ...traitement,
             tests: testsData || [],
-            seances: seancesData || []
+            seances: seancesData || [],
+            is_used_by_patient: usedTraitementIds.has(traitement.id)
           };
         })
       );
@@ -257,7 +269,12 @@ export default function TraitementType() {
     }
   };
 
-  const deleteTraitement = async (id: string) => {
+  const deleteTraitement = async (id: string, isUsedByPatient: boolean) => {
+    if (isUsedByPatient) {
+      toast.error("Ce traitement est utilisé par un patient et ne peut pas être supprimé");
+      return;
+    }
+    
     try {
       // Delete tests first
       await supabase.from("traitement_tests").delete().eq("traitement_type_id", id);
@@ -548,8 +565,13 @@ export default function TraitementType() {
                                 )}
 
                                 {/* Actions */}
-                                <div className="flex gap-1 flex-wrap">
-                                  {isOwner && (
+                                <div className="flex gap-1 flex-wrap items-center">
+                                  {traitement.is_used_by_patient && (
+                                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-600">
+                                      Utilisé par un patient
+                                    </Badge>
+                                  )}
+                                  {isOwner && !traitement.is_used_by_patient && (
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -569,12 +591,12 @@ export default function TraitementType() {
                                     <Copy className="w-3 h-3" />
                                     {isOwner ? "Dupliquer" : "Copier"}
                                   </Button>
-                                  {isOwner && (
+                                  {isOwner && !traitement.is_used_by_patient && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="text-destructive"
-                                      onClick={() => deleteTraitement(traitement.id)}
+                                      onClick={() => deleteTraitement(traitement.id, traitement.is_used_by_patient || false)}
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
