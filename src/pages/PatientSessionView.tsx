@@ -268,30 +268,6 @@ export default function PatientSessionView() {
           </div>
           
           <CardContent className="pt-4 space-y-4">
-            {/* Objectifs principaux */}
-            {accessData.seance?.objectifs_principaux && accessData.seance.objectifs_principaux.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2 text-muted-foreground">Objectifs principaux</p>
-                <div className="flex flex-wrap gap-2">
-                  {accessData.seance.objectifs_principaux.map((obj, i) => (
-                    <Badge key={i} variant="default" className="text-sm">{obj}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Objectifs secondaires */}
-            {accessData.seance?.objectifs_secondaires && accessData.seance.objectifs_secondaires.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2 text-muted-foreground">Objectifs secondaires</p>
-                <div className="flex flex-wrap gap-2">
-                  {accessData.seance.objectifs_secondaires.map((obj, i) => (
-                    <Badge key={i} variant="secondary" className="text-sm">{obj}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Progress bar */}
             {totalCount > 0 && (
               <div className="pt-2">
