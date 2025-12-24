@@ -570,14 +570,23 @@ export default function TraitementType() {
                                   <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                                   {traitement.tests && traitement.tests.length > 0 ? (
                                     <div className="space-y-2">
-                                      {traitement.tests.map((test) => (
+                                      {traitement.tests.map((test, j) => (
                                         <div
                                           key={test.id}
-                                          className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors"
-                                          onClick={() => setTestDetailDialog(test)}
+                                          className={`flex items-center gap-3 p-2 rounded-lg ${
+                                            test.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50 bg-muted/30' : 'bg-muted/20'
+                                          } border border-border/50`}
+                                          onClick={() => {
+                                            if (test.exercices?.video_url) {
+                                              openVideoDialog(
+                                                test.exercices.video_url,
+                                                test.exercices.title || `Test ${j + 1}`
+                                              );
+                                            }
+                                          }}
                                         >
                                           {test.exercices?.thumbnail_url ? (
-                                            <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                                            <div className="relative w-10 h-10 rounded overflow-hidden flex-shrink-0">
                                               <img
                                                 src={test.exercices.thumbnail_url}
                                                 alt={test.exercices.title}
@@ -585,12 +594,12 @@ export default function TraitementType() {
                                               />
                                               {test.exercices.video_url && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                                  <Play className="w-4 h-4 text-white" />
+                                                  <Play className="w-3 h-3 text-white" />
                                                 </div>
                                               )}
                                             </div>
                                           ) : (
-                                            <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
                                               <FileText className="w-5 h-5 text-primary" />
                                             </div>
                                           )}
@@ -605,10 +614,7 @@ export default function TraitementType() {
                                             )}
                                           </div>
                                           {test.exercices?.video_url && (
-                                            <Badge variant="secondary" className="text-xs flex-shrink-0">
-                                              <Play className="w-3 h-3 mr-1" />
-                                              Vidéo
-                                            </Badge>
+                                            <Play className="w-4 h-4 text-primary flex-shrink-0" />
                                           )}
                                         </div>
                                       ))}
