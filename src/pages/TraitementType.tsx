@@ -621,6 +621,7 @@ export default function TraitementType() {
           onOpenChange={setFormDialogOpen}
           traitement={editingTraitement}
           onSuccess={fetchData}
+          isHiddenFromList={true}
         />
 
         {/* Test Detail Dialog */}
