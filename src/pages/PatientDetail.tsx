@@ -294,6 +294,12 @@ export default function PatientDetail() {
   const handleSelectTraitement = async (traitementId: string) => {
     setCarePlan({ ...carePlan, active_traitement_id: traitementId });
     
+    // Set the treatment visibility to hidden by default when assigned to a patient
+    await supabase
+      .from("traitement_types")
+      .update({ is_hidden_from_list: true })
+      .eq("id", traitementId);
+    
     const { data: traitement } = await supabase
       .from("traitement_types")
       .select("pathologie")
