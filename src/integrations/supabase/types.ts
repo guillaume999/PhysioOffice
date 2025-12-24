@@ -285,6 +285,35 @@ export type Database = {
           },
         ]
       }
+      featured_traitements: {
+        Row: {
+          added_by: string
+          created_at: string
+          id: string
+          traitement_type_id: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          id?: string
+          traitement_type_id: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          id?: string
+          traitement_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_traitements_traitement_type_id_fkey"
+            columns: ["traitement_type_id"]
+            isOneToOne: true
+            referencedRelation: "traitement_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           content: string | null

@@ -74,7 +74,7 @@ interface TraitementType {
   is_used_by_patient?: boolean;
 }
 
-type FilterType = "mine" | "shared";
+type FilterType = "mine" | "platform" | "shared";
 
 export default function TraitementType() {
   const { user } = useAuth();
@@ -82,6 +82,7 @@ export default function TraitementType() {
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [filteredTraitements, setFilteredTraitements] = useState<TraitementType[]>([]);
+  const [featuredTraitementIds, setFeaturedTraitementIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filter and search state
@@ -106,7 +107,7 @@ export default function TraitementType() {
 
   useEffect(() => {
     applyFilters();
-  }, [traitements, filter, searchQuery, user]);
+  }, [traitements, filter, searchQuery, user, featuredTraitementIds]);
 
   const applyFilters = () => {
     let result = [...traitements];
@@ -124,11 +125,14 @@ export default function TraitementType() {
     // Apply filter type
     if (filter === "mine") {
       result = result.filter((t) => t.user_id === user?.id && !(t as any).is_hidden_from_list);
+    } else if (filter === "platform") {
+      result = result.filter((t) => featuredTraitementIds.includes(t.id));
     } else if (filter === "shared") {
       result = result.filter((t) => 
         t.is_shared && 
         t.is_validated &&
-        t.user_id !== user?.id
+        t.user_id !== user?.id &&
+        !featuredTraitementIds.includes(t.id)
       );
     }
 
@@ -152,14 +156,16 @@ export default function TraitementType() {
       .map((t) => t.original_id);
 
     const mine = traitements.filter((t) => t.user_id === user?.id && !(t as any).is_hidden_from_list).length;
+    const platform = traitements.filter((t) => featuredTraitementIds.includes(t.id)).length;
     const shared = traitements.filter((t) => 
       t.is_shared && 
       t.is_validated &&
       t.user_id !== user?.id &&
-      !userCopiedOriginalIds.includes(t.id)
+      !userCopiedOriginalIds.includes(t.id) &&
+      !featuredTraitementIds.includes(t.id)
     ).length;
 
-    return { mine, shared };
+    return { mine, platform, shared };
   };
 
   const filterCounts = getFilterCounts();
@@ -176,6 +182,12 @@ export default function TraitementType() {
 
       setUserPseudo(profileData?.pseudo || null);
       setUserCanShare(profileData?.can_share !== false);
+
+      // Fetch featured traitements
+      const { data: featuredData } = await supabase
+        .from("featured_traitements")
+        .select("traitement_type_id");
+      setFeaturedTraitementIds(featuredData?.map((f) => f.traitement_type_id) || []);
 
       // Fetch traitements
       const { data: traitementsData, error: traitementsError } = await supabase
@@ -467,6 +479,15 @@ export default function TraitementType() {
                 >
                   <User className="w-4 h-4" />
                   Mes traitements ({filterCounts.mine})
+                </Button>
+                <Button
+                  variant={filter === "platform" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter("platform")}
+                  className="gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  PhysioOffice ({filterCounts.platform})
                 </Button>
                 <Button
                   variant={filter === "shared" ? "default" : "outline"}
