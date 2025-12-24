@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
 import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjectivesCard";
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
-import { ImportTraitementDialog } from "@/components/patient/ImportTraitementDialog";
+import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 
 interface PatientData {
@@ -80,7 +80,8 @@ export default function PatientDetail() {
   });
   const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
   
-  const [importTraitementOpen, setImportTraitementOpen] = useState(false);
+  
+  const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateOptions, setDuplicateOptions] = useState({
@@ -304,6 +305,7 @@ export default function PatientDetail() {
 
 
   const handleCreateTraitement = () => {
+    setSelectTraitementDialogOpen(false);
     navigate("/traitement-type/new");
   };
 
@@ -390,8 +392,7 @@ export default function PatientDetail() {
           activeTraitementName={activeTraitementName}
           patientId={id || ""}
           patientName={patient.name}
-          onImportTraitement={() => setImportTraitementOpen(true)}
-          onCreateTraitement={handleCreateTraitement}
+          onSelectTraitement={() => setSelectTraitementDialogOpen(true)}
           onRemoveTraitement={handleRemoveTraitement}
           onTraitementChanged={handleSelectTraitement}
         />
@@ -507,10 +508,11 @@ export default function PatientDetail() {
           </CardContent>
         </Card>
 
-        <ImportTraitementDialog
-          open={importTraitementOpen}
-          onOpenChange={setImportTraitementOpen}
+        <SelectTraitementDialog
+          open={selectTraitementDialogOpen}
+          onOpenChange={setSelectTraitementDialogOpen}
           onSelect={handleSelectTraitement}
+          onCreate={handleCreateTraitement}
         />
 
 

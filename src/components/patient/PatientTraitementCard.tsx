@@ -82,8 +82,7 @@ interface PatientTraitementCardProps {
   activeTraitementName: string | null;
   patientId: string;
   patientName: string;
-  onImportTraitement: () => void;
-  onCreateTraitement: () => void;
+  onSelectTraitement: () => void;
   onRemoveTraitement: () => void;
   onTraitementChanged?: (newTraitementId: string) => void;
 }
@@ -93,8 +92,7 @@ export function PatientTraitementCard({
   activeTraitementName,
   patientId,
   patientName,
-  onImportTraitement,
-  onCreateTraitement,
+  onSelectTraitement,
   onRemoveTraitement,
   onTraitementChanged,
 }: PatientTraitementCardProps) {
@@ -392,16 +390,10 @@ export function PatientTraitementCard({
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-base font-semibold">Traitement actif</Label>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onImportTraitement}>
-                <FileDown className="w-4 h-4 mr-2" />
-                Importer
-              </Button>
-              <Button variant="outline" size="sm" onClick={onCreateTraitement}>
-                <Plus className="w-4 h-4 mr-2" />
-                Créer
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={onSelectTraitement}>
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter
+            </Button>
           </div>
 
           {loading ? (
