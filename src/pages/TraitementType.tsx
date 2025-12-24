@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp } from "lucide-react";
+import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp, Play, Clock, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -22,6 +22,25 @@ interface TraitementTest {
     title: string;
     description: string | null;
     thumbnail_url: string | null;
+    video_url: string | null;
+  } | null;
+}
+
+interface SeanceExercice {
+  id: string;
+  name: string | null;
+  description: string | null;
+  ordre: number;
+  repetitions: number | null;
+  duration_seconds: number | null;
+  series: number | null;
+  exercice_id: string | null;
+  exercices?: {
+    id: string;
+    title: string;
+    description: string | null;
+    thumbnail_url: string | null;
+    video_url: string | null;
   } | null;
 }
 
@@ -36,6 +55,7 @@ interface TraitementSeance {
     pathologies?: string[];
     objectifs_principaux?: string[];
   } | null;
+  exercices?: SeanceExercice[];
 }
 
 interface TraitementType {
@@ -73,6 +93,10 @@ export default function TraitementType() {
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
   const [testDetailDialog, setTestDetailDialog] = useState<TraitementTest | null>(null);
   const [expandedTraitements, setExpandedTraitements] = useState<Set<string>>(new Set());
+  const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
+  const [selectedVideoTitle, setSelectedVideoTitle] = useState<string>("");
 
   useEffect(() => {
     if (user) {
@@ -176,7 +200,7 @@ export default function TraitementType() {
         (traitementsData || []).map(async (traitement) => {
           const { data: testsData } = await supabase
             .from("traitement_tests")
-            .select("*, exercices(id, title, description, thumbnail_url)")
+            .select("*, exercices(id, title, description, thumbnail_url, video_url)")
             .eq("traitement_type_id", traitement.id)
             .order("ordre", { ascending: true });
 
@@ -186,10 +210,26 @@ export default function TraitementType() {
             .eq("traitement_type_id", traitement.id)
             .order("ordre", { ascending: true });
 
+          // Fetch exercices for each seance
+          const seancesWithExercices = await Promise.all(
+            (seancesData || []).map(async (seance) => {
+              const { data: exercicesData } = await supabase
+                .from("seance_exercices")
+                .select("*, exercices(id, title, description, thumbnail_url, video_url)")
+                .eq("seance_type_id", seance.seance_type_id)
+                .order("ordre", { ascending: true });
+
+              return {
+                ...seance,
+                exercices: exercicesData || []
+              };
+            })
+          );
+
           return {
             ...traitement,
             tests: testsData || [],
-            seances: seancesData || [],
+            seances: seancesWithExercices,
             is_used_by_patient: usedTraitementIds.has(traitement.id)
           };
         })
@@ -360,6 +400,30 @@ export default function TraitementType() {
     });
   };
 
+  const toggleSeanceExpand = (seanceId: string) => {
+    setExpandedSeances(prev => {
+      const next = new Set(prev);
+      if (next.has(seanceId)) {
+        next.delete(seanceId);
+      } else {
+        next.add(seanceId);
+      }
+      return next;
+    });
+  };
+
+  const openVideoDialog = (videoUrl: string, title: string) => {
+    setSelectedVideoUrl(videoUrl);
+    setSelectedVideoTitle(title);
+    setVideoDialogOpen(true);
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}min ${secs}s` : `${secs}s`;
+  };
+
   if (!user) {
     return (
       <Layout>
@@ -505,17 +569,48 @@ export default function TraitementType() {
                                 <div className="space-y-2">
                                   <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                                   {traitement.tests && traitement.tests.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="space-y-2">
                                       {traitement.tests.map((test) => (
-                                        <Badge
+                                        <div
                                           key={test.id}
-                                          variant="outline"
-                                          className="cursor-pointer hover:bg-muted flex items-center gap-1"
+                                          className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors"
                                           onClick={() => setTestDetailDialog(test)}
                                         >
-                                          <FileText className="w-3 h-3" />
-                                          {test.exercices?.title || test.description.substring(0, 25)}
-                                        </Badge>
+                                          {test.exercices?.thumbnail_url ? (
+                                            <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                                              <img
+                                                src={test.exercices.thumbnail_url}
+                                                alt={test.exercices.title}
+                                                className="w-full h-full object-cover"
+                                              />
+                                              {test.exercices.video_url && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                                  <Play className="w-4 h-4 text-white" />
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                              <FileText className="w-5 h-5 text-primary" />
+                                            </div>
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">
+                                              {test.exercices?.title || test.description.substring(0, 30)}
+                                            </p>
+                                            {test.exercices?.description && (
+                                              <p className="text-xs text-muted-foreground truncate">
+                                                {test.exercices.description}
+                                              </p>
+                                            )}
+                                          </div>
+                                          {test.exercices?.video_url && (
+                                            <Badge variant="secondary" className="text-xs flex-shrink-0">
+                                              <Play className="w-3 h-3 mr-1" />
+                                              Vidéo
+                                            </Badge>
+                                          )}
+                                        </div>
                                       ))}
                                     </div>
                                   ) : (
@@ -528,15 +623,100 @@ export default function TraitementType() {
                                   <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
                                   {traitement.seances && traitement.seances.length > 0 ? (
                                     <div className="space-y-2">
-                                      {traitement.seances.map((seance, i) => (
-                                        <div key={seance.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/50">
-                                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                      {traitement.seances.map((seance, i) => {
+                                        const isSeanceExpanded = expandedSeances.has(seance.id);
+                                        return (
+                                          <div key={seance.id} className="rounded-lg border border-border/50 overflow-hidden">
+                                            <div
+                                              className="flex items-center gap-3 p-2 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                                              onClick={() => toggleSeanceExpand(seance.id)}
+                                            >
+                                              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                              </div>
+                                              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                              <span className="text-sm flex-1">{getSeanceDisplay(seance)}</span>
+                                              <span className="text-xs text-muted-foreground">
+                                                {seance.exercices?.length || 0} exercice(s)
+                                              </span>
+                                              {isSeanceExpanded ? (
+                                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                              ) : (
+                                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                              )}
+                                            </div>
+                                            {isSeanceExpanded && seance.exercices && seance.exercices.length > 0 && (
+                                              <div className="p-2 bg-background space-y-2 border-t border-border/50">
+                                                {seance.exercices.map((exercice, j) => (
+                                                  <div
+                                                    key={exercice.id}
+                                                    className={`flex items-center gap-3 p-2 rounded-lg ${
+                                                      exercice.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50' : 'bg-muted/20'
+                                                    }`}
+                                                    onClick={() => {
+                                                      if (exercice.exercices?.video_url) {
+                                                        openVideoDialog(
+                                                          exercice.exercices.video_url,
+                                                          exercice.name || exercice.exercices.title || `Exercice ${j + 1}`
+                                                        );
+                                                      }
+                                                    }}
+                                                  >
+                                                    {exercice.exercices?.thumbnail_url ? (
+                                                      <div className="relative w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                                                        <img
+                                                          src={exercice.exercices.thumbnail_url}
+                                                          alt={exercice.name || exercice.exercices.title}
+                                                          className="w-full h-full object-cover"
+                                                        />
+                                                        {exercice.exercices.video_url && (
+                                                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                                            <Play className="w-3 h-3 text-white" />
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ) : (
+                                                      <div className="w-10 h-10 rounded bg-secondary/50 flex items-center justify-center flex-shrink-0">
+                                                        <span className="text-xs font-bold text-muted-foreground">{j + 1}</span>
+                                                      </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className="text-sm font-medium truncate">
+                                                        {exercice.name || exercice.exercices?.title || `Exercice ${j + 1}`}
+                                                      </p>
+                                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        {exercice.series && exercice.series > 1 && (
+                                                          <span>{exercice.series} séries</span>
+                                                        )}
+                                                        {exercice.repetitions && (
+                                                          <span className="flex items-center gap-1">
+                                                            <RotateCcw className="w-3 h-3" />
+                                                            {exercice.repetitions} rép.
+                                                          </span>
+                                                        )}
+                                                        {exercice.duration_seconds && (
+                                                          <span className="flex items-center gap-1">
+                                                            <Clock className="w-3 h-3" />
+                                                            {formatDuration(exercice.duration_seconds)}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    {exercice.exercices?.video_url && (
+                                                      <Play className="w-4 h-4 text-primary flex-shrink-0" />
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                            {isSeanceExpanded && (!seance.exercices || seance.exercices.length === 0) && (
+                                              <div className="p-3 bg-background text-xs text-muted-foreground text-center border-t border-border/50">
+                                                Aucun exercice dans cette séance
+                                              </div>
+                                            )}
                                           </div>
-                                          <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                          <span className="text-sm">{getSeanceDisplay(seance)}</span>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   ) : (
                                     <p className="text-xs text-muted-foreground">Aucune séance</p>
@@ -626,7 +806,7 @@ export default function TraitementType() {
 
         {/* Test Detail Dialog */}
         <Dialog open={!!testDetailDialog} onOpenChange={() => setTestDetailDialog(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Détail du test</h3>
             </div>
@@ -634,13 +814,22 @@ export default function TraitementType() {
               <div className="space-y-4">
                 {testDetailDialog.exercices ? (
                   <>
-                    {testDetailDialog.exercices.thumbnail_url && (
+                    {testDetailDialog.exercices.video_url ? (
+                      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                        <video
+                          src={testDetailDialog.exercices.video_url}
+                          controls
+                          className="w-full h-full object-contain"
+                          poster={testDetailDialog.exercices.thumbnail_url || undefined}
+                        />
+                      </div>
+                    ) : testDetailDialog.exercices.thumbnail_url ? (
                       <img 
                         src={testDetailDialog.exercices.thumbnail_url} 
                         alt={testDetailDialog.exercices.title}
                         className="w-full h-48 object-cover rounded-lg"
                       />
-                    )}
+                    ) : null}
                     <div>
                       <h4 className="font-medium text-lg">{testDetailDialog.exercices.title}</h4>
                       {testDetailDialog.exercices.description && (
@@ -651,6 +840,25 @@ export default function TraitementType() {
                 ) : (
                   <p className="text-sm">{testDetailDialog.description}</p>
                 )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Video Dialog */}
+        <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">{selectedVideoTitle}</h3>
+            </div>
+            {selectedVideoUrl && (
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                <video
+                  src={selectedVideoUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
               </div>
             )}
           </DialogContent>
