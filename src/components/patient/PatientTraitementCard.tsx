@@ -344,6 +344,8 @@ export function PatientTraitementCard({
     // Fetch the latest traitement created by this user to set as active
     if (!user) return;
     
+    const oldTraitementId = activeTraitementId;
+    
     const { data: latestTraitement } = await supabase
       .from("traitement_types")
       .select("id")
@@ -353,6 +355,15 @@ export function PatientTraitementCard({
       .maybeSingle();
     
     if (latestTraitement && onTraitementChanged) {
+      // Transfer bilans from old treatment to new treatment
+      if (oldTraitementId && oldTraitementId !== latestTraitement.id) {
+        await supabase
+          .from("patient_bilans")
+          .update({ traitement_id: latestTraitement.id })
+          .eq("patient_id", patientId)
+          .eq("traitement_id", oldTraitementId);
+      }
+      
       onTraitementChanged(latestTraitement.id);
     }
     
