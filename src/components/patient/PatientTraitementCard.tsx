@@ -6,13 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCodeDialog";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SeanceExercice {
   id: string;
@@ -72,6 +82,8 @@ interface TraitementDetails {
   description: string | null;
   author_name: string | null;
   is_hidden_from_list: boolean;
+  is_copy: boolean;
+  has_been_modified: boolean; // Track if traitement was modified (seances/tests changed)
   tests: TraitementTest[];
   seances: TraitementSeance[];
   bilans: PatientBilan[];
@@ -109,6 +121,8 @@ export function PatientTraitementCard({
   const [seanceFormDialogOpen, setSeanceFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
+  const [editConfirmDialogOpen, setEditConfirmDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState<'replace' | 'new' | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -125,7 +139,7 @@ export function PatientTraitementCard({
     try {
       const { data: traitementData } = await supabase
         .from("traitement_types")
-        .select("id, pathologie, description, author_name, is_hidden_from_list")
+        .select("id, pathologie, description, author_name, is_hidden_from_list, is_copy, original_id")
         .eq("id", activeTraitementId)
         .maybeSingle();
 
@@ -169,9 +183,17 @@ export function PatientTraitementCard({
           })
         );
 
+        // Determine if traitement has been modified (it's a copy that had changes made)
+        // A traitement is considered "modified" if it's a copy and the user has made any changes
+        // For now, we track this by checking if is_copy is true and original_id exists
+        const isCopy = traitementData.is_copy || false;
+        const hasBeenModified = isCopy && !traitementData.is_hidden_from_list;
+
         setTraitement({
           ...traitementData,
           is_hidden_from_list: traitementData.is_hidden_from_list || false,
+          is_copy: isCopy,
+          has_been_modified: hasBeenModified,
           tests: testsData || [],
           seances: seancesWithExercices,
           bilans: bilansData || [],
@@ -308,8 +330,23 @@ export function PatientTraitementCard({
   const handleEdit = () => {
     if (!traitement) return;
     
+    // If the traitement is visible (not hidden from list) and it's a copy,
+    // ask user if they want to replace or create new
+    if (!traitement.is_hidden_from_list && traitement.is_copy) {
+      setEditConfirmDialogOpen(true);
+      return;
+    }
+    
+    // Otherwise, proceed with creating a new entry (hidden by default)
+    proceedWithEdit(false);
+  };
+
+  const proceedWithEdit = (replaceOriginal: boolean) => {
+    if (!traitement) return;
+    
     setEditingTraitement({
-      // Don't pass id so it creates a new entry
+      // Pass id only if replacing the original
+      id: replaceOriginal ? traitement.id : undefined,
       pathologie: traitement.pathologie,
       description: traitement.description,
       tests: (traitement.tests || []).map(t => ({
@@ -337,7 +374,9 @@ export function PatientTraitementCard({
       })),
       author_name: traitement.author_name
     });
+    setEditMode(replaceOriginal ? 'replace' : 'new');
     setEditDialogOpen(true);
+    setEditConfirmDialogOpen(false);
   };
 
   const handleEditSuccess = async () => {
@@ -346,6 +385,14 @@ export function PatientTraitementCard({
     
     const oldTraitementId = activeTraitementId;
     
+    // If we're replacing, just refresh
+    if (editMode === 'replace') {
+      setEditMode(null);
+      fetchTraitementDetails();
+      return;
+    }
+    
+    // If creating new, fetch the latest and set as active
     const { data: latestTraitement } = await supabase
       .from("traitement_types")
       .select("id")
@@ -367,11 +414,33 @@ export function PatientTraitementCard({
       onTraitementChanged(latestTraitement.id);
     }
     
+    setEditMode(null);
     fetchTraitementDetails();
+  };
+
+  // Check if visibility can be enabled
+  // Visibility can only be enabled if the traitement has been modified (seances/exercices changed)
+  // A traitement is considered modifiable for visibility if:
+  // - It's not a fresh import (is_copy && has not been edited via TraitementFormDialog)
+  // We track this by checking if is_hidden_from_list was ever set to false after a modification
+  const canToggleVisibility = () => {
+    if (!traitement) return false;
+    // If it's already visible, always allow to hide it
+    if (!traitement.is_hidden_from_list) return true;
+    // If it's a copy and was never made visible before, check if user has modified it
+    // For simplicity, we allow toggling if it's not a fresh copy OR if modifications were made
+    // Fresh copies should only be made visible after modification
+    return traitement.has_been_modified || !traitement.is_copy;
   };
 
   const toggleVisibility = async () => {
     if (!traitement) return;
+    
+    // If trying to make visible and it's a fresh copy without modifications
+    if (traitement.is_hidden_from_list && traitement.is_copy && !traitement.has_been_modified) {
+      toast.error("Vous devez d'abord modifier le traitement (séances, exercices) avant de pouvoir le rendre visible.");
+      return;
+    }
     
     const newValue = !traitement.is_hidden_from_list;
     
@@ -385,7 +454,7 @@ export function PatientTraitementCard({
       return;
     }
     
-    setTraitement({ ...traitement, is_hidden_from_list: newValue });
+    setTraitement({ ...traitement, is_hidden_from_list: newValue, has_been_modified: !newValue ? true : traitement.has_been_modified });
     toast.success(newValue ? "Traitement masqué de la liste" : "Traitement visible dans la liste");
   };
 
@@ -677,10 +746,18 @@ export function PatientTraitementCard({
                             id="visibility"
                             checked={!traitement.is_hidden_from_list}
                             onCheckedChange={toggleVisibility}
+                            disabled={!canToggleVisibility() && traitement.is_hidden_from_list}
                           />
-                          <Label htmlFor="visibility" className="text-sm cursor-pointer">
-                            Visible dans la page Traitements
-                          </Label>
+                          <div className="flex flex-col">
+                            <Label htmlFor="visibility" className="text-sm cursor-pointer">
+                              Visible dans la page Traitements
+                            </Label>
+                            {traitement.is_copy && traitement.is_hidden_from_list && !traitement.has_been_modified && (
+                              <span className="text-xs text-muted-foreground">
+                                Modifiez le traitement pour activer cette option
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
                           <Edit className="w-4 h-4" />
@@ -700,12 +777,42 @@ export function PatientTraitementCard({
         </CardContent>
       </Card>
 
+      {/* Edit Confirmation Dialog */}
+      <AlertDialog open={editConfirmDialogOpen} onOpenChange={setEditConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Traitement visible
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Ce traitement est actuellement visible dans votre liste de traitements. 
+              Comment souhaitez-vous procéder ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <Button 
+              variant="outline" 
+              onClick={() => proceedWithEdit(true)}
+            >
+              Remplacer l'existant
+            </Button>
+            <Button 
+              onClick={() => proceedWithEdit(false)}
+            >
+              Créer un nouveau (masqué)
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <TraitementFormDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         traitement={editingTraitement}
         onSuccess={handleEditSuccess}
-        isHiddenFromList={true}
+        isHiddenFromList={editMode !== 'replace'}
       />
 
       {selectedSeanceForAccess && (
