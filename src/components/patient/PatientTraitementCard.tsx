@@ -82,8 +82,6 @@ interface TraitementDetails {
   description: string | null;
   author_name: string | null;
   is_hidden_from_list: boolean;
-  is_copy: boolean;
-  has_been_modified: boolean; // Track if traitement was modified (seances/tests changed)
   tests: TraitementTest[];
   seances: TraitementSeance[];
   bilans: PatientBilan[];
@@ -139,7 +137,7 @@ export function PatientTraitementCard({
     try {
       const { data: traitementData } = await supabase
         .from("traitement_types")
-        .select("id, pathologie, description, author_name, is_hidden_from_list, is_copy, original_id")
+        .select("id, pathologie, description, author_name, is_hidden_from_list")
         .eq("id", activeTraitementId)
         .maybeSingle();
 
@@ -183,17 +181,9 @@ export function PatientTraitementCard({
           })
         );
 
-        // Determine if traitement has been modified (it's a copy that had changes made)
-        // A traitement is considered "modified" if it's a copy and the user has made any changes
-        // For now, we track this by checking if is_copy is true and original_id exists
-        const isCopy = traitementData.is_copy || false;
-        const hasBeenModified = isCopy && !traitementData.is_hidden_from_list;
-
         setTraitement({
           ...traitementData,
           is_hidden_from_list: traitementData.is_hidden_from_list || false,
-          is_copy: isCopy,
-          has_been_modified: hasBeenModified,
           tests: testsData || [],
           seances: seancesWithExercices,
           bilans: bilansData || [],
@@ -330,15 +320,15 @@ export function PatientTraitementCard({
   const handleEdit = () => {
     if (!traitement) return;
     
-    // If the traitement is visible (not hidden from list) and it's a copy,
+    // If the traitement is visible (not hidden from list),
     // ask user if they want to replace or create new
-    if (!traitement.is_hidden_from_list && traitement.is_copy) {
+    if (!traitement.is_hidden_from_list) {
       setEditConfirmDialogOpen(true);
       return;
     }
     
-    // Otherwise, proceed with creating a new entry (hidden by default)
-    proceedWithEdit(false);
+    // Otherwise, proceed with replacing directly (already hidden)
+    proceedWithEdit(true);
   };
 
   const proceedWithEdit = (replaceOriginal: boolean) => {
@@ -418,29 +408,8 @@ export function PatientTraitementCard({
     fetchTraitementDetails();
   };
 
-  // Check if visibility can be enabled
-  // Visibility can only be enabled if the traitement has been modified (seances/exercices changed)
-  // A traitement is considered modifiable for visibility if:
-  // - It's not a fresh import (is_copy && has not been edited via TraitementFormDialog)
-  // We track this by checking if is_hidden_from_list was ever set to false after a modification
-  const canToggleVisibility = () => {
-    if (!traitement) return false;
-    // If it's already visible, always allow to hide it
-    if (!traitement.is_hidden_from_list) return true;
-    // If it's a copy and was never made visible before, check if user has modified it
-    // For simplicity, we allow toggling if it's not a fresh copy OR if modifications were made
-    // Fresh copies should only be made visible after modification
-    return traitement.has_been_modified || !traitement.is_copy;
-  };
-
   const toggleVisibility = async () => {
     if (!traitement) return;
-    
-    // If trying to make visible and it's a fresh copy without modifications
-    if (traitement.is_hidden_from_list && traitement.is_copy && !traitement.has_been_modified) {
-      toast.error("Vous devez d'abord modifier le traitement (séances, exercices) avant de pouvoir le rendre visible.");
-      return;
-    }
     
     const newValue = !traitement.is_hidden_from_list;
     
@@ -454,7 +423,7 @@ export function PatientTraitementCard({
       return;
     }
     
-    setTraitement({ ...traitement, is_hidden_from_list: newValue, has_been_modified: !newValue ? true : traitement.has_been_modified });
+    setTraitement({ ...traitement, is_hidden_from_list: newValue });
     toast.success(newValue ? "Traitement masqué de la liste" : "Traitement visible dans la liste");
   };
 
@@ -746,18 +715,10 @@ export function PatientTraitementCard({
                             id="visibility"
                             checked={!traitement.is_hidden_from_list}
                             onCheckedChange={toggleVisibility}
-                            disabled={!canToggleVisibility() && traitement.is_hidden_from_list}
                           />
-                          <div className="flex flex-col">
-                            <Label htmlFor="visibility" className="text-sm cursor-pointer">
-                              Visible dans la page Traitements
-                            </Label>
-                            {traitement.is_copy && traitement.is_hidden_from_list && !traitement.has_been_modified && (
-                              <span className="text-xs text-muted-foreground">
-                                Modifiez le traitement pour activer cette option
-                              </span>
-                            )}
-                          </div>
+                          <Label htmlFor="visibility" className="text-sm cursor-pointer">
+                            Visible dans la page Traitements
+                          </Label>
                         </div>
                         <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
                           <Edit className="w-4 h-4" />
