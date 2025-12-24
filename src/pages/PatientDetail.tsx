@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -19,6 +19,7 @@ import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
 import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjectivesCard";
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { ImportTraitementDialog } from "@/components/patient/ImportTraitementDialog";
+import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 
 interface PatientData {
   id: string;
@@ -87,6 +88,7 @@ export default function PatientDetail() {
     keepObjectives: true,
     keepTraitement: true,
   });
+  const [reportPrintDialogOpen, setReportPrintDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -342,6 +344,14 @@ export default function PatientDetail() {
             <Button 
               variant="outline" 
               size="icon"
+              onClick={() => setReportPrintDialogOpen(true)}
+              title="Imprimer le compte-rendu"
+            >
+              <Printer className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
               onClick={() => setDuplicateDialogOpen(true)}
               title="Dupliquer ce patient"
             >
@@ -555,6 +565,32 @@ export default function PatientDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <PatientReportPrintDialog
+          open={reportPrintDialogOpen}
+          onOpenChange={setReportPrintDialogOpen}
+          patient={{
+            name: patient.name,
+            numero: patient.numero,
+            status: patient.status,
+            has_mutual: patient.has_mutual,
+            remaining_sessions: patient.remaining_sessions,
+            prescription: patient.prescription,
+            address: patient.address,
+            postal_code: patient.postal_code,
+            medical_notes: patient.medical_notes,
+            allergies: patient.allergies,
+            blood_type: patient.blood_type,
+            antecedents: patient.antecedents,
+          }}
+          carePlan={{
+            comments: carePlan.comments,
+            motif_consultation: carePlan.motif_consultation,
+            bilan_kine: carePlan.bilan_kine,
+            objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+          }}
+          activeTraitementName={activeTraitementName}
+        />
       </div>
     </Layout>
   );
