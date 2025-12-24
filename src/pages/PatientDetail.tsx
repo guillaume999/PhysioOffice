@@ -46,6 +46,8 @@ interface CarePlanData {
   bilan_kine: string;
   objectifs_prise_en_charge: string;
   active_traitement_id: string | null;
+  bilan_initial_date: string | null;
+  traitement_start_date: string | null;
 }
 
 
@@ -78,6 +80,8 @@ export default function PatientDetail() {
     bilan_kine: "",
     objectifs_prise_en_charge: "",
     active_traitement_id: null,
+    bilan_initial_date: null,
+    traitement_start_date: null,
   });
   const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
   
@@ -139,6 +143,8 @@ export default function PatientDetail() {
         bilan_kine: data.bilan_kine || "",
         objectifs_prise_en_charge: data.objectifs_prise_en_charge || "",
         active_traitement_id: data.active_traitement_id,
+        bilan_initial_date: data.bilan_initial_date || null,
+        traitement_start_date: data.traitement_start_date || null,
       });
       
       if (data.active_traitement_id) {
@@ -194,6 +200,8 @@ export default function PatientDetail() {
           bilan_kine: carePlan.bilan_kine,
           objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
           active_traitement_id: carePlan.active_traitement_id,
+          bilan_initial_date: carePlan.bilan_initial_date,
+          traitement_start_date: carePlan.traitement_start_date,
         })
         .eq("id", carePlan.id);
     } else {
@@ -207,6 +215,8 @@ export default function PatientDetail() {
           bilan_kine: carePlan.bilan_kine,
           objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
           active_traitement_id: carePlan.active_traitement_id,
+          bilan_initial_date: carePlan.bilan_initial_date,
+          traitement_start_date: carePlan.traitement_start_date,
         })
         .select()
         .single();
@@ -474,6 +484,7 @@ export default function PatientDetail() {
               motif_consultation: carePlan.motif_consultation,
               bilan_kine: carePlan.bilan_kine,
               objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+              bilan_initial_date: carePlan.bilan_initial_date,
             }}
             onChange={handleCarePlanChange}
             onBilanInitial={() => navigate(`/patients/${id}/bilan-initial`)}

@@ -2,12 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Target, ClipboardList, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Target, ClipboardList, FileText, Calendar } from "lucide-react";
+import { format } from "date-fns";
 
 interface CarePlanData {
   motif_consultation: string;
   bilan_kine: string;
   objectifs_prise_en_charge: string;
+  bilan_initial_date?: string | null;
 }
 
 interface PatientCareObjectivesCardProps {
@@ -30,12 +33,20 @@ export function PatientCareObjectivesCard({
           <Target className="w-5 h-5" />
           Objectifs soins
         </CardTitle>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {onBilanInitial && (
-            <Button variant="outline" size="sm" onClick={onBilanInitial}>
-              <ClipboardList className="w-4 h-4 mr-2" />
-              Bilan initial
-            </Button>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={carePlan.bilan_initial_date || ""}
+                onChange={(e) => onChange("bilan_initial_date", e.target.value)}
+                className="w-36 h-9 text-xs"
+              />
+              <Button variant="outline" size="sm" onClick={onBilanInitial}>
+                <ClipboardList className="w-4 h-4 mr-2" />
+                Bilan initial
+              </Button>
+            </div>
           )}
           {onCertificats && (
             <Button variant="outline" size="sm" onClick={onCertificats}>
