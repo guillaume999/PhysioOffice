@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Target, ClipboardList } from "lucide-react";
 
 interface CarePlanData {
   motif_consultation: string;
@@ -12,19 +13,27 @@ interface CarePlanData {
 interface PatientCareObjectivesCardProps {
   carePlan: CarePlanData;
   onChange: (field: keyof CarePlanData, value: string) => void;
+  onBilanInitial?: () => void;
 }
 
 export function PatientCareObjectivesCard({
   carePlan,
   onChange,
+  onBilanInitial,
 }: PatientCareObjectivesCardProps) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg flex items-center gap-2">
           <Target className="w-5 h-5" />
           Objectifs soins
         </CardTitle>
+        {onBilanInitial && (
+          <Button variant="outline" size="sm" onClick={onBilanInitial}>
+            <ClipboardList className="w-4 h-4 mr-2" />
+            Bilan initial
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
