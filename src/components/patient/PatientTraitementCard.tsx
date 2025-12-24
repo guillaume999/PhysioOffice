@@ -630,7 +630,7 @@ export function PatientTraitementCard({
                                           variant="ghost"
                                           size="sm"
                                           className="h-7 text-xs"
-                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${activeTraitementId}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
+                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
                                         >
                                           <Edit className="w-3 h-3 mr-1" />
                                           Modifier
@@ -645,7 +645,7 @@ export function PatientTraitementCard({
                                       variant="ghost"
                                       size="sm"
                                       className="text-xs text-muted-foreground hover:text-primary h-8"
-                                      onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${activeTraitementId}&position=${i + 1}`)}
+                                      onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}`)}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
                                       Ajouter un bilan après cette séance
