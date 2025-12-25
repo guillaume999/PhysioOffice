@@ -15,22 +15,41 @@ interface BilanData {
   // Infos patient
   profession: string;
   poids_taille_bmi: string;
+  taille: string;
+  poids: string;
   lateralite: string;
   loisir_sport: string;
+  activite_physique_type: string;
   situation_fam: string;
   pathologie: string;
+  pathologies_associees: string;
   plainte_patient: string;
   date_debut: string;
   circonstances: string;
+  facteurs_declenchants: string;
   evolution: string;
+  histoire_naturelle: string;
+  recidive: string;
+  chirurgie: string;
+  chirurgie_detail: string;
   signes: string;
   mvt_impossibles: string;
   atcd: string;
+  medicaments: string;
+  tabac: string;
+  etat_psychique: string;
+  examen_complementaire: string;
   ttt_deja_suivis: string;
   projets_attentes: string;
   
   // Bilan douleurs
+  douleur_frequence: string;
+  douleur_eva_habituelle: string;
+  douleur_eva_pire: string;
+  douleur_eva_sport: string;
+  douleur_eva_faible: string;
   douleur_type: string;
+  douleur_sensations: string;
   douleur_localisation: string;
   douleur_circonstances_apparition: string;
   douleur_eva: string;
@@ -68,20 +87,39 @@ interface BilanData {
 const defaultBilan: BilanData = {
   profession: "",
   poids_taille_bmi: "",
+  taille: "",
+  poids: "",
   lateralite: "",
   loisir_sport: "",
+  activite_physique_type: "",
   situation_fam: "",
   pathologie: "",
+  pathologies_associees: "",
   plainte_patient: "",
   date_debut: "",
   circonstances: "",
+  facteurs_declenchants: "",
   evolution: "",
+  histoire_naturelle: "",
+  recidive: "",
+  chirurgie: "",
+  chirurgie_detail: "",
   signes: "",
   mvt_impossibles: "",
   atcd: "",
+  medicaments: "",
+  tabac: "",
+  etat_psychique: "",
+  examen_complementaire: "",
   ttt_deja_suivis: "",
   projets_attentes: "",
+  douleur_frequence: "",
+  douleur_eva_habituelle: "",
+  douleur_eva_pire: "",
+  douleur_eva_sport: "",
+  douleur_eva_faible: "",
   douleur_type: "",
+  douleur_sensations: "",
   douleur_localisation: "",
   douleur_circonstances_apparition: "",
   douleur_eva: "",
@@ -249,25 +287,37 @@ export default function PatientBilanInitial() {
                   />
                 </div>
                 <div>
-                  <Label>Poids / Taille / BMI</Label>
+                  <Label>Taille (cm)</Label>
                   <Input
-                    placeholder="Ex: 75kg / 1m75 / 24.5"
-                    value={bilan.poids_taille_bmi}
-                    onChange={(e) => handleChange("poids_taille_bmi", e.target.value)}
+                    placeholder="Ex: 175"
+                    value={bilan.taille}
+                    onChange={(e) => handleChange("taille", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Poids (kg)</Label>
+                  <Input
+                    placeholder="Ex: 75"
+                    value={bilan.poids}
+                    onChange={(e) => handleChange("poids", e.target.value)}
                     className="mt-1"
                   />
                 </div>
                 <div>
                   <Label>Latéralité</Label>
                   <Input
-                    placeholder="Ex: Droitier"
+                    placeholder="Droitier / Gaucher"
                     value={bilan.lateralite}
                     onChange={(e) => handleChange("lateralite", e.target.value)}
                     className="mt-1"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <Label>Loisir / Sport</Label>
+                  <Label>Loisirs - Activités physiques</Label>
                   <Input
                     placeholder="Ex: Tennis, natation"
                     value={bilan.loisir_sport}
@@ -275,9 +325,15 @@ export default function PatientBilanInitial() {
                     className="mt-1"
                   />
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Type d'activité</Label>
+                  <Input
+                    placeholder="Occasionnelle / Compétition / Loisir / Pro"
+                    value={bilan.activite_physique_type}
+                    onChange={(e) => handleChange("activite_physique_type", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
                 <div>
                   <Label>Situation familiale</Label>
                   <Input
@@ -287,12 +343,87 @@ export default function PatientBilanInitial() {
                     className="mt-1"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Pathologie</Label>
+                  <Label>Antécédents (ATCD)</Label>
+                  <Textarea
+                    placeholder="Antécédents médicaux, chirurgicaux..."
+                    value={bilan.atcd}
+                    onChange={(e) => handleChange("atcd", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Médicaments</Label>
+                  <Textarea
+                    placeholder="Traitements médicamenteux en cours..."
+                    value={bilan.medicaments}
+                    onChange={(e) => handleChange("medicaments", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Pathologies associées</Label>
+                  <Input
+                    placeholder="Ex: Diabète, HTA..."
+                    value={bilan.pathologies_associees}
+                    onChange={(e) => handleChange("pathologies_associees", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Tabac</Label>
+                  <Input
+                    placeholder="Oui / Non / Sevré"
+                    value={bilan.tabac}
+                    onChange={(e) => handleChange("tabac", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>État psychique du patient</Label>
+                <Input
+                  placeholder="Normal / Inquiet / Dépressif / Désespéré / Autre"
+                  value={bilan.etat_psychique}
+                  onChange={(e) => handleChange("etat_psychique", e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Histoire */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardList className="w-5 h-5" />
+                Histoire
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Motif de consultation / Pathologie</Label>
                   <Input
                     placeholder="Ex: Lombalgie chronique"
                     value={bilan.pathologie}
                     onChange={(e) => handleChange("pathologie", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Depuis quand ?</Label>
+                  <Input
+                    type="date"
+                    value={bilan.date_debut}
+                    onChange={(e) => handleChange("date_debut", e.target.value)}
                     className="mt-1"
                   />
                 </div>
@@ -310,18 +441,18 @@ export default function PatientBilanInitial() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Date de début</Label>
+                  <Label>Facteurs déclenchants</Label>
                   <Input
-                    type="date"
-                    value={bilan.date_debut}
-                    onChange={(e) => handleChange("date_debut", e.target.value)}
+                    placeholder="Trauma / Progressif / Spontané / Autre"
+                    value={bilan.facteurs_declenchants}
+                    onChange={(e) => handleChange("facteurs_declenchants", e.target.value)}
                     className="mt-1"
                   />
                 </div>
                 <div>
                   <Label>Circonstances</Label>
                   <Input
-                    placeholder="Ex: Traumatique, progressif..."
+                    placeholder="Ex: Accident, effort..."
                     value={bilan.circonstances}
                     onChange={(e) => handleChange("circonstances", e.target.value)}
                     className="mt-1"
@@ -331,6 +462,15 @@ export default function PatientBilanInitial() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                  <Label>Histoire naturelle de la pathologie</Label>
+                  <Input
+                    placeholder="S'améliore / Stationnaire / S'empire / Fluctuant"
+                    value={bilan.histoire_naturelle}
+                    onChange={(e) => handleChange("histoire_naturelle", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
                   <Label>Évolution</Label>
                   <Input
                     placeholder="Ex: Stable, amélioration, aggravation..."
@@ -339,6 +479,60 @@ export default function PatientBilanInitial() {
                     className="mt-1"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <Label>Récidive</Label>
+                  <Input
+                    placeholder="Oui / Non"
+                    value={bilan.recidive}
+                    onChange={(e) => handleChange("recidive", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Chirurgie</Label>
+                  <Input
+                    placeholder="Oui / Non"
+                    value={bilan.chirurgie}
+                    onChange={(e) => handleChange("chirurgie", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Si oui, quelle opération ?</Label>
+                  <Input
+                    placeholder="Détail de l'opération..."
+                    value={bilan.chirurgie_detail}
+                    onChange={(e) => handleChange("chirurgie_detail", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Examen complémentaire (imagerie)</Label>
+                  <Textarea
+                    placeholder="Radio, IRM, Scanner..."
+                    value={bilan.examen_complementaire}
+                    onChange={(e) => handleChange("examen_complementaire", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Traitements kiné déjà suivis</Label>
+                  <Textarea
+                    placeholder="Traitements précédents..."
+                    value={bilan.ttt_deja_suivis}
+                    onChange={(e) => handleChange("ttt_deja_suivis", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Signes</Label>
                   <Input
@@ -348,40 +542,19 @@ export default function PatientBilanInitial() {
                     className="mt-1"
                   />
                 </div>
+                <div>
+                  <Label>Mouvements impossibles</Label>
+                  <Input
+                    placeholder="Ex: Rotation externe, élévation..."
+                    value={bilan.mvt_impossibles}
+                    onChange={(e) => handleChange("mvt_impossibles", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
               </div>
 
               <div>
-                <Label>Mouvements impossibles</Label>
-                <Input
-                  placeholder="Ex: Rotation externe, élévation antérieure..."
-                  value={bilan.mvt_impossibles}
-                  onChange={(e) => handleChange("mvt_impossibles", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label>Antécédents (ATCD)</Label>
-                <Textarea
-                  placeholder="Antécédents médicaux, chirurgicaux..."
-                  value={bilan.atcd}
-                  onChange={(e) => handleChange("atcd", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label>Traitements kiné déjà suivis</Label>
-                <Textarea
-                  placeholder="Traitements précédents..."
-                  value={bilan.ttt_deja_suivis}
-                  onChange={(e) => handleChange("ttt_deja_suivis", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label>Projets / Attentes</Label>
+                <Label>Objectifs / Projets / Attentes du patient</Label>
                 <Textarea
                   placeholder="Objectifs et attentes du patient..."
                   value={bilan.projets_attentes}
@@ -401,11 +574,70 @@ export default function PatientBilanInitial() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <Label>Fréquence des symptômes (2 dernières semaines)</Label>
+                <Input
+                  placeholder="Jamais / 1-2 fois / 1-2x/sem / 3-6x/sem / Chaque jour / Plusieurs fois/jour"
+                  value={bilan.douleur_frequence}
+                  onChange={(e) => handleChange("douleur_frequence", e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label>Douleur habituelle /10</Label>
+                  <Input
+                    placeholder="Ex: 5"
+                    value={bilan.douleur_eva_habituelle}
+                    onChange={(e) => handleChange("douleur_eva_habituelle", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Pire douleur /10</Label>
+                  <Input
+                    placeholder="Ex: 8"
+                    value={bilan.douleur_eva_pire}
+                    onChange={(e) => handleChange("douleur_eva_pire", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Douleur sport /10</Label>
+                  <Input
+                    placeholder="Ex: 7"
+                    value={bilan.douleur_eva_sport}
+                    onChange={(e) => handleChange("douleur_eva_sport", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Douleur la plus faible /10</Label>
+                  <Input
+                    placeholder="Ex: 2"
+                    value={bilan.douleur_eva_faible}
+                    onChange={(e) => handleChange("douleur_eva_faible", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Sensations</Label>
+                <Input
+                  placeholder="Engourdissements / Picotements / Brûlure / Courbatures..."
+                  value={bilan.douleur_sensations}
+                  onChange={(e) => handleChange("douleur_sensations", e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Type</Label>
+                  <Label>Type de douleur</Label>
                   <Input
-                    placeholder="Ex: Mécanique, inflammatoire, mixte..."
+                    placeholder="Constante / Diffuse / Intermittente / Élancements / Aiguë..."
                     value={bilan.douleur_type}
                     onChange={(e) => handleChange("douleur_type", e.target.value)}
                     className="mt-1"
@@ -421,22 +653,14 @@ export default function PatientBilanInitial() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Circonstances / Apparition</Label>
+                  <Label>Circonstances d'apparition</Label>
                   <Input
                     placeholder="Ex: Au mouvement, au repos..."
                     value={bilan.douleur_circonstances_apparition}
                     onChange={(e) => handleChange("douleur_circonstances_apparition", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>EVA (0-10)</Label>
-                  <Input
-                    placeholder="Ex: 6/10"
-                    value={bilan.douleur_eva}
-                    onChange={(e) => handleChange("douleur_eva", e.target.value)}
                     className="mt-1"
                   />
                 </div>
