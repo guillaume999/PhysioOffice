@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, X, Trash2, Calendar, GripVertical } from "lucide-react";
+import { Plus, X, Trash2, Calendar, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ interface TraitementSeanceItem {
   seance_type_id: string;
   ordre: number;
   seance?: SeanceOption;
+  localId: string; // Unique identifier for each instance (allows duplicates)
 }
 
 interface ExerciceOption {
@@ -83,7 +84,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         setPathologie(traitement.pathologie || "");
         setDescription(traitement.description || "");
         setTests(traitement.tests || []);
-        setSelectedSeances(traitement.seances || []);
+        setSelectedSeances((traitement.seances || []).map(s => ({
+          ...s,
+          localId: s.localId || crypto.randomUUID()
+        })));
       } else {
         resetForm();
       }
@@ -163,24 +167,29 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     setTests(updated);
   };
 
-  const toggleSeance = (seance: SeanceOption) => {
-    const exists = selectedSeances.find(s => s.seance_type_id === seance.id);
-    if (exists) {
-      setSelectedSeances(selectedSeances.filter(s => s.seance_type_id !== seance.id));
-    } else {
-      setSelectedSeances([
-        ...selectedSeances,
-        {
-          seance_type_id: seance.id,
-          ordre: selectedSeances.length,
-          seance
-        }
-      ]);
-    }
+  const addSeance = (seance: SeanceOption) => {
+    setSelectedSeances([
+      ...selectedSeances,
+      {
+        seance_type_id: seance.id,
+        ordre: selectedSeances.length,
+        seance,
+        localId: crypto.randomUUID()
+      }
+    ]);
   };
 
-  const removeSeance = (seanceId: string) => {
-    const updated = selectedSeances.filter(s => s.seance_type_id !== seanceId);
+  const removeSeance = (localId: string) => {
+    const updated = selectedSeances.filter(s => s.localId !== localId);
+    updated.forEach((s, i) => s.ordre = i);
+    setSelectedSeances(updated);
+  };
+
+  const moveSeance = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= selectedSeances.length) return;
+    const updated = [...selectedSeances];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, moved);
     updated.forEach((s, i) => s.ordre = i);
     setSelectedSeances(updated);
   };
@@ -424,8 +433,28 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
               <div className="space-y-2 mb-4">
                 <p className="text-sm font-medium text-muted-foreground">Séances sélectionnées ({selectedSeances.length})</p>
                 {selectedSeances.map((item, index) => (
-                  <Card key={item.seance_type_id} className="bg-primary/5 border-primary/20">
+                  <Card key={item.localId} className="bg-primary/5 border-primary/20">
                     <CardContent className="p-3 flex items-center gap-3">
+                      <div className="flex flex-col gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => moveSeance(index, index - 1)}
+                          disabled={index === 0}
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => moveSeance(index, index + 1)}
+                          disabled={index === selectedSeances.length - 1}
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </Button>
+                      </div>
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
                         {index + 1}
                       </div>
@@ -441,7 +470,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                           ))}
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => removeSeance(item.seance_type_id)}>
+                      <Button variant="ghost" size="icon" onClick={() => removeSeance(item.localId)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </CardContent>
@@ -456,14 +485,14 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                 <p className="text-sm text-muted-foreground p-2 text-center">Aucune séance disponible. Créez d'abord des séances types.</p>
               ) : (
                 availableSeances.map((seance) => {
-                  const isSelected = selectedSeances.some(s => s.seance_type_id === seance.id);
+                  const count = selectedSeances.filter(s => s.seance_type_id === seance.id).length;
                   return (
                     <div 
                       key={seance.id} 
-                      className={`flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
-                      onClick={() => toggleSeance(seance)}
+                      className={`flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer ${count > 0 ? 'bg-primary/10' : ''}`}
+                      onClick={() => addSeance(seance)}
                     >
-                      <Checkbox checked={isSelected} />
+                      <Plus className="w-4 h-4 text-primary" />
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap gap-1">
@@ -476,6 +505,9 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                           ))}
                         </div>
                       </div>
+                      {count > 0 && (
+                        <Badge variant="secondary" className="text-xs">{count}x</Badge>
+                      )}
                     </div>
                   );
                 })
