@@ -132,7 +132,6 @@ export function PatientTraitementCard({
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [editConfirmDialogOpen, setEditConfirmDialogOpen] = useState(false);
-  const [editMode, setEditMode] = useState<'replace' | 'new' | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -349,23 +348,9 @@ export function PatientTraitementCard({
   const handleEdit = () => {
     if (!traitement) return;
     
-    // If the traitement is visible (not hidden from list),
-    // ask user if they want to replace or create new
-    if (!traitement.is_hidden_from_list) {
-      setEditConfirmDialogOpen(true);
-      return;
-    }
-    
-    // Otherwise, proceed with replacing directly (already hidden)
-    proceedWithEdit(true);
-  };
-
-  const proceedWithEdit = (replaceOriginal: boolean) => {
-    if (!traitement) return;
-    
+    // Always open the form dialog directly (create new version)
     setEditingTraitement({
-      // Pass id only if replacing the original
-      id: replaceOriginal ? traitement.id : undefined,
+      // Never pass id - always create a new treatment
       pathologie: traitement.pathologie,
       description: traitement.description,
       tests: (traitement.tests || []).map(t => ({
@@ -393,25 +378,28 @@ export function PatientTraitementCard({
       })),
       author_name: traitement.author_name
     });
-    setEditMode(replaceOriginal ? 'replace' : 'new');
     setEditDialogOpen(true);
-    setEditConfirmDialogOpen(false);
   };
 
   const handleEditSuccess = async () => {
-    // Fetch the latest traitement created by this user to set as active
+    if (!user || !traitement) return;
+    
+    // If the original treatment was visible, ask user what to do
+    if (!traitement.is_hidden_from_list) {
+      setEditConfirmDialogOpen(true);
+      return;
+    }
+    
+    // If original was already hidden, just activate the new one
+    await finalizeEdit('new');
+  };
+
+  const finalizeEdit = async (mode: 'replace' | 'new') => {
     if (!user) return;
     
     const oldTraitementId = activeTraitementId;
     
-    // If we're replacing, just refresh
-    if (editMode === 'replace') {
-      setEditMode(null);
-      fetchTraitementDetails();
-      return;
-    }
-    
-    // If creating new, fetch the latest and set as active
+    // Fetch the latest traitement created by this user
     const { data: latestTraitement } = await supabase
       .from("traitement_types")
       .select("id")
@@ -420,8 +408,30 @@ export function PatientTraitementCard({
       .limit(1)
       .maybeSingle();
     
-    if (latestTraitement && onTraitementChanged) {
-      // Transfer bilans from old treatment to new treatment
+    if (!latestTraitement) return;
+    
+    if (mode === 'replace') {
+      // Delete the old treatment
+      if (oldTraitementId) {
+        // First delete related data
+        await supabase.from("traitement_tests").delete().eq("traitement_type_id", oldTraitementId);
+        await supabase.from("traitement_seances").delete().eq("traitement_type_id", oldTraitementId);
+        await supabase.from("patient_traitement_seance_dates").delete().eq("traitement_id", oldTraitementId);
+        // Delete bilans linked to old treatment
+        await supabase.from("patient_bilans").delete().eq("traitement_id", oldTraitementId);
+        // Delete the treatment itself
+        await supabase.from("traitement_types").delete().eq("id", oldTraitementId);
+      }
+      
+      // Make the new treatment visible
+      await supabase
+        .from("traitement_types")
+        .update({ is_hidden_from_list: false })
+        .eq("id", latestTraitement.id);
+      
+      toast.success("Traitement remplacé avec succès");
+    } else {
+      // Keep new as hidden, transfer bilans
       if (oldTraitementId && oldTraitementId !== latestTraitement.id) {
         await supabase
           .from("patient_bilans")
@@ -430,10 +440,15 @@ export function PatientTraitementCard({
           .eq("traitement_id", oldTraitementId);
       }
       
+      toast.success("Nouvelle version du traitement créée");
+    }
+    
+    // Activate the new treatment
+    if (onTraitementChanged) {
       onTraitementChanged(latestTraitement.id);
     }
     
-    setEditMode(null);
+    setEditConfirmDialogOpen(false);
     fetchTraitementDetails();
   };
 
@@ -943,31 +958,27 @@ export function PatientTraitementCard({
         </CardContent>
       </Card>
 
-      {/* Edit Confirmation Dialog */}
       <AlertDialog open={editConfirmDialogOpen} onOpenChange={setEditConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Traitement visible
+              Modifications enregistrées
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Ce traitement est actuellement visible dans votre liste de traitements. 
+              L'ancien traitement est visible dans votre liste de traitements. 
               Comment souhaitez-vous procéder ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => finalizeEdit('new')}>
+              Garder les deux versions
+            </AlertDialogCancel>
             <Button 
-              variant="outline" 
-              onClick={() => proceedWithEdit(true)}
+              variant="default" 
+              onClick={() => finalizeEdit('replace')}
             >
-              Remplacer l'existant
-            </Button>
-            <Button 
-              onClick={() => proceedWithEdit(false)}
-            >
-              Créer un nouveau (masqué)
+              Remplacer l'ancien
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -978,7 +989,7 @@ export function PatientTraitementCard({
         onOpenChange={setEditDialogOpen}
         traitement={editingTraitement}
         onSuccess={handleEditSuccess}
-        isHiddenFromList={editMode !== 'replace'}
+        isHiddenFromList={true}
       />
 
       {selectedSeanceForAccess && (
