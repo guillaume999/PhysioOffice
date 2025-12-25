@@ -132,6 +132,7 @@ export function PatientTraitementCard({
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [editConfirmDialogOpen, setEditConfirmDialogOpen] = useState(false);
+  const [canReplaceTraitement, setCanReplaceTraitement] = useState(true);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -386,6 +387,13 @@ export function PatientTraitementCard({
     
     // If the original treatment was visible, ask user what to do
     if (!traitement.is_hidden_from_list) {
+      // Check if multiple patients use this treatment
+      const { count } = await supabase
+        .from("patient_care_plans")
+        .select("id", { count: "exact", head: true })
+        .eq("active_traitement_id", traitement.id);
+      
+      setCanReplaceTraitement((count || 0) <= 1);
       setEditConfirmDialogOpen(true);
       return;
     }
@@ -985,20 +993,24 @@ export function PatientTraitementCard({
               Modifications enregistrées
             </AlertDialogTitle>
             <AlertDialogDescription>
-              L'ancien traitement est visible dans votre liste de traitements. 
-              Comment souhaitez-vous procéder ?
+              {canReplaceTraitement 
+                ? "L'ancien traitement est visible dans votre liste de traitements. Comment souhaitez-vous procéder ?"
+                : "Ce traitement est utilisé par plusieurs patients. Une nouvelle version sera créée pour éviter d'affecter les autres patients."
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel onClick={() => finalizeEdit('new')}>
-              Garder les deux versions
+              {canReplaceTraitement ? "Garder les deux versions" : "Créer nouvelle version"}
             </AlertDialogCancel>
-            <Button 
-              variant="default" 
-              onClick={() => finalizeEdit('replace')}
-            >
-              Remplacer l'ancien
-            </Button>
+            {canReplaceTraitement && (
+              <Button 
+                variant="default" 
+                onClick={() => finalizeEdit('replace')}
+              >
+                Remplacer l'ancien
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
