@@ -824,9 +824,6 @@ export function PatientTraitementCard({
                                           Modifier
                                         </Button>
                                       </div>
-                                      <p className="text-sm text-muted-foreground line-clamp-2">
-                                        {bilanAfterSeance.content || "Bilan vide"}
-                                      </p>
                                     </div>
                                   ) : (
                                     <Button
