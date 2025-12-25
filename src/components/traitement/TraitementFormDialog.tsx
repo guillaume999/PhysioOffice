@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, X, Trash2, Calendar, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,7 @@ interface TraitementTest {
   exercice_id: string;
   exercice?: ExerciceOption;
   ordre: number;
+  localId: string; // Unique identifier for each instance (allows duplicates)
 }
 
 interface TraitementFormData {
@@ -83,7 +84,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
       if (traitement) {
         setPathologie(traitement.pathologie || "");
         setDescription(traitement.description || "");
-        setTests(traitement.tests || []);
+        setTests((traitement.tests || []).map(t => ({
+          ...t,
+          localId: t.localId || crypto.randomUUID()
+        })));
         setSelectedSeances((traitement.seances || []).map(s => ({
           ...s,
           localId: s.localId || crypto.randomUUID()
@@ -143,26 +147,20 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     setSelectedSeances([]);
   };
 
-  const toggleExercice = (exercice: ExerciceOption) => {
-    const exists = tests.find(t => t.exercice_id === exercice.id);
-    if (exists) {
-      const updated = tests.filter(t => t.exercice_id !== exercice.id);
-      updated.forEach((t, i) => t.ordre = i);
-      setTests(updated);
-    } else {
-      setTests([
-        ...tests,
-        {
-          exercice_id: exercice.id,
-          exercice,
-          ordre: tests.length
-        }
-      ]);
-    }
+  const addTest = (exercice: ExerciceOption) => {
+    setTests([
+      ...tests,
+      {
+        exercice_id: exercice.id,
+        exercice,
+        ordre: tests.length,
+        localId: crypto.randomUUID()
+      }
+    ]);
   };
 
-  const removeTest = (exerciceId: string) => {
-    const updated = tests.filter(t => t.exercice_id !== exerciceId);
+  const removeTest = (localId: string) => {
+    const updated = tests.filter(t => t.localId !== localId);
     updated.forEach((t, i) => t.ordre = i);
     setTests(updated);
   };
@@ -363,7 +361,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
               <div className="space-y-2 mb-4">
                 <p className="text-sm font-medium text-muted-foreground">Exercices sélectionnés ({tests.length})</p>
                 {tests.map((item, index) => (
-                  <Card key={item.exercice_id} className="bg-secondary/30 border-secondary/50">
+                  <Card key={item.localId} className="bg-secondary/30 border-secondary/50">
                     <CardContent className="p-3 flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground font-bold">
                         {index + 1}
@@ -381,7 +379,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                           <p className="text-sm text-muted-foreground truncate">{item.exercice.description}</p>
                         )}
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => removeTest(item.exercice_id)}>
+                      <Button variant="ghost" size="icon" onClick={() => removeTest(item.localId)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </CardContent>
@@ -396,14 +394,14 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                 <p className="text-sm text-muted-foreground p-2 text-center">Aucun exercice disponible. Créez d'abord des exercices.</p>
               ) : (
                 availableExercices.map((exercice) => {
-                  const isSelected = tests.some(t => t.exercice_id === exercice.id);
+                  const count = tests.filter(t => t.exercice_id === exercice.id).length;
                   return (
                     <div 
                       key={exercice.id} 
-                      className={`flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer ${isSelected ? 'bg-secondary/20' : ''}`}
-                      onClick={() => toggleExercice(exercice)}
+                      className={`flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer ${count > 0 ? 'bg-secondary/20' : ''}`}
+                      onClick={() => addTest(exercice)}
                     >
-                      <Checkbox checked={isSelected} />
+                      <Plus className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       {exercice.thumbnail_url && (
                         <img 
                           src={exercice.thumbnail_url} 
@@ -417,6 +415,9 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                           <p className="text-xs text-muted-foreground truncate">{exercice.description}</p>
                         )}
                       </div>
+                      {count > 0 && (
+                        <Badge variant="secondary" className="text-xs">{count}</Badge>
+                      )}
                     </div>
                   );
                 })
