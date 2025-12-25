@@ -633,20 +633,46 @@ export function PatientTraitementCard({
                     )}
 
                     {/* Tests */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                       {traitement.tests && traitement.tests.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {traitement.tests.map((test) => (
-                            <Badge
-                              key={test.id}
-                              variant="outline"
-                              className="flex items-center gap-1"
-                            >
-                              <FileText className="w-3 h-3" />
-                              {test.exercices?.title || test.description?.substring(0, 25) || "Test"}
-                            </Badge>
-                          ))}
+                        <div className="space-y-3">
+                          {traitement.tests.map((test, i) => {
+                            const thumbnailUrl = test.exercices?.thumbnail_url || null;
+                            const testName = test.exercices?.title || test.description?.substring(0, 50) || `Test ${i + 1}`;
+                            
+                            return (
+                              <div 
+                                key={test.id} 
+                                className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50"
+                              >
+                                {/* Order number */}
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-sm font-bold text-primary">{i + 1}</span>
+                                </div>
+
+                                {/* Thumbnail */}
+                                <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                                  {thumbnailUrl ? (
+                                    <img 
+                                      src={thumbnailUrl} 
+                                      alt={testName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                      <FileText className="w-6 h-6" />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Test info */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-base truncate">{testName}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">Aucun test</p>
@@ -730,37 +756,77 @@ export function PatientTraitementCard({
                                     <div className="px-3 pb-3 space-y-3">
                                       {/* Exercices list */}
                                       {exercices.length > 0 ? (
-                                        <div className="space-y-2">
-                                          {exercices.map((ex, j) => (
-                                            <div 
-                                              key={ex.id}
-                                              className="flex items-center gap-3 p-2 bg-background/50 rounded-md border border-border/30"
-                                            >
-                                              <span className="text-xs text-muted-foreground w-5">{j + 1}.</span>
-                                              {ex.exercice?.thumbnail_url && (
-                                                <img 
-                                                  src={ex.exercice.thumbnail_url} 
-                                                  alt="" 
-                                                  className="w-10 h-10 rounded object-cover flex-shrink-0"
-                                                />
-                                              )}
-                                              <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium truncate">
-                                                  {ex.exercice?.title || ex.name || "Exercice"}
-                                                </p>
-                                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                  {ex.series > 1 && <span>{ex.series} séries</span>}
-                                                  {ex.repetitions && <span>× {ex.repetitions} reps</span>}
-                                                  {ex.duration_seconds && <span>{ex.duration_seconds}s</span>}
+                                        <div className="space-y-3">
+                                          {exercices.map((ex, j) => {
+                                            const thumbnailUrl = ex.exercice?.thumbnail_url || null;
+                                            const videoUrl = ex.exercice?.video_url || null;
+                                            const exerciceName = ex.exercice?.title || ex.name || `Exercice ${j + 1}`;
+                                            
+                                            return (
+                                              <div 
+                                                key={ex.id}
+                                                className="flex items-start gap-4 p-3 bg-background/50 rounded-xl border border-border/30"
+                                              >
+                                                {/* Order number */}
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                  <span className="text-sm font-bold text-primary">{j + 1}</span>
+                                                </div>
+
+                                                {/* Thumbnail */}
+                                                <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                                  {thumbnailUrl ? (
+                                                    <img 
+                                                      src={thumbnailUrl} 
+                                                      alt={exerciceName}
+                                                      className="w-full h-full object-cover"
+                                                    />
+                                                  ) : videoUrl ? (
+                                                    <video 
+                                                      src={videoUrl}
+                                                      className="w-full h-full object-cover"
+                                                      muted
+                                                    />
+                                                  ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                      <Play className="w-6 h-6" />
+                                                    </div>
+                                                  )}
+                                                  {videoUrl && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                                      <Play className="w-5 h-5 text-white fill-white" />
+                                                    </div>
+                                                  )}
+                                                </div>
+                                                
+                                                {/* Exercise info */}
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
+                                                  
+                                                  {/* Stats */}
+                                                  <div className="flex items-center gap-3 flex-wrap">
+                                                    <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-lg">
+                                                      <span className="text-base font-bold text-primary">{ex.series || 1}</span>
+                                                      <span className="text-xs text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                                    </div>
+                                                    
+                                                    {ex.repetitions && (
+                                                      <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
+                                                        <span className="text-base font-bold">{ex.repetitions}</span>
+                                                        <span className="text-xs text-muted-foreground">reps</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {ex.duration_seconds && (
+                                                      <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
+                                                        <span className="text-base font-bold">{ex.duration_seconds}</span>
+                                                        <span className="text-xs text-muted-foreground">sec</span>
+                                                      </div>
+                                                    )}
+                                                  </div>
                                                 </div>
                                               </div>
-                                              {ex.exercice?.video_url && (
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                                                  <Play className="w-4 h-4" />
-                                                </Button>
-                                              )}
-                                            </div>
-                                          ))}
+                                            );
+                                          })}
                                         </div>
                                       ) : (
                                         <p className="text-xs text-muted-foreground">Aucun exercice</p>
