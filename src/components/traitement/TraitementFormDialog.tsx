@@ -236,9 +236,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         for (const test of tests) {
           await supabase.from("traitement_tests").insert({
             traitement_type_id: traitement.id,
-            description: test.exercice?.title || '',
+            exercice_id: test.exercice_id,
+            description: test.exercice?.description || '',
             ordre: test.ordre
-          } as any);
+          });
         }
 
         // Delete old seances
@@ -276,9 +277,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         for (const test of tests) {
           await supabase.from("traitement_tests").insert({
             traitement_type_id: newTraitement.id,
-            description: test.exercice?.title || '',
+            exercice_id: test.exercice_id,
+            description: test.exercice?.description || '',
             ordre: test.ordre
-          } as any);
+          });
         }
 
         // Insert seances

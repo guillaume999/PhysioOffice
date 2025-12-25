@@ -681,7 +681,8 @@ export function PatientTraitementCard({
                         <div className="space-y-3">
                           {traitement.tests.map((test, i) => {
                             const thumbnailUrl = test.exercices?.thumbnail_url || null;
-                            const testName = test.exercices?.title || test.description?.substring(0, 50) || `Test ${i + 1}`;
+                            const testName = test.exercices?.title || `Test ${i + 1}`;
+                            const testDescription = test.description || test.exercices?.description || null;
                             
                             return (
                               <div 
@@ -711,6 +712,9 @@ export function PatientTraitementCard({
                                 {/* Test info */}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-base truncate">{testName}</p>
+                                  {testDescription && (
+                                    <p className="text-sm text-muted-foreground line-clamp-2">{testDescription}</p>
+                                  )}
                                 </div>
                               </div>
                             );
