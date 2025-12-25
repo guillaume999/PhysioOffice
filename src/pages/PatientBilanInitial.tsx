@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -604,288 +605,364 @@ export default function PatientBilanInitial() {
 
           {/* Bilan douleurs */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5" />
+            <CardHeader className="print:py-2">
+              <CardTitle className="text-lg flex items-center gap-2 print:text-base">
+                <Activity className="w-5 h-5 print:w-4 print:h-4" />
                 Bilan douleurs
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Fréquence des symptômes (2 dernières semaines)</Label>
-                <Input
-                  placeholder="Jamais / 1-2 fois / 1-2x/sem / 3-6x/sem / Chaque jour / Plusieurs fois/jour"
-                  value={bilan.douleur_frequence}
-                  onChange={(e) => handleChange("douleur_frequence", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label>Douleur habituelle /10</Label>
-                  <Input
-                    placeholder="Ex: 5"
-                    value={bilan.douleur_eva_habituelle}
-                    onChange={(e) => handleChange("douleur_eva_habituelle", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Pire douleur /10</Label>
-                  <Input
-                    placeholder="Ex: 8"
-                    value={bilan.douleur_eva_pire}
-                    onChange={(e) => handleChange("douleur_eva_pire", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Douleur sport /10</Label>
-                  <Input
-                    placeholder="Ex: 7"
-                    value={bilan.douleur_eva_sport}
-                    onChange={(e) => handleChange("douleur_eva_sport", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Douleur la plus faible /10</Label>
-                  <Input
-                    placeholder="Ex: 2"
-                    value={bilan.douleur_eva_faible}
-                    onChange={(e) => handleChange("douleur_eva_faible", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Sensations</Label>
-                <Input
-                  placeholder="Engourdissements / Picotements / Brûlure / Courbatures..."
-                  value={bilan.douleur_sensations}
-                  onChange={(e) => handleChange("douleur_sensations", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Type de douleur</Label>
-                  <Input
-                    placeholder="Constante / Diffuse / Intermittente / Élancements / Aiguë..."
-                    value={bilan.douleur_type}
-                    onChange={(e) => handleChange("douleur_type", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Localisation</Label>
-                  <Input
-                    placeholder="Ex: Épaule droite, lombaires..."
-                    value={bilan.douleur_localisation}
-                    onChange={(e) => handleChange("douleur_localisation", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Circonstances d'apparition</Label>
-                  <Input
-                    placeholder="Ex: Au mouvement, au repos..."
-                    value={bilan.douleur_circonstances_apparition}
-                    onChange={(e) => handleChange("douleur_circonstances_apparition", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Soulagé / Aggravé par</Label>
-                  <Input
-                    placeholder="Ex: Repos / Effort"
-                    value={bilan.douleur_soulage_aggrave}
-                    onChange={(e) => handleChange("douleur_soulage_aggrave", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
+            <CardContent className="print:p-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/3">Critère</TableHead>
+                    <TableHead>Valeur</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Fréquence (2 dernières semaines)</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Jamais / 1-2 fois / 1-2x/sem / 3-6x/sem / Chaque jour"
+                        value={bilan.douleur_frequence}
+                        onChange={(e) => handleChange("douleur_frequence", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">EVA habituelle /10</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: 5"
+                        value={bilan.douleur_eva_habituelle}
+                        onChange={(e) => handleChange("douleur_eva_habituelle", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Pire douleur /10</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: 8"
+                        value={bilan.douleur_eva_pire}
+                        onChange={(e) => handleChange("douleur_eva_pire", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Douleur sport /10</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: 7"
+                        value={bilan.douleur_eva_sport}
+                        onChange={(e) => handleChange("douleur_eva_sport", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Douleur la plus faible /10</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: 2"
+                        value={bilan.douleur_eva_faible}
+                        onChange={(e) => handleChange("douleur_eva_faible", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Type de douleur</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Constante / Diffuse / Intermittente / Aiguë..."
+                        value={bilan.douleur_type}
+                        onChange={(e) => handleChange("douleur_type", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Sensations</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Engourdissements / Picotements / Brûlure..."
+                        value={bilan.douleur_sensations}
+                        onChange={(e) => handleChange("douleur_sensations", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Localisation</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: Épaule droite, lombaires..."
+                        value={bilan.douleur_localisation}
+                        onChange={(e) => handleChange("douleur_localisation", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Circonstances d'apparition</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: Au mouvement, au repos..."
+                        value={bilan.douleur_circonstances_apparition}
+                        onChange={(e) => handleChange("douleur_circonstances_apparition", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Soulagé / Aggravé par</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Ex: Repos / Effort"
+                        value={bilan.douleur_soulage_aggrave}
+                        onChange={(e) => handleChange("douleur_soulage_aggrave", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
           {/* Bilan morphodynamique */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5" />
+            <CardHeader className="print:py-2">
+              <CardTitle className="text-lg flex items-center gap-2 print:text-base">
+                <Activity className="w-5 h-5 print:w-4 print:h-4" />
                 Bilan morphodynamique
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Extension / Flexion / Oscillé / Trajets segments / Force</Label>
-                <Textarea
-                  placeholder="Décrivez les observations morphodynamiques..."
-                  value={bilan.morpho_extension_flexion}
-                  onChange={(e) => handleChange("morpho_extension_flexion", e.target.value)}
-                  className="mt-1 min-h-[100px]"
-                />
-              </div>
-              <div>
-                <Label>Fonctionnel</Label>
-                <Textarea
-                  placeholder="Évaluation fonctionnelle..."
-                  value={bilan.morpho_fonctionnel}
-                  onChange={(e) => handleChange("morpho_fonctionnel", e.target.value)}
-                  className="mt-1 min-h-[100px]"
-                />
-              </div>
+            <CardContent className="print:p-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/3">Critère</TableHead>
+                    <TableHead>Observation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Extension / Flexion / Oscillé / Trajets / Force</TableCell>
+                    <TableCell>
+                      <Textarea
+                        placeholder="Décrivez les observations morphodynamiques..."
+                        value={bilan.morpho_extension_flexion}
+                        onChange={(e) => handleChange("morpho_extension_flexion", e.target.value)}
+                        className="border-0 p-0 min-h-[60px] focus-visible:ring-0 resize-none"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Fonctionnel</TableCell>
+                    <TableCell>
+                      <Textarea
+                        placeholder="Évaluation fonctionnelle..."
+                        value={bilan.morpho_fonctionnel}
+                        onChange={(e) => handleChange("morpho_fonctionnel", e.target.value)}
+                        className="border-0 p-0 min-h-[60px] focus-visible:ring-0 resize-none"
+                      />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
           {/* Bilan morphostatique */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Eye className="w-5 h-5" />
+            <CardHeader className="print:py-2">
+              <CardTitle className="text-lg flex items-center gap-2 print:text-base">
+                <Eye className="w-5 h-5 print:w-4 print:h-4" />
                 Bilan morphostatique
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Attitude statique</Label>
-                <Input
-                  placeholder="Description de l'attitude statique..."
-                  value={bilan.morpho_attitude_statique}
-                  onChange={(e) => handleChange("morpho_attitude_statique", e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label>Ceinture</Label>
-                  <Input
-                    placeholder="Observations ceinture..."
-                    value={bilan.morpho_ceinture}
-                    onChange={(e) => handleChange("morpho_ceinture", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Dos</Label>
-                  <Input
-                    placeholder="Observations dos..."
-                    value={bilan.morpho_dos}
-                    onChange={(e) => handleChange("morpho_dos", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Bassin</Label>
-                  <Input
-                    placeholder="Observations bassin..."
-                    value={bilan.morpho_bassin}
-                    onChange={(e) => handleChange("morpho_bassin", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Genou</Label>
-                  <Input
-                    placeholder="Observations genou..."
-                    value={bilan.morpho_genou}
-                    onChange={(e) => handleChange("morpho_genou", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Pieds</Label>
-                  <Input
-                    placeholder="Observations pieds..."
-                    value={bilan.morpho_pieds}
-                    onChange={(e) => handleChange("morpho_pieds", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Articulaire</Label>
-                  <Input
-                    placeholder="Observations articulaires..."
-                    value={bilan.morpho_articulaire}
-                    onChange={(e) => handleChange("morpho_articulaire", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
+            <CardContent className="print:p-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/3">Zone</TableHead>
+                    <TableHead>Observation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Attitude statique</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Description de l'attitude statique..."
+                        value={bilan.morpho_attitude_statique}
+                        onChange={(e) => handleChange("morpho_attitude_statique", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Ceinture</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations ceinture..."
+                        value={bilan.morpho_ceinture}
+                        onChange={(e) => handleChange("morpho_ceinture", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Dos</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations dos..."
+                        value={bilan.morpho_dos}
+                        onChange={(e) => handleChange("morpho_dos", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Bassin</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations bassin..."
+                        value={bilan.morpho_bassin}
+                        onChange={(e) => handleChange("morpho_bassin", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Genou</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations genou..."
+                        value={bilan.morpho_genou}
+                        onChange={(e) => handleChange("morpho_genou", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Pieds</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations pieds..."
+                        value={bilan.morpho_pieds}
+                        onChange={(e) => handleChange("morpho_pieds", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Articulaire</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Observations articulaires..."
+                        value={bilan.morpho_articulaire}
+                        onChange={(e) => handleChange("morpho_articulaire", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
           {/* Bilan cutanéo-trophique */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Stethoscope className="w-5 h-5" />
+            <CardHeader className="print:py-2">
+              <CardTitle className="text-lg flex items-center gap-2 print:text-base">
+                <Stethoscope className="w-5 h-5 print:w-4 print:h-4" />
                 Bilan cutanéo-trophique
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label>Cicatrice / Couleur</Label>
-                  <Input
-                    placeholder="État cicatriciel, coloration..."
-                    value={bilan.cutaneo_cicatrice_couleur}
-                    onChange={(e) => handleChange("cutaneo_cicatrice_couleur", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Trophiques</Label>
-                  <Input
-                    placeholder="État trophique..."
-                    value={bilan.cutaneo_trophiques}
-                    onChange={(e) => handleChange("cutaneo_trophiques", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Adhérences / Chaleur</Label>
-                  <Input
-                    placeholder="Présence d'adhérences, chaleur..."
-                    value={bilan.cutaneo_adherences_chaleur}
-                    onChange={(e) => handleChange("cutaneo_adherences_chaleur", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Test décollement</Label>
-                  <Input
-                    placeholder="Résultat du test..."
-                    value={bilan.cutaneo_test_decollement}
-                    onChange={(e) => handleChange("cutaneo_test_decollement", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Test godet</Label>
-                  <Input
-                    placeholder="Résultat du test..."
-                    value={bilan.cutaneo_test_godet}
-                    onChange={(e) => handleChange("cutaneo_test_godet", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Amyotrophie</Label>
-                  <Input
-                    placeholder="Présence d'amyotrophie..."
-                    value={bilan.cutaneo_amyotrophie}
-                    onChange={(e) => handleChange("cutaneo_amyotrophie", e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
+            <CardContent className="print:p-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/3">Critère</TableHead>
+                    <TableHead>Observation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Cicatrice / Couleur</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="État cicatriciel, coloration..."
+                        value={bilan.cutaneo_cicatrice_couleur}
+                        onChange={(e) => handleChange("cutaneo_cicatrice_couleur", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Trophiques</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="État trophique..."
+                        value={bilan.cutaneo_trophiques}
+                        onChange={(e) => handleChange("cutaneo_trophiques", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Adhérences / Chaleur</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Présence d'adhérences, chaleur..."
+                        value={bilan.cutaneo_adherences_chaleur}
+                        onChange={(e) => handleChange("cutaneo_adherences_chaleur", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Test décollement</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Résultat du test..."
+                        value={bilan.cutaneo_test_decollement}
+                        onChange={(e) => handleChange("cutaneo_test_decollement", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Test godet</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Résultat du test..."
+                        value={bilan.cutaneo_test_godet}
+                        onChange={(e) => handleChange("cutaneo_test_godet", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Amyotrophie</TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Présence d'amyotrophie..."
+                        value={bilan.cutaneo_amyotrophie}
+                        onChange={(e) => handleChange("cutaneo_amyotrophie", e.target.value)}
+                        className="border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
