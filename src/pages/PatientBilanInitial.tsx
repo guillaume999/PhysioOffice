@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare } from "lucide-react";
+import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer } from "lucide-react";
 
 interface BilanData {
   // Infos patient
@@ -231,6 +231,10 @@ export default function PatientBilanInitial() {
     setBilan(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (authLoading || loading) {
     return (
       <Layout>
@@ -260,23 +264,56 @@ export default function PatientBilanInitial() {
               </p>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Enregistrer
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handlePrint} className="print:hidden">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+            <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground print:hidden">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              Enregistrer
+            </Button>
+          </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 print:space-y-4">
+          {/* En-tête pour impression avec champs nom/prénom vides */}
+          <Card className="hidden print:block">
+            <CardHeader>
+              <CardTitle className="text-lg text-center">Bilan Initial Kinésithérapie</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="font-semibold">Nom :</Label>
+                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="font-semibold">Prénom :</Label>
+                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="font-semibold">Date de naissance :</Label>
+                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="font-semibold">Date :</Label>
+                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Informations complémentaires patient */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="w-5 h-5" />
+            <CardHeader className="print:py-2">
+              <CardTitle className="text-lg flex items-center gap-2 print:text-base">
+                <User className="w-5 h-5 print:w-4 print:h-4" />
                 Informations patient
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <CardContent className="space-y-4 print:space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:gap-2">
                 <div>
                   <Label>Profession</Label>
                   <Input
