@@ -68,32 +68,31 @@ export default function Index() {
 
   return (
     <Layout>
-      {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 lg:py-32">
+      <section className="relative overflow-hidden py-12 md:py-20 lg:py-32">
         <div className="absolute inset-0 gradient-primary opacity-5" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6 animate-fade-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4 md:mb-6 animate-fade-up">
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">Plateforme médicale intelligente</span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-bold mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <h1 className="text-3xl md:text-5xl lg:text-7xl font-display font-bold mb-4 md:mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
               Votre cabinet médical
               <span className="text-gradient block mt-2">simplifié</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: "0.2s" }}>
+            <p className="text-base md:text-xl text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto animate-fade-up px-4" style={{ animationDelay: "0.2s" }}>
               Gérez vos patients, accédez à votre vidéothèque, utilisez l'IA pour vos diagnostics et organisez vos notes en un seul endroit.
             </p>
             
             {!user && (
               <Link
                 to="/auth"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-lg shadow-soft hover:shadow-glow transition-all duration-300 animate-fade-up"
+                className="inline-flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-base md:text-lg shadow-soft hover:shadow-glow transition-all duration-300 animate-fade-up"
                 style={{ animationDelay: "0.3s" }}
               >
                 Commencer maintenant
@@ -105,18 +104,18 @@ export default function Index() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-20 bg-muted/30">
+      <section className="py-12 md:py-20 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl md:text-4xl font-display font-bold mb-4">
               Tout ce dont vous avez besoin
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
               Une suite complète d'outils pour optimiser la gestion de votre cabinet médical
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-6 max-w-4xl mx-auto">
             {features.map((feature, index) => (
               <Link
                 key={feature.title}
@@ -125,21 +124,21 @@ export default function Index() {
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
-                  <CardHeader className="flex flex-row items-start gap-4">
-                    <div className={`p-3 rounded-xl ${feature.bgColor}`}>
-                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
-                        <feature.icon className="w-5 h-5 text-white" />
+                  <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
+                    <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
+                      <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
+                        <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-xl font-display group-hover:text-primary transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-sm md:text-xl font-display group-hover:text-primary transition-colors leading-tight">
                         {feature.title}
                       </CardTitle>
-                      <CardDescription className="mt-2">
+                      <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm line-clamp-2">
                         {feature.description}
                       </CardDescription>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all hidden md:block" />
                   </CardHeader>
                 </Card>
               </Link>
@@ -147,8 +146,8 @@ export default function Index() {
           </div>
 
           {!user && (
-            <div className="text-center mt-12">
-              <p className="text-muted-foreground">
+            <div className="text-center mt-8 md:mt-12">
+              <p className="text-muted-foreground text-sm">
                 Connectez-vous pour accéder à toutes les fonctionnalités
               </p>
             </div>
