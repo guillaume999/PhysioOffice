@@ -232,67 +232,74 @@ export default function Patients() {
 
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Numéro</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Mutuelle</TableHead>
-                  <TableHead>Séances restantes</TableHead>
-                  <TableHead>Prescription</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(p => (
-                  <TableRow 
-                    key={p.id} 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/patients/${p.id}`)}
-                  >
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>{p.numero || "-"}</TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      <Select value={p.status} onValueChange={(value) => updatePatientStatus(p.id, value)}>
-                        <SelectTrigger className={`w-32 h-8 text-xs ${statusColors[p.status] || ""}`}>
-                          <SelectValue>{statusLabels[p.status] || p.status}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Actif</SelectItem>
-                          <SelectItem value="in_treatment">En traitement</SelectItem>
-                          <SelectItem value="waiting">En attente</SelectItem>
-                          <SelectItem value="inactive">Inactif</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        p.has_mutual ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {p.has_mutual ? "Oui" : "Non"}
-                      </span>
-                    </TableCell>
-                    <TableCell>{p.remaining_sessions ?? 0}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        p.prescription === "oui" ? "bg-green-500/10 text-green-600" :
-                        p.prescription === "renouv_kine" ? "bg-orange-500/10 text-orange-600" :
-                        "bg-muted text-muted-foreground"
-                      }`}>
-                        {prescriptionLabels[p.prescription || "none"] || "Non"}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      Aucun patient trouvé
-                    </TableCell>
+                    <TableHead className="min-w-[150px]">Nom</TableHead>
+                    <TableHead className="min-w-[100px] hidden sm:table-cell">Numéro</TableHead>
+                    <TableHead className="min-w-[130px]">Statut</TableHead>
+                    <TableHead className="min-w-[80px] hidden md:table-cell">Mutuelle</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Séances</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Prescription</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(p => (
+                    <TableRow 
+                      key={p.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/patients/${p.id}`)}
+                    >
+                      <TableCell className="font-medium">
+                        <div>
+                          <span>{p.name}</span>
+                          <span className="sm:hidden text-xs text-muted-foreground block">{p.numero || "-"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">{p.numero || "-"}</TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <Select value={p.status} onValueChange={(value) => updatePatientStatus(p.id, value)}>
+                          <SelectTrigger className={`w-full sm:w-32 h-8 text-xs ${statusColors[p.status] || ""}`}>
+                            <SelectValue>{statusLabels[p.status] || p.status}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Actif</SelectItem>
+                            <SelectItem value="in_treatment">En traitement</SelectItem>
+                            <SelectItem value="waiting">En attente</SelectItem>
+                            <SelectItem value="inactive">Inactif</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          p.has_mutual ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {p.has_mutual ? "Oui" : "Non"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">{p.remaining_sessions ?? 0}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          p.prescription === "oui" ? "bg-green-500/10 text-green-600" :
+                          p.prescription === "renouv_kine" ? "bg-orange-500/10 text-orange-600" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {prescriptionLabels[p.prescription || "none"] || "Non"}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        Aucun patient trouvé
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

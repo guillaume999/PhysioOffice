@@ -2,18 +2,15 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
-import { LogOut, User, Menu, X, Shield } from "lucide-react";
-import { useState } from "react";
+import { LogOut, User, Shield } from "lucide-react";
 
 export function Navbar() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
-    setIsMenuOpen(false);
     try {
       await signOut();
       navigate("/");
@@ -143,117 +140,7 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
         </div>
-
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t animate-fade-in">
-            <div className="flex flex-col gap-4">
-              <Link
-                to="/"
-                className="font-medium text-foreground hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Accueil
-              </Link>
-              {user && (
-                <>
-                  <Link
-                    to="/patients"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Patients
-                  </Link>
-                  <Link
-                    to="/seance-type"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Séance
-                  </Link>
-                  <Link
-                    to="/exercices"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Exercices
-                  </Link>
-                  <Link
-                    to="/videos"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Vidéos
-                  </Link>
-                  <Link
-                    to="/traitement-type"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    TTT
-                  </Link>
-                  <Link
-                    to="/ia-diagnostic"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    IA Diagnostic
-                  </Link>
-                  <Link
-                    to="/notes"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Notes
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-2"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Shield className="w-4 h-4" />
-                      Admin
-                    </Link>
-                  )}
-                </>
-              )}
-              {user ? (
-                <>
-                  <Link
-                    to="/profile"
-                    className="font-medium text-foreground hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Mon Profil
-                  </Link>
-                  <Button variant="outline" onClick={handleSignOut}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Déconnexion
-                  </Button>
-                </>
-              ) : (
-                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="w-full gradient-primary text-primary-foreground">
-                    Connexion
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </nav>
   );
