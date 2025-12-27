@@ -402,26 +402,38 @@ export default function PatientDetail() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/patients")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-3 flex-1">
-            <div className="p-3 rounded-xl bg-blue-500/10">
-              <User className="w-6 h-6 text-blue-500" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-display font-bold">{patient.name}</h1>
-              <p className="text-muted-foreground">Patient #{patient.numero || "-"}</p>
+      <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
+        {/* Header mobile optimisé */}
+        <div className="flex flex-col gap-4 mb-6 md:mb-8">
+          {/* Ligne 1: Retour + Info patient */}
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/patients")} className="shrink-0">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 shrink-0">
+                <User className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg md:text-2xl font-display font-bold truncate">{patient.name}</h1>
+                <p className="text-sm text-muted-foreground">#{patient.numero || "-"}</p>
+              </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          
+          {/* Ligne 2: Actions (scroll horizontal sur mobile) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
+            <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground shrink-0">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              <span className="hidden sm:inline">Enregistrer</span>
+              <span className="sm:hidden">Sauver</span>
+            </Button>
             <Button 
               variant="outline" 
               size="icon"
               onClick={() => setReportPrintDialogOpen(true)}
               title="Imprimer le compte-rendu"
+              className="shrink-0"
             >
               <Printer className="w-4 h-4" />
             </Button>
@@ -430,16 +442,13 @@ export default function PatientDetail() {
               size="icon"
               onClick={() => setDuplicateDialogOpen(true)}
               title="Dupliquer ce patient"
+              className="shrink-0"
             >
               <Copy className="w-4 h-4" />
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-              Enregistrer
-            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="icon">
+                <Button variant="destructive" size="icon" className="shrink-0">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </AlertDialogTrigger>

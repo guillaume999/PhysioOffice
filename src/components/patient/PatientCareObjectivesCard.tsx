@@ -28,30 +28,34 @@ export function PatientCareObjectivesCard({
 }: PatientCareObjectivesCardProps) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Target className="w-5 h-5" />
-          Objectifs soins
-        </CardTitle>
-        <div className="flex items-center gap-2">
+      <CardHeader className="flex flex-col gap-3 pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Objectifs soins
+          </CardTitle>
+        </div>
+        {/* Actions - responsive layout */}
+        <div className="flex flex-col sm:flex-row gap-2">
           {onBilanInitial && (
             <div className="flex items-center gap-2">
               <Input
                 type="date"
                 value={carePlan.bilan_initial_date || ""}
                 onChange={(e) => onChange("bilan_initial_date", e.target.value)}
-                className="w-36 h-9 text-xs"
+                className="flex-1 sm:w-36 h-9 text-xs"
               />
-              <Button variant="outline" size="sm" onClick={onBilanInitial}>
-                <ClipboardList className="w-4 h-4 mr-2" />
-                Bilan initial
+              <Button variant="outline" size="sm" onClick={onBilanInitial} className="shrink-0">
+                <ClipboardList className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Bilan initial</span>
               </Button>
             </div>
           )}
           {onCertificats && (
-            <Button variant="outline" size="sm" onClick={onCertificats}>
-              <FileText className="w-4 h-4 mr-2" />
-              Certificat constat
+            <Button variant="outline" size="sm" onClick={onCertificats} className="shrink-0">
+              <FileText className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Certificat constat</span>
+              <span className="sm:hidden">Certificat</span>
             </Button>
           )}
         </div>

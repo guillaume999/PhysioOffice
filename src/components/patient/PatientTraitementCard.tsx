@@ -621,12 +621,45 @@ export function PatientTraitementCard({
           ) : traitement ? (
             <Card className="overflow-hidden border-primary/20">
               <CardContent className="p-4">
-                {/* Header */}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Badge variant="outline" className="text-sm flex-shrink-0">
+                {/* Header - Mobile optimized */}
+                <div className="flex flex-col gap-3">
+                  {/* Ligne 1: Badge + Actions */}
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline" className="text-sm">
                       {traitement.pathologie}
                     </Badge>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpanded(!expanded)}
+                        className="gap-1 h-8 px-2"
+                      >
+                        {expanded ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            <span className="hidden sm:inline">Réduire</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            <span className="hidden sm:inline">Détails</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onRemoveTraitement}
+                        className="text-destructive h-8 w-8"
+                        title="Retirer le traitement"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Ligne 2: Date + infos */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <Input
                       type="date"
                       value={traitement.traitement_start_date || ""}
@@ -634,41 +667,8 @@ export function PatientTraitementCard({
                       className="w-32 h-7 text-xs"
                       title="Date de début du traitement"
                     />
-                    <span className="text-xs text-muted-foreground truncate">
-                      par {traitement.author_name || "Anonyme"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setExpanded(!expanded)}
-                      className="gap-1 flex-shrink-0"
-                    >
-                      {expanded ? (
-                        <>
-                          <ChevronUp className="w-4 h-4" />
-                          Réduire
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="w-4 h-4" />
-                          Détails
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onRemoveTraitement}
-                      className="text-destructive h-8 w-8"
-                      title="Retirer le traitement"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    <span className="truncate">par {traitement.author_name || "Anonyme"}</span>
+                    <span>• {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances</span>
                   </div>
                 </div>
 
