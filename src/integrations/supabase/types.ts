@@ -713,6 +713,10 @@ export type Database = {
           last_name: string | null
           pseudo: string | null
           specialty: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_end_date: string | null
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           trial_end_date: string | null
           updated_at: string
           user_id: string
@@ -729,6 +733,10 @@ export type Database = {
           last_name?: string | null
           pseudo?: string | null
           specialty?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           trial_end_date?: string | null
           updated_at?: string
           user_id: string
@@ -745,6 +753,10 @@ export type Database = {
           last_name?: string | null
           pseudo?: string | null
           specialty?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           trial_end_date?: string | null
           updated_at?: string
           user_id?: string
@@ -931,6 +943,69 @@ export type Database = {
           },
         ]
       }
+      subscription_limits: {
+        Row: {
+          can_share_exercices: boolean
+          can_use_ai: boolean
+          created_at: string
+          id: string
+          max_exercices: number
+          max_patients: number
+          max_seances: number
+          max_traitements: number
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Insert: {
+          can_share_exercices?: boolean
+          can_use_ai?: boolean
+          created_at?: string
+          id?: string
+          max_exercices: number
+          max_patients: number
+          max_seances: number
+          max_traitements: number
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Update: {
+          can_share_exercices?: boolean
+          can_use_ai?: boolean
+          created_at?: string
+          id?: string
+          max_exercices?: number
+          max_patients?: number
+          max_seances?: number
+          max_traitements?: number
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Relationships: []
+      }
+      subscription_prices: {
+        Row: {
+          billing_period: string
+          created_at: string
+          id: string
+          price_cents: number
+          stripe_price_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Insert: {
+          billing_period: string
+          created_at?: string
+          id?: string
+          price_cents: number
+          stripe_price_id?: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Update: {
+          billing_period?: string
+          created_at?: string
+          id?: string
+          price_cents?: number
+          stripe_price_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+        }
+        Relationships: []
+      }
       traitement_seances: {
         Row: {
           created_at: string
@@ -1083,6 +1158,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_create_item: {
+        Args: { _item_type: string; _user_id: string }
+        Returns: boolean
+      }
+      get_user_subscription_tier: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["subscription_tier"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1094,6 +1177,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      subscription_tier: "free" | "basic" | "premium"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1222,6 +1306,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      subscription_tier: ["free", "basic", "premium"],
     },
   },
 } as const
