@@ -344,6 +344,35 @@ export default function Admin() {
     }
   };
 
+  const updateSubscriptionEndDate = async (userId: string, newDate: string | null) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          subscription_end_date: newDate ? new Date(newDate).toISOString() : null,
+        })
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setUsers(users.map(u => 
+        u.user_id === userId ? { ...u, subscription_end_date: newDate ? new Date(newDate).toISOString() : null } : u
+      ));
+
+      toast({
+        title: "Succès",
+        description: newDate ? `Date de fin modifiée.` : "Date de fin supprimée.",
+      });
+    } catch (error) {
+      console.error("Error updating subscription end date:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la date.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const toggleBan = async (userId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
@@ -924,9 +953,8 @@ export default function Admin() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Utilisateur</th>
                         <th className="text-left py-3 px-2">Email</th>
-                        <th className="text-left py-3 px-2">Pseudo</th>
                         <th className="text-left py-3 px-2">Abonnement</th>
-                        <th className="text-left py-3 px-2">Stripe</th>
+                        <th className="text-left py-3 px-2">Fin abonnement</th>
                         <th className="text-left py-3 px-2">Partage</th>
                         <th className="text-left py-3 px-2">Banni</th>
                         <th className="text-left py-3 px-2">Admin</th>
@@ -934,31 +962,34 @@ export default function Admin() {
                     </thead>
                     <tbody>
                       {filteredUsers.map((u) => {
-                        const now = new Date();
-                        const trialEnd = u.trial_end_date ? new Date(u.trial_end_date) : null;
-                        const isInTrial = u.subscription_tier === 'free' && trialEnd && trialEnd > now;
-
-                        const getTierBadge = () => {
-                          if (u.is_banned) return <Badge variant="destructive">Banni</Badge>;
-                          if (u.subscription_tier === 'premium') return <Badge className="bg-purple-500 text-white">Premium</Badge>;
-                          if (u.subscription_tier === 'basic') return <Badge className="bg-blue-500 text-white">Basic</Badge>;
-                          if (isInTrial) return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700">Essai</Badge>;
-                          return <Badge variant="outline">Gratuit</Badge>;
-                        };
+                        const isUserAdmin = adminUserIds.has(u.user_id);
 
                         return (
-                          <tr key={u.id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""}`}>
+                          <tr key={u.id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""} ${isUserAdmin ? "bg-primary/5" : ""}`}>
                             <td className="py-3 px-2">
-                              {u.first_name} {u.last_name}
+                              <div className="flex flex-col">
+                                <span>{u.first_name} {u.last_name}</span>
+                                {u.pseudo && <span className="text-xs text-muted-foreground">{u.pseudo}</span>}
+                              </div>
                             </td>
                             <td className="py-3 px-2 text-sm text-muted-foreground">
-                              {u.email}
-                            </td>
-                            <td className="py-3 px-2 text-sm">
-                              {u.pseudo || "-"}
+                              <div className="flex items-center gap-2">
+                                {u.email}
+                                {u.stripe_customer_id && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <CreditCard className="w-3 h-3 mr-1" />
+                                    Stripe
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-2">
-                              <div className="flex flex-col gap-1">
+                              {isUserAdmin ? (
+                                <Badge className="bg-primary text-primary-foreground">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  Illimité
+                                </Badge>
+                              ) : (
                                 <Select
                                   value={u.subscription_tier || "free"}
                                   onValueChange={(value: "free" | "basic" | "premium") => 
@@ -974,21 +1005,30 @@ export default function Admin() {
                                     <SelectItem value="premium">Premium</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                {u.subscription_end_date && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Fin: {new Date(u.subscription_end_date).toLocaleDateString("fr-FR")}
-                                  </span>
-                                )}
-                              </div>
+                              )}
                             </td>
-                            <td className="py-3 px-2 text-sm">
-                              {u.stripe_customer_id ? (
-                                <Badge variant="outline" className="text-xs">
-                                  <CreditCard className="w-3 h-3 mr-1" />
-                                  Lié
-                                </Badge>
+                            <td className="py-3 px-2">
+                              {isUserAdmin ? (
+                                <span className="text-xs text-muted-foreground">-</span>
                               ) : (
-                                <span className="text-muted-foreground">-</span>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="date"
+                                    className="w-[140px] h-8 text-sm"
+                                    value={u.subscription_end_date ? new Date(u.subscription_end_date).toISOString().split('T')[0] : ""}
+                                    onChange={(e) => updateSubscriptionEndDate(u.user_id, e.target.value || null)}
+                                  />
+                                  {u.subscription_end_date && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => updateSubscriptionEndDate(u.user_id, null)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </td>
                             <td className="py-3 px-2">
