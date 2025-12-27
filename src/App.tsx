@@ -22,6 +22,7 @@ import Exercices from "./pages/Exercices";
 import Videos from "./pages/Videos";
 import Admin from "./pages/Admin";
 import PatientSessionView from "./pages/PatientSessionView";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/videos" element={<Videos />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/patient-session" element={<PatientSessionView />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
