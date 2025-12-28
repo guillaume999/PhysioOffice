@@ -179,6 +179,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          video_id: string | null
           video_url: string | null
         }
         Insert: {
@@ -197,6 +198,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          video_id?: string | null
           video_url?: string | null
         }
         Update: {
@@ -215,6 +217,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          video_id?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -223,6 +226,13 @@ export type Database = {
             columns: ["original_id"]
             isOneToOne: false
             referencedRelation: "exercices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercices_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
             referencedColumns: ["id"]
           },
         ]
@@ -1150,6 +1160,39 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string
         }
         Relationships: []
       }
