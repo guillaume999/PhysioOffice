@@ -223,35 +223,53 @@ export default function Videos() {
     const fileExt = file.name.split(".").pop();
     const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const { data: signed, error: signError } = await supabase.storage
-      .from("videos")
-      .createSignedUploadUrl(objectName, { upsert: false });
+    const toAbsoluteSignedUrl = (raw: string) =>
+      raw.startsWith("http")
+        ? raw
+        : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${raw.startsWith("/") ? "" : "/"}${raw}`;
 
-    if (signError) throw signError;
+    const putFile = async (uploadUrl: string) => {
+      const res = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
 
-    // Avoid Supabase client headers (authorization/apikey) on the PUT request.
-    // Some mobile networks/proxies block these cross-origin PUTs and the browser reports "Failed to fetch".
-    const rawSignedUrl = signed.signedUrl;
-    const uploadUrl = rawSignedUrl.startsWith("http")
-      ? rawSignedUrl
-      : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${rawSignedUrl.startsWith("/") ? "" : "/"}${rawSignedUrl}`;
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+      }
+    };
 
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type || "application/octet-stream",
-        "x-upsert": "false",
-      },
-      body: file,
-    });
+    // Retry a couple times because mobile networks/proxies sometimes drop large PUT uploads.
+    const retryDelaysMs = [0, 1500, 3500];
+    let lastError: unknown = null;
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+    for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
+      if (retryDelaysMs[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
+      }
+
+      const { data: signed, error: signError } = await supabase.storage
+        .from("videos")
+        .createSignedUploadUrl(objectName, { upsert: true });
+
+      if (signError) throw signError;
+
+      const uploadUrl = toAbsoluteSignedUrl(signed.signedUrl);
+
+      try {
+        await putFile(uploadUrl);
+        const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
+        return { publicUrl: data.publicUrl, objectName };
+      } catch (e) {
+        lastError = e;
+      }
     }
 
-    const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
-    return { publicUrl: data.publicUrl, objectName };
+    throw lastError instanceof Error ? lastError : new Error("Upload failed");
   };
 
   const handleReplaceVideo = async (file: File) => {
