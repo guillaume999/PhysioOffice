@@ -234,7 +234,7 @@ export default function Exercices() {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         metadata: {
-          bucketName: "videos",
+          bucketName: "exercice-videos",
           objectName,
           contentType: videoFile.type || "application/octet-stream",
           cacheControl: "3600",
@@ -246,7 +246,7 @@ export default function Exercices() {
       upload.start();
     });
 
-    const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
+    const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
     return { publicUrl: data.publicUrl, objectName };
   };
 
@@ -275,27 +275,10 @@ export default function Exercices() {
 
       // Upload video if file selected (from phone)
       if (formData.videoFile) {
-        if (!formData.video_title.trim()) {
-          toast.error("Le titre de la vidéo est requis");
-          return;
-        }
-
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-
-        const { data: createdVideo, error: videoError } = await supabase
-          .from("videos")
-          .insert({
-            user_id: user.id,
-            title: formData.video_title.trim(),
-            video_url: videoUrl,
-          })
-          .select("id")
-          .single();
-
-        if (videoError) throw videoError;
-        videoId = createdVideo?.id ?? null;
+        videoId = null;
       }
 
       const { error } = await supabase
@@ -351,27 +334,10 @@ export default function Exercices() {
 
       // Upload video if new file selected (from phone)
       if (formData.videoFile) {
-        if (!formData.video_title.trim()) {
-          toast.error("Le titre de la vidéo est requis");
-          return;
-        }
-
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-
-        const { data: createdVideo, error: videoError } = await supabase
-          .from("videos")
-          .insert({
-            user_id: user.id,
-            title: formData.video_title.trim(),
-            video_url: videoUrl,
-          })
-          .select("id")
-          .single();
-
-        if (videoError) throw videoError;
-        videoId = createdVideo?.id ?? null;
+        videoId = null;
       }
 
       const { error } = await supabase
@@ -1138,12 +1104,6 @@ function ExerciceThumbnail({
   );
 }
 
-interface VideoLibraryItem {
-  id: string;
-  title: string;
-  video_url: string;
-  thumbnail_url: string | null;
-}
 
 interface ExerciceFormProps {
   formData: {
@@ -1176,51 +1136,9 @@ interface ExerciceFormProps {
 }
 
 function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel, isUploading }: ExerciceFormProps) {
-  const { user } = useAuth();
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
-  const [videoLibraryOpen, setVideoLibraryOpen] = useState(false);
-  const [videoLibrary, setVideoLibrary] = useState<VideoLibraryItem[]>([]);
-  const [loadingLibrary, setLoadingLibrary] = useState(false);
-
-  const fetchVideoLibrary = async () => {
-    if (!user) return;
-    setLoadingLibrary(true);
-    try {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("id, title, video_url, thumbnail_url")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      setVideoLibrary(data || []);
-    } catch (error) {
-      console.error("Error fetching video library:", error);
-    } finally {
-      setLoadingLibrary(false);
-    }
-  };
-
-  const handleSelectFromLibrary = (video: VideoLibraryItem) => {
-    setFormData({
-      ...formData,
-      video_id: video.id,
-      video_title: video.title,
-      video_url: video.video_url,
-      thumbnail_url: video.thumbnail_url || "",
-      videoFile: null
-    });
-    setVideoPreview(null);
-    setThumbnailPreview(null);
-    setVideoLibraryOpen(false);
-  };
-
-  const openVideoLibrary = () => {
-    fetchVideoLibrary();
-    setVideoLibraryOpen(true);
-  };
 
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1381,21 +1299,11 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={openVideoLibrary}
-                className="flex-1"
-              >
-                <Video className="w-4 h-4 mr-2" />
-                Bibliothèque
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => videoInputRef.current?.click()}
                 className="flex-1"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Téléphone
+                Changer la vidéo
               </Button>
               <Button
                 type="button"
@@ -1407,105 +1315,24 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
                 <X className="w-4 h-4" />
               </Button>
             </div>
-
-            {formData.videoFile && (
-              <div className="space-y-2">
-                <Label htmlFor="video-title">Titre de la vidéo *</Label>
-                <Input
-                  id="video-title"
-                  value={formData.video_title}
-                  onChange={(e) => setFormData({ ...formData, video_title: e.target.value })}
-                  placeholder="Titre de la vidéo"
-                />
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={openVideoLibrary}
-                className="flex-1"
-              >
-                <Video className="w-4 h-4 mr-2" />
-                Choisir dans ma vidéothèque
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => videoInputRef.current?.click()}
-                className="flex-1"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Importer du téléphone
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => videoInputRef.current?.click()}
+              className="w-full"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importer une vidéo
+            </Button>
             <p className="text-xs text-muted-foreground text-center">
               MP4, WebM, MOV (max. 50 Mo)
             </p>
           </div>
         )}
       </div>
-
-      {/* Video Library Dialog */}
-      <Dialog open={videoLibraryOpen} onOpenChange={setVideoLibraryOpen}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Choisir une vidéo</DialogTitle>
-            <DialogDescription>Sélectionnez une vidéo de votre vidéothèque pour l’associer à cet exercice.</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
-            {loadingLibrary ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : videoLibrary.length === 0 ? (
-              <div className="text-center py-12">
-                <Video className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Aucune vidéo dans votre bibliothèque
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Importez des vidéos dans la section Vidéothèque
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
-                {videoLibrary.map((video) => (
-                  <button
-                    key={video.id}
-                    type="button"
-                    onClick={() => handleSelectFromLibrary(video)}
-                    className="group relative aspect-video rounded-lg overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
-                  >
-                    {video.thumbnail_url ? (
-                      <img 
-                        src={video.thumbnail_url} 
-                        alt={video.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={video.video_url}
-                        className="w-full h-full object-cover"
-                        muted
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Check className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                      <p className="text-white text-xs truncate">{video.title}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Button 
         onClick={onSubmit} 
