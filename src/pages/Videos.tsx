@@ -81,6 +81,91 @@ export default function Videos() {
     }
   };
 
+  const generateThumbnailFromFile = (videoFile: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      
+      const cleanup = () => {
+        URL.revokeObjectURL(video.src);
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 10000);
+
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(1, video.duration * 0.1);
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 320;
+          canvas.height = video.videoHeight || 180;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            clearTimeout(timeout);
+            cleanup();
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          clearTimeout(timeout);
+          cleanup();
+          resolve(dataUrl);
+        } catch {
+          clearTimeout(timeout);
+          cleanup();
+          resolve(null);
+        }
+      };
+
+      video.onerror = () => {
+        clearTimeout(timeout);
+        cleanup();
+        resolve(null);
+      };
+
+      video.src = URL.createObjectURL(videoFile);
+    });
+  };
+
+  const uploadThumbnailToStorage = async (thumbnailDataUrl: string): Promise<string | null> => {
+    if (!user) return null;
+    
+    try {
+      // Convert data URL to blob
+      const response = await fetch(thumbnailDataUrl);
+      const blob = await response.blob();
+      
+      const objectName = `${user.id}/thumbnails/${Date.now()}.jpg`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("exercice-videos")
+        .upload(objectName, blob, {
+          cacheControl: "3600",
+          contentType: "image/jpeg",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Thumbnail upload error:", uploadError);
+        return null;
+      }
+
+      const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
+      return data.publicUrl;
+    } catch (error) {
+      console.error("Error uploading thumbnail:", error);
+      return null;
+    }
+  };
+
   const uploadVideoToStorage = async (videoFile: File): Promise<string> => {
     if (!user) throw new Error("Not authenticated");
 
@@ -131,7 +216,17 @@ export default function Videos() {
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      setUploadProgress(30);
+      // Generate thumbnail first
+      setUploadProgress(10);
+      const thumbnailDataUrl = await generateThumbnailFromFile(formVideoFile);
+      let thumbnailUrl: string | null = null;
+      
+      if (thumbnailDataUrl) {
+        setUploadProgress(20);
+        thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+      }
+
+      setUploadProgress(40);
       const videoUrl = await uploadVideoToStorage(formVideoFile);
       setUploadProgress(80);
 
@@ -141,6 +236,7 @@ export default function Videos() {
           user_id: user.id,
           title: formTitle.trim(),
           video_url: videoUrl,
+          thumbnail_url: thumbnailUrl,
         });
 
       if (error) throw error;
@@ -171,9 +267,19 @@ export default function Videos() {
     setUploadProgress(0);
     try {
       let videoUrl = selectedVideo.video_url;
+      let thumbnailUrl = selectedVideo.thumbnail_url;
 
       if (formVideoFile) {
-        setUploadProgress(30);
+        // Generate new thumbnail
+        setUploadProgress(10);
+        const thumbnailDataUrl = await generateThumbnailFromFile(formVideoFile);
+        
+        if (thumbnailDataUrl) {
+          setUploadProgress(20);
+          thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+        }
+
+        setUploadProgress(40);
         videoUrl = await uploadVideoToStorage(formVideoFile);
         setUploadProgress(80);
       }
@@ -183,6 +289,7 @@ export default function Videos() {
         .update({
           title: formTitle.trim(),
           video_url: videoUrl,
+          thumbnail_url: thumbnailUrl,
         })
         .eq("id", selectedVideo.id);
 
