@@ -195,71 +195,18 @@ export default function Exercices() {
     }
   };
 
-  const uploadVideoAndThumbnail = async (videoFile: File): Promise<{ videoUrl: string; thumbnailUrl: string }> => {
-    const fileExt = videoFile.name.split('.').pop();
+  const uploadVideoToStorage = async (videoFile: File): Promise<string> => {
+    const fileExt = videoFile.name.split(".").pop();
     const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
-    
-    // Upload video
-    const { data: videoData, error: videoError } = await supabase.storage
-      .from('videos')
+
+    const { error: uploadError } = await supabase.storage
+      .from("videos")
       .upload(fileName, videoFile);
-    
-    if (videoError) throw videoError;
-    
-    const { data: { publicUrl: videoUrl } } = supabase.storage
-      .from('videos')
-      .getPublicUrl(fileName);
 
-    // Generate and upload thumbnail
-    const thumbnailBlob = await generateThumbnailBlob(videoFile);
-    const thumbnailFileName = `${user!.id}/${Date.now()}_thumb.jpg`;
-    
-    const { error: thumbError } = await supabase.storage
-      .from('videos')
-      .upload(thumbnailFileName, thumbnailBlob);
-    
-    if (thumbError) throw thumbError;
-    
-    const { data: { publicUrl: thumbnailUrl } } = supabase.storage
-      .from('videos')
-      .getPublicUrl(thumbnailFileName);
+    if (uploadError) throw uploadError;
 
-    return { videoUrl, thumbnailUrl };
-  };
-
-  const generateThumbnailBlob = (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.src = URL.createObjectURL(file);
-      
-      video.onloadeddata = () => {
-        video.currentTime = Math.min(1, video.duration * 0.1);
-      };
-
-      video.onseeked = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob(
-            (blob) => {
-              URL.revokeObjectURL(video.src);
-              if (blob) resolve(blob);
-              else reject(new Error("Failed to generate thumbnail"));
-            },
-            'image/jpeg',
-            0.8
-          );
-        } else {
-          reject(new Error("Failed to get canvas context"));
-        }
-      };
-
-      video.onerror = () => reject(new Error("Failed to load video"));
-    });
+    const { data } = supabase.storage.from("videos").getPublicUrl(fileName);
+    return data.publicUrl;
   };
 
   const handleSubmit = async () => {
@@ -286,9 +233,8 @@ export default function Exercices() {
 
       // Upload video if file selected
       if (formData.videoFile) {
-        const uploaded = await uploadVideoAndThumbnail(formData.videoFile);
-        videoUrl = uploaded.videoUrl;
-        thumbnailUrl = uploaded.thumbnailUrl;
+        videoUrl = await uploadVideoToStorage(formData.videoFile);
+        thumbnailUrl = "";
       }
 
       const { error } = await supabase
@@ -342,9 +288,8 @@ export default function Exercices() {
 
       // Upload video if new file selected
       if (formData.videoFile) {
-        const uploaded = await uploadVideoAndThumbnail(formData.videoFile);
-        videoUrl = uploaded.videoUrl;
-        thumbnailUrl = uploaded.thumbnailUrl;
+        videoUrl = await uploadVideoToStorage(formData.videoFile);
+        thumbnailUrl = "";
       }
 
       const { error } = await supabase
