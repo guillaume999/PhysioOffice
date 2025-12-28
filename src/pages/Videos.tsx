@@ -217,34 +217,24 @@ export default function Videos() {
     }
   };
 
-  const uploadVideoViaSignedUrl = async (file: File): Promise<{ publicUrl: string; objectName: string }> => {
+  const uploadVideoToStorage = async (
+    file: File
+  ): Promise<{ publicUrl: string; objectName: string }> => {
     if (!user) throw new Error("Not authenticated");
 
-    const fileExt = file.name.split(".").pop();
+    const fileExt = file.name.split(".").pop() || "mp4";
     const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const toAbsoluteSignedUrl = (raw: string) =>
-      raw.startsWith("http")
-        ? raw
-        : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${raw.startsWith("/") ? "" : "/"}${raw}`;
-
-    const putFile = async (uploadUrl: string) => {
-      const res = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-        body: file,
+    const doUpload = async () => {
+      const { error } = await supabase.storage.from("videos").upload(objectName, file, {
+        upsert: true,
+        contentType: file.type || "application/octet-stream",
       });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
-      }
+      if (error) throw error;
     };
 
-    // Retry a couple times because mobile networks/proxies sometimes drop large PUT uploads.
-    const retryDelaysMs = [0, 1500, 3500];
+    // Retry once: some mobile networks intermittently fail large uploads.
+    const retryDelaysMs = [0, 1500];
     let lastError: unknown = null;
 
     for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
@@ -252,16 +242,8 @@ export default function Videos() {
         await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
       }
 
-      const { data: signed, error: signError } = await supabase.storage
-        .from("videos")
-        .createSignedUploadUrl(objectName, { upsert: true });
-
-      if (signError) throw signError;
-
-      const uploadUrl = toAbsoluteSignedUrl(signed.signedUrl);
-
       try {
-        await putFile(uploadUrl);
+        await doUpload();
         const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
         return { publicUrl: data.publicUrl, objectName };
       } catch (e) {
@@ -289,8 +271,8 @@ export default function Videos() {
     try {
       const oldVideoUrl = replaceVideoDialog.video.video_url;
 
-      // Upload new video (signed URL)
-      const uploaded = await uploadVideoViaSignedUrl(file);
+      // Upload new video
+      const uploaded = await uploadVideoToStorage(file);
       const newVideoUrl = uploaded.publicUrl;
 
       // Update the video record
@@ -357,8 +339,8 @@ export default function Videos() {
 
     setUploading(true);
     try {
-      // Upload (signed URL)
-      const uploaded = await uploadVideoViaSignedUrl(selectedImportFile);
+      // Upload
+      const uploaded = await uploadVideoToStorage(selectedImportFile);
       const videoUrl = uploaded.publicUrl;
 
       const title = importTitle.trim();
