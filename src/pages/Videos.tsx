@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useAdmin } from "@/hooks/useAdmin";
-import * as tus from "tus-js-client";
+
 
 const MAX_VIDEO_SIZE_MB = 150;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
@@ -217,41 +217,24 @@ export default function Videos() {
     }
   };
 
-  const uploadVideoWithTus = async (file: File): Promise<{ publicUrl: string; objectName: string }> => {
+  const uploadVideoViaSignedUrl = async (file: File): Promise<{ publicUrl: string; objectName: string }> => {
     const fileExt = file.name.split(".").pop();
     const objectName = `${user!.id}/${Date.now()}.${fileExt}`;
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) throw new Error("Not authenticated");
+    const { data: signed, error: signError } = await supabase.storage
+      .from("videos")
+      .createSignedUploadUrl(objectName, { upsert: false });
 
-    const tusEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
+    if (signError) throw signError;
 
-    await new Promise<void>((resolve, reject) => {
-      const upload = new tus.Upload(file, {
-        endpoint: tusEndpoint,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        chunkSize: 2 * 1024 * 1024,
-        removeFingerprintOnSuccess: true,
-        uploadDataDuringCreation: false,
-        overridePatchMethod: true,
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        metadata: {
-          bucketName: "videos",
-          objectName,
-          contentType: file.type || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        onError: (err) => reject(err),
-        onSuccess: () => resolve(),
+    const { error: uploadError } = await supabase.storage
+      .from("videos")
+      .uploadToSignedUrl(objectName, signed.token, file, {
+        contentType: file.type || "application/octet-stream",
+        cacheControl: "3600",
       });
 
-      upload.start();
-    });
+    if (uploadError) throw uploadError;
 
     const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
     return { publicUrl: data.publicUrl, objectName };
@@ -274,8 +257,8 @@ export default function Videos() {
     try {
       const oldVideoUrl = replaceVideoDialog.video.video_url;
 
-      // Upload new video with TUS (resumable upload)
-      const uploaded = await uploadVideoWithTus(file);
+      // Upload new video (signed URL)
+      const uploaded = await uploadVideoViaSignedUrl(file);
       const newVideoUrl = uploaded.publicUrl;
 
       // Update the video record
@@ -342,8 +325,8 @@ export default function Videos() {
 
     setUploading(true);
     try {
-      // Upload with TUS (resumable upload)
-      const uploaded = await uploadVideoWithTus(selectedImportFile);
+      // Upload (signed URL)
+      const uploaded = await uploadVideoViaSignedUrl(selectedImportFile);
       const videoUrl = uploaded.publicUrl;
 
       const title = importTitle.trim();
