@@ -372,13 +372,20 @@ export default function Videos() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette vidéo ?")) return;
 
     try {
-      // Extract object path from URL
+      // First, remove the video reference from all exercices using it
+      await supabase
+        .from("exercices")
+        .update({ video_id: null, video_url: null, thumbnail_url: null })
+        .eq("video_id", video.id);
+
+      // Extract object path from URL and delete from storage
       const urlParts = video.video_url.split("/exercice-videos/");
       if (urlParts.length > 1) {
         const objectPath = urlParts[1];
         await supabase.storage.from("exercice-videos").remove([objectPath]);
       }
 
+      // Delete the video record
       const { error } = await supabase
         .from("videos")
         .delete()
