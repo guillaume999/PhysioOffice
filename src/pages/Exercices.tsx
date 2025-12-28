@@ -9,12 +9,20 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import * as tus from "tus-js-client";
+
+interface VideoLibraryItem {
+  id: string;
+  title: string;
+  video_url: string;
+  thumbnail_url: string | null;
+}
 
 interface Exercice {
   id: string;
@@ -715,6 +723,7 @@ export default function Exercices() {
                   onSubmit={handleSubmit}
                   submitLabel="Créer"
                   isUploading={isUploading}
+                  userId={user.id}
                 />
               </DialogContent>
             </Dialog>
@@ -950,6 +959,7 @@ export default function Exercices() {
             onSubmit={handleUpdate}
             submitLabel="Enregistrer"
             isUploading={isUploading}
+            userId={user.id}
           />
         </DialogContent>
       </Dialog>
@@ -1133,12 +1143,60 @@ interface ExerciceFormProps {
   onSubmit: () => void;
   submitLabel: string;
   isUploading?: boolean;
+  userId: string;
 }
 
-function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel, isUploading }: ExerciceFormProps) {
+function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel, isUploading, userId }: ExerciceFormProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
+  const [libraryVideos, setLibraryVideos] = useState<VideoLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+
+  const fetchLibraryVideos = async () => {
+    setLibraryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, title, video_url, thumbnail_url")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setLibraryVideos(data || []);
+    } catch (error) {
+      console.error("Error fetching library videos:", error);
+      toast.error("Erreur lors du chargement de la vidéothèque");
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const openLibraryDialog = () => {
+    fetchLibraryVideos();
+    setLibraryDialogOpen(true);
+  };
+
+  const selectLibraryVideo = (video: VideoLibraryItem) => {
+    setFormData({
+      ...formData,
+      videoFile: null,
+      video_url: video.video_url,
+      thumbnail_url: video.thumbnail_url || "",
+      video_id: video.id,
+      video_title: video.title
+    });
+    setVideoPreview(null);
+    setThumbnailPreview(null);
+    setLibraryDialogOpen(false);
+    toast.success(`Vidéo "${video.title}" sélectionnée`);
+  };
+
+  const filteredLibraryVideos = librarySearch.trim()
+    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    : libraryVideos;
 
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1303,7 +1361,17 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
                 className="flex-1"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Changer la vidéo
+                Importer
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openLibraryDialog}
+                className="flex-1"
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Vidéothèque
               </Button>
               <Button
                 type="button"
@@ -1318,17 +1386,28 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
           </div>
         ) : (
           <div className="space-y-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => videoInputRef.current?.click()}
-              className="w-full"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Importer une vidéo
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex-1"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Importer une vidéo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openLibraryDialog}
+                className="flex-1"
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Vidéothèque
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground text-center">
-              MP4, WebM, MOV (max. 50 Mo)
+              MP4, WebM, MOV (max. 50 Mo) ou sélectionnez depuis votre vidéothèque
             </p>
           </div>
         )}
@@ -1348,6 +1427,74 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
           submitLabel
         )}
       </Button>
+
+      {/* Video Library Dialog */}
+      <Dialog open={libraryDialogOpen} onOpenChange={setLibraryDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Choisir depuis la vidéothèque</DialogTitle>
+            <DialogDescription>
+              Sélectionnez une vidéo de votre vidéothèque
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une vidéo..."
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <ScrollArea className="h-[400px]">
+              {libraryLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredLibraryVideos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <Video className="w-8 h-8 mb-2" />
+                  <p className="text-sm">
+                    {librarySearch ? "Aucune vidéo trouvée" : "Aucune vidéo dans votre vidéothèque"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredLibraryVideos.map((video) => (
+                    <button
+                      key={video.id}
+                      type="button"
+                      onClick={() => selectLibraryVideo(video)}
+                      className="flex flex-col gap-2 p-2 rounded-lg border hover:bg-muted/50 transition-colors text-left group"
+                    >
+                      <div className="relative aspect-video rounded overflow-hidden bg-muted">
+                        {video.thumbnail_url ? (
+                          <img 
+                            src={video.thumbnail_url} 
+                            alt={video.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Play className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Check className="w-8 h-8 text-primary" />
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium line-clamp-2">{video.title}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
