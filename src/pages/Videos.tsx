@@ -45,8 +45,6 @@ export default function Videos() {
   const [editDialog, setEditDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null }>({ open: false, video: null });
   const [uploading, setUploading] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importTitle, setImportTitle] = useState("");
-  const [importDescription, setImportDescription] = useState("");
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -304,14 +302,11 @@ export default function Videos() {
         return;
       }
       setSelectedImportFile(file);
-      if (!importTitle) {
-        setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
-      }
     }
   };
 
   const handleImportVideo = async () => {
-    if (!selectedImportFile || !user || !importTitle.trim()) return;
+    if (!selectedImportFile || !user) return;
 
     setUploading(true);
     try {
@@ -330,13 +325,15 @@ export default function Videos() {
 
       const videoUrl = urlData.publicUrl;
 
+      // Use file name as title (without extension)
+      const title = selectedImportFile.name.replace(/\.[^/.]+$/, "");
+
       // Create exercice with the video
       const { error: insertError } = await supabase
         .from("exercices")
         .insert({
           user_id: user.id,
-          title: importTitle.trim(),
-          description: importDescription.trim() || null,
+          title: title,
           video_url: videoUrl,
           status: "validated",
         });
@@ -349,8 +346,6 @@ export default function Videos() {
       });
 
       setImportDialogOpen(false);
-      setImportTitle("");
-      setImportDescription("");
       setSelectedImportFile(null);
       fetchVideos();
     } catch (error) {
@@ -615,8 +610,6 @@ export default function Videos() {
         <Dialog open={importDialogOpen} onOpenChange={(open) => {
           if (!open) {
             setImportDialogOpen(false);
-            setImportTitle("");
-            setImportDescription("");
             setSelectedImportFile(null);
           }
         }}>
@@ -627,7 +620,8 @@ export default function Videos() {
                 Importer une vidéo
               </DialogTitle>
               <DialogDescription>
-                Ajoutez une nouvelle vidéo à votre bibliothèque. Un exercice sera créé automatiquement.
+                Ajoutez une nouvelle vidéo à votre bibliothèque.
+                {!isAdmin && ` Taille max: ${MAX_VIDEO_SIZE_MB} Mo.`}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -660,26 +654,6 @@ export default function Videos() {
                   </div>
                 )}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="import-title">Titre de l'exercice *</Label>
-                <Input
-                  id="import-title"
-                  value={importTitle}
-                  onChange={(e) => setImportTitle(e.target.value)}
-                  placeholder="Ex: Étirement quadriceps"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="import-description">Description (optionnel)</Label>
-                <Input
-                  id="import-description"
-                  value={importDescription}
-                  onChange={(e) => setImportDescription(e.target.value)}
-                  placeholder="Description de l'exercice..."
-                />
-              </div>
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button 
@@ -692,7 +666,7 @@ export default function Videos() {
               </Button>
               <Button 
                 onClick={handleImportVideo} 
-                disabled={uploading || !selectedImportFile || !importTitle.trim()}
+                disabled={uploading || !selectedImportFile}
                 className="w-full sm:w-auto"
               >
                 {uploading ? (
