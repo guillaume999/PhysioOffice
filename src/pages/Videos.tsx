@@ -573,12 +573,24 @@ export default function Videos() {
                     {filteredVideos.map((video) => (
                       <TableRow key={video.id}>
                         <TableCell>
-                          <div 
-                            className="w-16 h-12 bg-muted rounded flex items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors"
+                          <button 
+                            type="button"
+                            className="w-20 h-14 bg-muted rounded overflow-hidden flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative group"
                             onClick={() => openVideoPlayer(video)}
                           >
-                            <Play className="h-6 w-6 text-muted-foreground" />
-                          </div>
+                            {video.thumbnail_url ? (
+                              <img 
+                                src={video.thumbnail_url} 
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Play className="h-6 w-6 text-muted-foreground" />
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Play className="h-6 w-6 text-white" />
+                            </div>
+                          </button>
                         </TableCell>
                         <TableCell className="font-medium">{video.title}</TableCell>
                         <TableCell>
