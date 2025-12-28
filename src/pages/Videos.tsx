@@ -232,9 +232,9 @@ export default function Videos() {
       const upload = new tus.Upload(file, {
         endpoint: tusEndpoint,
         retryDelays: [0, 3000, 5000, 10000, 20000],
-        chunkSize: 6 * 1024 * 1024,
+        chunkSize: 2 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
-        uploadDataDuringCreation: true,
+        uploadDataDuringCreation: false,
         headers: {
           authorization: `Bearer ${accessToken}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
