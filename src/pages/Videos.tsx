@@ -135,6 +135,52 @@ export default function Videos() {
     });
   };
 
+  const generateThumbnailFromUrl = (videoUrl: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = 'anonymous';
+      
+      const timeout = setTimeout(() => {
+        resolve(null);
+      }, 15000);
+
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(1, video.duration * 0.1);
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 320;
+          canvas.height = video.videoHeight || 180;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            clearTimeout(timeout);
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          clearTimeout(timeout);
+          resolve(dataUrl);
+        } catch {
+          clearTimeout(timeout);
+          resolve(null);
+        }
+      };
+
+      video.onerror = () => {
+        clearTimeout(timeout);
+        resolve(null);
+      };
+
+      video.src = videoUrl;
+    });
+  };
+
   const uploadThumbnailToStorage = async (thumbnailDataUrl: string): Promise<string | null> => {
     if (!user) return null;
     
@@ -270,7 +316,7 @@ export default function Videos() {
       let thumbnailUrl = selectedVideo.thumbnail_url;
 
       if (formVideoFile) {
-        // Generate new thumbnail
+        // Generate new thumbnail from new file
         setUploadProgress(10);
         const thumbnailDataUrl = await generateThumbnailFromFile(formVideoFile);
         
@@ -281,6 +327,17 @@ export default function Videos() {
 
         setUploadProgress(40);
         videoUrl = await uploadVideoToStorage(formVideoFile);
+        setUploadProgress(80);
+      } else if (!thumbnailUrl && videoUrl) {
+        // Generate thumbnail from existing video URL if missing
+        setUploadProgress(20);
+        toast.info("Génération de la vignette...");
+        const thumbnailDataUrl = await generateThumbnailFromUrl(videoUrl);
+        
+        if (thumbnailDataUrl) {
+          setUploadProgress(50);
+          thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+        }
         setUploadProgress(80);
       }
 
@@ -296,7 +353,9 @@ export default function Videos() {
       if (error) throw error;
 
       setUploadProgress(100);
-      toast.success("Vidéo modifiée avec succès");
+      toast.success(thumbnailUrl && !selectedVideo.thumbnail_url 
+        ? "Vidéo modifiée et vignette générée" 
+        : "Vidéo modifiée avec succès");
       setEditDialogOpen(false);
       resetForm();
       fetchVideos();
