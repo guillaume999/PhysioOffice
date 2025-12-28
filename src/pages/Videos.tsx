@@ -10,6 +10,10 @@ import { Video, Search, Play, X, MoreVertical, Pencil, Trash2, FileVideo, Dumbbe
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useAdmin } from "@/hooks/useAdmin";
+
+const MAX_VIDEO_SIZE_MB = 150;
+const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 
 interface ExerciceWithVideo {
   id: string;
@@ -29,6 +33,7 @@ type DeleteMode = 'video-only' | 'video-and-exercises' | 'video-and-seances';
 export default function Videos() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin } = useAdmin();
   const [videos, setVideos] = useState<ExerciceWithVideo[]>([]);
   const [filteredVideos, setFilteredVideos] = useState<ExerciceWithVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,6 +219,16 @@ export default function Videos() {
   const handleReplaceVideo = async (file: File) => {
     if (!editDialog.video || !user) return;
 
+    // Check file size for non-admins
+    if (!isAdmin && file.size > MAX_VIDEO_SIZE_BYTES) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: `La taille maximale autorisée est de ${MAX_VIDEO_SIZE_MB} Mo. Votre fichier fait ${formatFileSize(file.size)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     try {
       const oldVideoUrl = editDialog.video.video_url;
@@ -278,6 +293,16 @@ export default function Videos() {
   const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file size for non-admins
+      if (!isAdmin && file.size > MAX_VIDEO_SIZE_BYTES) {
+        toast({
+          title: "Fichier trop volumineux",
+          description: `La taille maximale autorisée est de ${MAX_VIDEO_SIZE_MB} Mo. Votre fichier fait ${formatFileSize(file.size)}.`,
+          variant: "destructive",
+        });
+        e.target.value = "";
+        return;
+      }
       setSelectedImportFile(file);
       if (!importTitle) {
         setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
