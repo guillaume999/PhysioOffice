@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
-import * as tus from "tus-js-client";
 
 interface VideoLibraryItem {
   id: string;
@@ -207,6 +206,8 @@ export default function Exercices() {
   };
 
   const uploadVideoToStorage = async (videoFile: File): Promise<{ publicUrl: string; objectName: string }> => {
+    if (!user) throw new Error("Not authenticated");
+
     // Normalize extension: take from file name or fallback to mime type
     let fileExt = videoFile.name.split(".").pop()?.toLowerCase();
     if (!fileExt || fileExt === videoFile.name.toLowerCase()) {
@@ -220,39 +221,20 @@ export default function Exercices() {
       };
       fileExt = mimeMap[videoFile.type] || "mp4";
     }
-    const objectName = `${user!.id}/${Date.now()}.${fileExt}`;
+    const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) throw new Error("Not authenticated");
-
-    const tusEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
-
-    await new Promise<void>((resolve, reject) => {
-      const upload = new tus.Upload(videoFile, {
-        endpoint: tusEndpoint,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        chunkSize: 2 * 1024 * 1024,
-        removeFingerprintOnSuccess: true,
-        uploadDataDuringCreation: false,
-        overridePatchMethod: true,
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        metadata: {
-          bucketName: "exercice-videos",
-          objectName,
-          contentType: videoFile.type || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        onError: (err) => reject(err),
-        onSuccess: () => resolve(),
+    // Use standard upload instead of TUS for reliability
+    const { error: uploadError } = await supabase.storage
+      .from("exercice-videos")
+      .upload(objectName, videoFile, {
+        cacheControl: "3600",
+        upsert: false,
       });
 
-      upload.start();
-    });
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      throw uploadError;
+    }
 
     const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
     return { publicUrl: data.publicUrl, objectName };
