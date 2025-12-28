@@ -228,13 +228,6 @@ export type Database = {
             referencedRelation: "exercices"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "exercices_video_id_fkey"
-            columns: ["video_id"]
-            isOneToOne: false
-            referencedRelation: "videos"
-            referencedColumns: ["id"]
-          },
         ]
       }
       featured_exercices: {
@@ -1160,39 +1153,6 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
-        }
-        Relationships: []
-      }
-      videos: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          thumbnail_url: string | null
-          title: string
-          updated_at: string
-          user_id: string
-          video_url: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          thumbnail_url?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-          video_url: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          thumbnail_url?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-          video_url?: string
         }
         Relationships: []
       }
