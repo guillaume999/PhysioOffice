@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useAdmin } from "@/hooks/useAdmin";
+import * as tus from "tus-js-client";
 
 const MAX_VIDEO_SIZE_MB = 150;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
@@ -216,6 +217,43 @@ export default function Videos() {
     }
   };
 
+  const uploadVideoWithTus = async (file: File): Promise<{ publicUrl: string; objectName: string }> => {
+    const fileExt = file.name.split(".").pop();
+    const objectName = `${user!.id}/${Date.now()}.${fileExt}`;
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error("Not authenticated");
+
+    await new Promise<void>((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.storage.supabase.co/storage/v1/upload/resumable`,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        chunkSize: 6 * 1024 * 1024,
+        removeFingerprintOnSuccess: true,
+        uploadDataDuringCreation: true,
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        metadata: {
+          bucketName: "videos",
+          objectName,
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+        },
+        onError: (err) => reject(err),
+        onSuccess: () => resolve(),
+      });
+
+      upload.start();
+    });
+
+    const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
+    return { publicUrl: data.publicUrl, objectName };
+  };
+
   const handleReplaceVideo = async (file: File) => {
     if (!replaceVideoDialog.video || !user) return;
 
@@ -233,21 +271,9 @@ export default function Videos() {
     try {
       const oldVideoUrl = replaceVideoDialog.video.video_url;
 
-      // Upload new video
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('videos')
-        .getPublicUrl(fileName);
-
-      const newVideoUrl = urlData.publicUrl;
+      // Upload new video with TUS (resumable upload)
+      const uploaded = await uploadVideoWithTus(file);
+      const newVideoUrl = uploaded.publicUrl;
 
       // Update the video record
       const { error: updateError } = await supabase
@@ -313,20 +339,9 @@ export default function Videos() {
 
     setUploading(true);
     try {
-      const fileExt = selectedImportFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(fileName, selectedImportFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('videos')
-        .getPublicUrl(fileName);
-
-      const videoUrl = urlData.publicUrl;
+      // Upload with TUS (resumable upload)
+      const uploaded = await uploadVideoWithTus(selectedImportFile);
+      const videoUrl = uploaded.publicUrl;
 
       const title = importTitle.trim();
 
