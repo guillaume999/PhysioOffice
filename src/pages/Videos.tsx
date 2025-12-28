@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useAdmin } from "@/hooks/useAdmin";
+import * as tus from "tus-js-client";
 
 
 const MAX_VIDEO_SIZE_MB = 150;
@@ -46,6 +47,7 @@ export default function Videos() {
   const [editDescription, setEditDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   const [importTitle, setImportTitle] = useState("");
@@ -225,33 +227,46 @@ export default function Videos() {
     const fileExt = file.name.split(".").pop() || "mp4";
     const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const doUpload = async () => {
-      const { error } = await supabase.storage.from("videos").upload(objectName, file, {
-        upsert: true,
-        contentType: file.type || "application/octet-stream",
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error("Not authenticated");
+
+    const tusEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
+
+    setUploadProgress(0);
+
+    await new Promise<void>((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: tusEndpoint,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        chunkSize: 2 * 1024 * 1024,
+        removeFingerprintOnSuccess: true,
+        uploadDataDuringCreation: false,
+        overridePatchMethod: true,
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        metadata: {
+          bucketName: "videos",
+          objectName,
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+        },
+        onError: (err) => reject(err),
+        onProgress: (bytesUploaded, bytesTotal) => {
+          const pct = bytesTotal ? Math.round((bytesUploaded / bytesTotal) * 100) : 0;
+          setUploadProgress(pct);
+        },
+        onSuccess: () => resolve(),
       });
-      if (error) throw error;
-    };
 
-    // Retry once: some mobile networks intermittently fail large uploads.
-    const retryDelaysMs = [0, 1500];
-    let lastError: unknown = null;
+      upload.start();
+    });
 
-    for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
-      if (retryDelaysMs[attempt] > 0) {
-        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
-      }
-
-      try {
-        await doUpload();
-        const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
-        return { publicUrl: data.publicUrl, objectName };
-      } catch (e) {
-        lastError = e;
-      }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error("Upload failed");
+    const { data } = supabase.storage.from("videos").getPublicUrl(objectName);
+    return { publicUrl: data.publicUrl, objectName };
   };
 
   const handleReplaceVideo = async (file: File) => {
@@ -267,6 +282,7 @@ export default function Videos() {
       return;
     }
 
+    setUploadProgress(0);
     setUploading(true);
     try {
       const oldVideoUrl = replaceVideoDialog.video.video_url;
@@ -305,6 +321,7 @@ export default function Videos() {
       });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -337,6 +354,7 @@ export default function Videos() {
   const handleImportVideo = async () => {
     if (!selectedImportFile || !user || !importTitle.trim()) return;
 
+    setUploadProgress(0);
     setUploading(true);
     try {
       // Upload
@@ -374,6 +392,7 @@ export default function Videos() {
       });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -657,7 +676,7 @@ export default function Videos() {
                 {uploading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Upload en cours...
+                    Upload en cours{uploadProgress > 0 ? ` (${uploadProgress}%)` : ""}...
                   </>
                 ) : (
                   <>
@@ -745,12 +764,12 @@ export default function Videos() {
                 disabled={uploading || !selectedImportFile || !importTitle.trim()}
                 className="w-full sm:w-auto"
               >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Import en cours...
-                  </>
-                ) : (
+                 {uploading ? (
+                   <>
+                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                     Import en cours{uploadProgress > 0 ? ` (${uploadProgress}%)` : ""}...
+                   </>
+                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
                     Importer
