@@ -39,7 +39,12 @@ export default function Videos() {
   const [deleting, setDeleting] = useState(false);
   const [editDialog, setEditDialog] = useState<{ open: boolean; video: ExerciceWithVideo | null }>({ open: false, video: null });
   const [uploading, setUploading] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importTitle, setImportTitle] = useState("");
+  const [importDescription, setImportDescription] = useState("");
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -270,6 +275,71 @@ export default function Videos() {
     }
   };
 
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImportFile(file);
+      if (!importTitle) {
+        setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+    }
+  };
+
+  const handleImportVideo = async () => {
+    if (!selectedImportFile || !user || !importTitle.trim()) return;
+
+    setUploading(true);
+    try {
+      const fileExt = selectedImportFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(fileName, selectedImportFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(fileName);
+
+      const videoUrl = urlData.publicUrl;
+
+      // Create exercice with the video
+      const { error: insertError } = await supabase
+        .from("exercices")
+        .insert({
+          user_id: user.id,
+          title: importTitle.trim(),
+          description: importDescription.trim() || null,
+          video_url: videoUrl,
+          status: "validated",
+        });
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Vidéo importée",
+        description: "La vidéo a été ajoutée à votre bibliothèque",
+      });
+
+      setImportDialogOpen(false);
+      setImportTitle("");
+      setImportDescription("");
+      setSelectedImportFile(null);
+      fetchVideos();
+    } catch (error) {
+      console.error("Erreur lors de l'import:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'import de la vidéo",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!user) {
     return (
       <Layout>
@@ -298,14 +368,20 @@ export default function Videos() {
                   </CardTitle>
                 </div>
 
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher une vidéo..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher une vidéo..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setImportDialogOpen(true)} className="shrink-0">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importer une vidéo
+                  </Button>
                 </div>
               </div>
 
@@ -507,6 +583,106 @@ export default function Videos() {
                 )}
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import Video Dialog */}
+        <Dialog open={importDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setImportDialogOpen(false);
+            setImportTitle("");
+            setImportDescription("");
+            setSelectedImportFile(null);
+          }
+        }}>
+          <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="w-5 h-5" />
+                Importer une vidéo
+              </DialogTitle>
+              <DialogDescription>
+                Ajoutez une nouvelle vidéo à votre bibliothèque. Un exercice sera créé automatiquement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleImportFileSelect}
+                className="hidden"
+              />
+              
+              <div
+                onClick={() => importFileInputRef.current?.click()}
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+              >
+                {selectedImportFile ? (
+                  <div className="space-y-2">
+                    <FileVideo className="w-10 h-10 mx-auto text-primary" />
+                    <p className="text-sm font-medium truncate">{selectedImportFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(selectedImportFile.size)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Cliquez pour sélectionner une vidéo
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="import-title">Titre de l'exercice *</Label>
+                <Input
+                  id="import-title"
+                  value={importTitle}
+                  onChange={(e) => setImportTitle(e.target.value)}
+                  placeholder="Ex: Étirement quadriceps"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="import-description">Description (optionnel)</Label>
+                <Input
+                  id="import-description"
+                  value={importDescription}
+                  onChange={(e) => setImportDescription(e.target.value)}
+                  placeholder="Description de l'exercice..."
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setImportDialogOpen(false)} 
+                disabled={uploading}
+                className="w-full sm:w-auto"
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={handleImportVideo} 
+                disabled={uploading || !selectedImportFile || !importTitle.trim()}
+                className="w-full sm:w-auto"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Import en cours...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importer
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
