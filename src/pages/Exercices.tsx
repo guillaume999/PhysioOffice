@@ -263,12 +263,30 @@ export default function Exercices() {
       let thumbnailUrl = formData.thumbnail_url;
       let videoId = formData.video_id;
 
-      // Upload video if file selected (from phone)
+      // Upload video if file selected (from phone) and add to video library
       if (formData.videoFile) {
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-        videoId = null;
+        
+        // Also add to video library
+        const { data: videoData, error: videoError } = await supabase
+          .from("videos")
+          .insert({
+            user_id: user.id,
+            title: formData.title.trim() || formData.videoFile.name,
+            video_url: uploaded.publicUrl,
+            name: formData.videoFile.name,
+            thumbnail_url: null
+          })
+          .select()
+          .single();
+        
+        if (videoError) {
+          console.error("Error adding to video library:", videoError);
+        } else {
+          videoId = videoData.id;
+        }
       }
 
       const { error } = await supabase
@@ -322,12 +340,30 @@ export default function Exercices() {
       let thumbnailUrl = formData.thumbnail_url;
       let videoId = formData.video_id;
 
-      // Upload video if new file selected (from phone)
+      // Upload video if new file selected (from phone) and add to video library
       if (formData.videoFile) {
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-        videoId = null;
+        
+        // Also add to video library
+        const { data: videoData, error: videoError } = await supabase
+          .from("videos")
+          .insert({
+            user_id: user.id,
+            title: formData.title.trim() || formData.videoFile.name,
+            video_url: uploaded.publicUrl,
+            name: formData.videoFile.name,
+            thumbnail_url: null
+          })
+          .select()
+          .single();
+        
+        if (videoError) {
+          console.error("Error adding to video library:", videoError);
+        } else {
+          videoId = videoData.id;
+        }
       }
 
       const { error } = await supabase
