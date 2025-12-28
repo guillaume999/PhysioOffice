@@ -207,9 +207,11 @@ export default function Exercices() {
     const accessToken = sessionData.session?.access_token;
     if (!accessToken) throw new Error("Not authenticated");
 
+    const tusEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
+
     await new Promise<void>((resolve, reject) => {
       const upload = new tus.Upload(videoFile, {
-        endpoint: `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.storage.supabase.co/storage/v1/upload/resumable`,
+        endpoint: tusEndpoint,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         chunkSize: 6 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
