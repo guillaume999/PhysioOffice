@@ -6,11 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Edit, Play, X, Upload, Loader2, Video } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import * as tus from "tus-js-client";
 
 interface VideoItem {
   id: string;
@@ -36,12 +35,12 @@ export default function Videos() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const editVideoInputRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    name: "",
-    videoFile: null as File | null,
-  });
+  // Form state
+  const [formTitle, setFormTitle] = useState("");
+  const [formName, setFormName] = useState("");
+  const [formVideoFile, setFormVideoFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -89,6 +88,8 @@ export default function Videos() {
   };
 
   const uploadVideoToStorage = async (videoFile: File): Promise<string> => {
+    if (!user) throw new Error("Not authenticated");
+
     let fileExt = videoFile.name.split(".").pop()?.toLowerCase();
     if (!fileExt || fileExt === videoFile.name.toLowerCase()) {
       const mimeMap: Record<string, string> = {
@@ -101,43 +102,20 @@ export default function Videos() {
       };
       fileExt = mimeMap[videoFile.type] || "mp4";
     }
-    const objectName = `${user!.id}/${Date.now()}.${fileExt}`;
+    const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) throw new Error("Not authenticated");
-
-    const tusEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
-
-    await new Promise<void>((resolve, reject) => {
-      const upload = new tus.Upload(videoFile, {
-        endpoint: tusEndpoint,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        chunkSize: 2 * 1024 * 1024,
-        removeFingerprintOnSuccess: true,
-        uploadDataDuringCreation: false,
-        overridePatchMethod: true,
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        metadata: {
-          bucketName: "exercice-videos",
-          objectName,
-          contentType: videoFile.type || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        onError: (err) => reject(err),
-        onProgress: (bytesUploaded, bytesTotal) => {
-          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
-          setUploadProgress(percentage);
-        },
-        onSuccess: () => resolve(),
+    // Use standard upload instead of TUS for simplicity
+    const { error: uploadError } = await supabase.storage
+      .from("exercice-videos")
+      .upload(objectName, videoFile, {
+        cacheControl: "3600",
+        upsert: false,
       });
 
-      upload.start();
-    });
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      throw uploadError;
+    }
 
     const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
     return data.publicUrl;
@@ -146,12 +124,12 @@ export default function Videos() {
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (!formData.title.trim()) {
+    if (!formTitle.trim()) {
       toast.error("Le titre est requis");
       return;
     }
 
-    if (!formData.videoFile) {
+    if (!formVideoFile) {
       toast.error("Veuillez sélectionner une vidéo");
       return;
     }
@@ -159,19 +137,22 @@ export default function Videos() {
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      const videoUrl = await uploadVideoToStorage(formData.videoFile);
+      setUploadProgress(30);
+      const videoUrl = await uploadVideoToStorage(formVideoFile);
+      setUploadProgress(80);
 
       const { error } = await supabase
         .from("videos")
         .insert({
           user_id: user.id,
-          title: formData.title.trim(),
-          name: formData.name.trim() || null,
+          title: formTitle.trim(),
+          name: formName.trim() || null,
           video_url: videoUrl,
         });
 
       if (error) throw error;
 
+      setUploadProgress(100);
       toast.success("Vidéo ajoutée avec succès");
       setDialogOpen(false);
       resetForm();
@@ -188,7 +169,7 @@ export default function Videos() {
   const handleUpdate = async () => {
     if (!user || !selectedVideo) return;
 
-    if (!formData.title.trim()) {
+    if (!formTitle.trim()) {
       toast.error("Le titre est requis");
       return;
     }
@@ -198,21 +179,24 @@ export default function Videos() {
     try {
       let videoUrl = selectedVideo.video_url;
 
-      if (formData.videoFile) {
-        videoUrl = await uploadVideoToStorage(formData.videoFile);
+      if (formVideoFile) {
+        setUploadProgress(30);
+        videoUrl = await uploadVideoToStorage(formVideoFile);
+        setUploadProgress(80);
       }
 
       const { error } = await supabase
         .from("videos")
         .update({
-          title: formData.title.trim(),
-          name: formData.name.trim() || null,
+          title: formTitle.trim(),
+          name: formName.trim() || null,
           video_url: videoUrl,
         })
         .eq("id", selectedVideo.id);
 
       if (error) throw error;
 
+      setUploadProgress(100);
       toast.success("Vidéo modifiée avec succès");
       setEditDialogOpen(false);
       resetForm();
@@ -253,21 +237,17 @@ export default function Videos() {
   };
 
   const resetForm = () => {
-    setFormData({
-      title: "",
-      name: "",
-      videoFile: null,
-    });
+    setFormTitle("");
+    setFormName("");
+    setFormVideoFile(null);
     setSelectedVideo(null);
   };
 
   const openEditDialog = (video: VideoItem) => {
     setSelectedVideo(video);
-    setFormData({
-      title: video.title,
-      name: video.name || "",
-      videoFile: null,
-    });
+    setFormTitle(video.title);
+    setFormName(video.name || "");
+    setFormVideoFile(null);
     setEditDialogOpen(true);
   };
 
@@ -285,97 +265,13 @@ export default function Videos() {
       return;
     }
 
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error("La vidéo ne doit pas dépasser 100 Mo");
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("La vidéo ne doit pas dépasser 50 Mo");
       return;
     }
 
-    setFormData({ 
-      ...formData,
-      videoFile: file,
-    });
+    setFormVideoFile(file);
   };
-
-  const VideoForm = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="title">Titre *</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="Titre de la vidéo"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="name">Nom</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Nom descriptif (optionnel)"
-        />
-      </div>
-
-      <div>
-        <Label>Vidéo {!isEdit && "*"}</Label>
-        <div className="mt-2">
-          <input
-            ref={videoInputRef}
-            type="file"
-            accept="video/*"
-            onChange={handleVideoSelect}
-            className="hidden"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => videoInputRef.current?.click()}
-            className="w-full"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {formData.videoFile ? formData.videoFile.name : (isEdit ? "Changer la vidéo" : "Sélectionner une vidéo")}
-          </Button>
-        </div>
-        {isEdit && selectedVideo && !formData.videoFile && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Vidéo actuelle : conservée si aucune nouvelle vidéo n'est sélectionnée
-          </p>
-        )}
-      </div>
-
-      {isUploading && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Upload en cours... {uploadProgress}%</span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div 
-              className="bg-primary h-2 rounded-full transition-all duration-300" 
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      <Button 
-        onClick={isEdit ? handleUpdate : handleSubmit} 
-        className="w-full"
-        disabled={isUploading}
-      >
-        {isUploading ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Upload en cours...
-          </>
-        ) : (
-          isEdit ? "Modifier" : "Ajouter"
-        )}
-      </Button>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -412,7 +308,79 @@ export default function Videos() {
               <DialogHeader>
                 <DialogTitle>Nouvelle vidéo</DialogTitle>
               </DialogHeader>
-              <VideoForm />
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="add-title">Titre *</Label>
+                  <Input
+                    id="add-title"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="Titre de la vidéo"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="add-name">Nom</Label>
+                  <Input
+                    id="add-name"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="Nom descriptif (optionnel)"
+                  />
+                </div>
+
+                <div>
+                  <Label>Vidéo *</Label>
+                  <div className="mt-2">
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => videoInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {formVideoFile ? formVideoFile.name : "Sélectionner une vidéo"}
+                    </Button>
+                  </div>
+                </div>
+
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Upload en cours... {uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleSubmit} 
+                  className="w-full"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Upload en cours...
+                    </>
+                  ) : (
+                    "Ajouter"
+                  )}
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
@@ -516,7 +484,84 @@ export default function Videos() {
             <DialogHeader>
               <DialogTitle>Modifier la vidéo</DialogTitle>
             </DialogHeader>
-            <VideoForm isEdit />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title">Titre *</Label>
+                <Input
+                  id="edit-title"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="Titre de la vidéo"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-name">Nom</Label>
+                <Input
+                  id="edit-name"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Nom descriptif (optionnel)"
+                />
+              </div>
+
+              <div>
+                <Label>Vidéo</Label>
+                <div className="mt-2">
+                  <input
+                    ref={editVideoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => editVideoInputRef.current?.click()}
+                    className="w-full"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {formVideoFile ? formVideoFile.name : "Changer la vidéo"}
+                  </Button>
+                </div>
+                {selectedVideo && !formVideoFile && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Vidéo actuelle : conservée si aucune nouvelle vidéo n'est sélectionnée
+                  </p>
+                )}
+              </div>
+
+              {isUploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Upload en cours... {uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Button 
+                onClick={handleUpdate} 
+                className="w-full"
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Upload en cours...
+                  </>
+                ) : (
+                  "Modifier"
+                )}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
