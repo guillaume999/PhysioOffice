@@ -14,7 +14,6 @@ import { toast } from "sonner";
 interface VideoItem {
   id: string;
   title: string;
-  name: string | null;
   video_url: string;
   thumbnail_url: string | null;
   created_at: string;
@@ -39,7 +38,6 @@ export default function Videos() {
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
-  const [formName, setFormName] = useState("");
   const [formVideoFile, setFormVideoFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -57,11 +55,7 @@ export default function Videos() {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (v) =>
-          v.title.toLowerCase().includes(query) ||
-          v.name?.toLowerCase().includes(query)
-      );
+      result = result.filter((v) => v.title.toLowerCase().includes(query));
     }
 
     setFilteredVideos(result);
@@ -146,7 +140,6 @@ export default function Videos() {
         .insert({
           user_id: user.id,
           title: formTitle.trim(),
-          name: formName.trim() || null,
           video_url: videoUrl,
         });
 
@@ -189,7 +182,6 @@ export default function Videos() {
         .from("videos")
         .update({
           title: formTitle.trim(),
-          name: formName.trim() || null,
           video_url: videoUrl,
         })
         .eq("id", selectedVideo.id);
@@ -238,7 +230,6 @@ export default function Videos() {
 
   const resetForm = () => {
     setFormTitle("");
-    setFormName("");
     setFormVideoFile(null);
     setSelectedVideo(null);
   };
@@ -246,7 +237,6 @@ export default function Videos() {
   const openEditDialog = (video: VideoItem) => {
     setSelectedVideo(video);
     setFormTitle(video.title);
-    setFormName(video.name || "");
     setFormVideoFile(null);
     setEditDialogOpen(true);
   };
@@ -316,16 +306,6 @@ export default function Videos() {
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Titre de la vidéo"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="add-name">Nom</Label>
-                  <Input
-                    id="add-name"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="Nom descriptif (optionnel)"
                   />
                 </div>
 
@@ -419,7 +399,6 @@ export default function Videos() {
                     <TableRow>
                       <TableHead>Aperçu</TableHead>
                       <TableHead>Titre</TableHead>
-                      <TableHead>Nom</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -436,19 +415,11 @@ export default function Videos() {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">{video.title}</TableCell>
-                        <TableCell>{video.name || "-"}</TableCell>
                         <TableCell>
                           {new Date(video.created_at).toLocaleDateString("fr-FR")}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openVideoPlayer(video)}
-                            >
-                              <Play className="h-4 w-4" />
-                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -492,16 +463,6 @@ export default function Videos() {
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder="Titre de la vidéo"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-name">Nom</Label>
-                <Input
-                  id="edit-name"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Nom descriptif (optionnel)"
                 />
               </div>
 
