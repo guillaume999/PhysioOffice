@@ -47,6 +47,7 @@ export default function Videos() {
   const [uploading, setUploading] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [importTitle, setImportTitle] = useState("");
   const [replaceVideoDialog, setReplaceVideoDialog] = useState<{ open: boolean; video: VideoItem | null }>({ open: false, video: null });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -302,11 +303,13 @@ export default function Videos() {
         return;
       }
       setSelectedImportFile(file);
+      // Pre-fill title with filename (without extension)
+      setImportTitle(file.name.replace(/\.[^/.]+$/, ""));
     }
   };
 
   const handleImportVideo = async () => {
-    if (!selectedImportFile || !user) return;
+    if (!selectedImportFile || !user || !importTitle.trim()) return;
 
     setUploading(true);
     try {
@@ -325,8 +328,7 @@ export default function Videos() {
 
       const videoUrl = urlData.publicUrl;
 
-      // Use file name as title (without extension)
-      const title = selectedImportFile.name.replace(/\.[^/.]+$/, "");
+      const title = importTitle.trim();
 
       // Create video in videos table
       const { error: insertError } = await supabase
@@ -346,6 +348,7 @@ export default function Videos() {
 
       setImportDialogOpen(false);
       setSelectedImportFile(null);
+      setImportTitle("");
       fetchVideos();
     } catch (error) {
       console.error("Erreur lors de l'import:", error);
@@ -700,11 +703,23 @@ export default function Videos() {
                   </div>
                 )}
               </div>
+
+              {selectedImportFile && (
+                <div className="space-y-2">
+                  <Label htmlFor="import-title">Titre</Label>
+                  <Input
+                    id="import-title"
+                    value={importTitle}
+                    onChange={(e) => setImportTitle(e.target.value)}
+                    placeholder="Titre de la vidéo"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button 
                 variant="outline" 
-                onClick={() => setImportDialogOpen(false)} 
+                onClick={() => { setImportDialogOpen(false); setSelectedImportFile(null); setImportTitle(""); }} 
                 disabled={uploading}
                 className="w-full sm:w-auto"
               >
@@ -712,7 +727,7 @@ export default function Videos() {
               </Button>
               <Button 
                 onClick={handleImportVideo} 
-                disabled={uploading || !selectedImportFile}
+                disabled={uploading || !selectedImportFile || !importTitle.trim()}
                 className="w-full sm:w-auto"
               >
                 {uploading ? (
