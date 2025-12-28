@@ -125,45 +125,43 @@ export function SelectTraitementDialog({
 
   const TraitementCard = ({ traitement }: { traitement: Traitement }) => (
     <div
-      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors active:bg-muted"
       onClick={() => handleSelect(traitement.id)}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs">
-              {traitement.pathologie}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {traitement.seances_count} séances • {traitement.tests_count} tests
-            </span>
-          </div>
-          {traitement.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {traitement.description}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">
-            par {traitement.author_name || "Anonyme"}
-          </p>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs shrink-0">
+            {traitement.pathologie}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {traitement.seances_count} séances • {traitement.tests_count} tests
+          </span>
         </div>
+        {traitement.description && (
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {traitement.description}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          par {traitement.author_name || "Anonyme"}
+        </p>
       </div>
     </div>
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ClipboardList className="w-5 h-5" />
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[90vh] p-4 sm:p-6">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
             Ajouter un traitement
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Create new button */}
-          <Button onClick={handleCreate} className="w-full" variant="outline">
+          <Button onClick={handleCreate} className="w-full h-10 sm:h-11" variant="outline">
             <Plus className="w-4 h-4 mr-2" />
             Créer un nouveau traitement
           </Button>
@@ -183,28 +181,30 @@ export function SelectTraitementDialog({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Rechercher un traitement..."
+              placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
+              className="pl-9 h-10"
             />
           </div>
 
           {/* Tabs */}
           <Tabs defaultValue="personal" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="personal" className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Mes traitements ({filterTraitements(personalTraitements).length})
+            <TabsList className="grid w-full grid-cols-2 h-auto p-1">
+              <TabsTrigger value="personal" className="flex items-center gap-1.5 text-xs sm:text-sm py-2 px-2">
+                <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Mes traitements</span>
+                <span className="text-muted-foreground">({filterTraitements(personalTraitements).length})</span>
               </TabsTrigger>
-              <TabsTrigger value="platform" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Plateforme ({filterTraitements(platformTraitements).length})
+              <TabsTrigger value="platform" className="flex items-center gap-1.5 text-xs sm:text-sm py-2 px-2">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Plateforme</span>
+                <span className="text-muted-foreground">({filterTraitements(platformTraitements).length})</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="personal" className="mt-4">
-              <ScrollArea className="h-[300px]">
+            <TabsContent value="personal" className="mt-3">
+              <ScrollArea className="h-[calc(50vh-200px)] min-h-[180px] max-h-[300px]">
                 {loading ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Chargement...
@@ -214,7 +214,7 @@ export function SelectTraitementDialog({
                     Aucun traitement personnel trouvé
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 pr-2">
                     {filterTraitements(personalTraitements).map((t) => (
                       <TraitementCard key={t.id} traitement={t} />
                     ))}
@@ -223,8 +223,8 @@ export function SelectTraitementDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="platform" className="mt-4">
-              <ScrollArea className="h-[300px]">
+            <TabsContent value="platform" className="mt-3">
+              <ScrollArea className="h-[calc(50vh-200px)] min-h-[180px] max-h-[300px]">
                 {loading ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Chargement...
@@ -234,7 +234,7 @@ export function SelectTraitementDialog({
                     Aucun traitement de la plateforme trouvé
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 pr-2">
                     {filterTraitements(platformTraitements).map((t) => (
                       <TraitementCard key={t.id} traitement={t} />
                     ))}
