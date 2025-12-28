@@ -224,7 +224,20 @@ export default function Videos() {
   ): Promise<{ publicUrl: string; objectName: string }> => {
     if (!user) throw new Error("Not authenticated");
 
-    const fileExt = file.name.split(".").pop() || "mp4";
+    // Normalize extension: take from file name or fallback to mime type
+    let fileExt = file.name.split(".").pop()?.toLowerCase();
+    if (!fileExt || fileExt === file.name.toLowerCase()) {
+      // No extension in name, derive from mime type
+      const mimeMap: Record<string, string> = {
+        "video/mp4": "mp4",
+        "video/quicktime": "mov",
+        "video/x-m4v": "m4v",
+        "video/webm": "webm",
+        "video/3gpp": "3gp",
+        "video/avi": "avi",
+      };
+      fileExt = mimeMap[file.type] || "mp4";
+    }
     const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();

@@ -199,7 +199,19 @@ export default function Exercices() {
   };
 
   const uploadVideoToStorage = async (videoFile: File): Promise<{ publicUrl: string; objectName: string }> => {
-    const fileExt = videoFile.name.split(".").pop();
+    // Normalize extension: take from file name or fallback to mime type
+    let fileExt = videoFile.name.split(".").pop()?.toLowerCase();
+    if (!fileExt || fileExt === videoFile.name.toLowerCase()) {
+      const mimeMap: Record<string, string> = {
+        "video/mp4": "mp4",
+        "video/quicktime": "mov",
+        "video/x-m4v": "m4v",
+        "video/webm": "webm",
+        "video/3gpp": "3gp",
+        "video/avi": "avi",
+      };
+      fileExt = mimeMap[videoFile.type] || "mp4";
+    }
     const objectName = `${user!.id}/${Date.now()}.${fileExt}`;
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
