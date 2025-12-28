@@ -216,6 +216,7 @@ export default function Exercices() {
         chunkSize: 2 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
         uploadDataDuringCreation: false,
+        overridePatchMethod: true,
         headers: {
           authorization: `Bearer ${accessToken}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
