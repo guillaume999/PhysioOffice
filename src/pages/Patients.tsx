@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Users, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, Users, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Share2 } from "lucide-react";
+import { BulkSharePatientsDialog } from "@/components/sharing/BulkSharePatientsDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -159,11 +160,20 @@ export default function Patients() {
             <div className="p-3 rounded-xl bg-blue-500/10"><Users className="w-6 h-6 text-blue-500" /></div>
             <div><h1 className="text-3xl font-display font-bold">Patients</h1><p className="text-muted-foreground">{patients.length} patient(s) enregistré(s)</p></div>
           </div>
-          <div className="flex gap-4 w-full md:w-auto">
+          <div className="flex gap-2 md:gap-4 w-full md:w-auto flex-wrap">
             <Button variant="outline" onClick={() => navigate("/planning")}>
               <Calendar className="w-4 h-4 mr-2" />
-              Planning
+              <span className="hidden sm:inline">Planning</span>
             </Button>
+            <BulkSharePatientsDialog
+              patients={patients}
+              trigger={
+                <Button variant="outline">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Partager</span>
+                </Button>
+              }
+            />
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
