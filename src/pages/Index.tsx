@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
@@ -30,6 +30,14 @@ const features = [
     bgColor: "bg-emerald-500/10",
   },
   {
+    title: "News",
+    description: "Les dernières actualités de PhysioOffice",
+    icon: Newspaper,
+    href: "/news",
+    color: "from-pink-500 to-rose-500",
+    bgColor: "bg-pink-500/10",
+  },
+  {
     title: "Séance",
     description: "Modèles de séances prédéfinies",
     icon: Calendar,
@@ -44,6 +52,14 @@ const features = [
     href: "/exercices",
     color: "from-green-500 to-emerald-500",
     bgColor: "bg-green-500/10",
+  },
+  {
+    title: "Vidéos",
+    description: "Accédez à votre vidéothèque personnelle",
+    icon: Video,
+    href: "/videos",
+    color: "from-cyan-500 to-sky-500",
+    bgColor: "bg-cyan-500/10",
   },
   {
     title: "TTT",
