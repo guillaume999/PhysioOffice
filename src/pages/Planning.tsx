@@ -1,0 +1,417 @@
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Layout } from "@/components/layout/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X } from "lucide-react";
+import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, setHours, setMinutes, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+interface Patient {
+  id: string;
+  name: string;
+  numero: string | null;
+  status: string;
+}
+
+interface Appointment {
+  id: string;
+  patient_id: string;
+  start_time: string;
+  end_time: string;
+  notes: string | null;
+  patient?: Patient;
+}
+
+type ViewMode = "week" | "day";
+
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const hours = Math.floor(i / 4) + 7; // Start at 7:00
+  const minutes = (i % 4) * 15;
+  return { hours, minutes, label: `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}` };
+}).filter(slot => slot.hours < 20); // End at 20:00
+
+export default function Planning() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const printRef = useRef<HTMLDivElement>(null);
+  
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{ date: Date; time: { hours: number; minutes: number } } | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [appointmentNotes, setAppointmentNotes] = useState("");
+  const [duration, setDuration] = useState<number>(30);
+
+  useEffect(() => {
+    if (!authLoading && !user) navigate("/auth");
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPatients();
+      fetchAppointments();
+    }
+  }, [user, currentDate, viewMode]);
+
+  const fetchPatients = async () => {
+    const { data, error } = await supabase
+      .from("patients")
+      .select("id, name, numero, status")
+      .neq("status", "inactive")
+      .order("name");
+    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    else setPatients(data || []);
+  };
+
+  const fetchAppointments = async () => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+    
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("*")
+      .gte("start_time", weekStart.toISOString())
+      .lte("start_time", weekEnd.toISOString())
+      .order("start_time");
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      // Fetch patient info for each appointment
+      const appointmentsWithPatients = await Promise.all(
+        (data || []).map(async (apt) => {
+          const patient = patients.find(p => p.id === apt.patient_id) || 
+            (await supabase.from("patients").select("id, name, numero, status").eq("id", apt.patient_id).single()).data;
+          return { ...apt, patient: patient || undefined };
+        })
+      );
+      setAppointments(appointmentsWithPatients);
+    }
+    setLoading(false);
+  };
+
+  const getWeekDays = () => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  };
+
+  const handleSlotClick = (date: Date, time: { hours: number; minutes: number }) => {
+    setSelectedSlot({ date, time });
+    setSelectedPatientId("");
+    setAppointmentNotes("");
+    setDuration(30);
+    setIsDialogOpen(true);
+  };
+
+  const handleCreateAppointment = async () => {
+    if (!selectedSlot || !selectedPatientId) {
+      toast({ title: "Erreur", description: "Veuillez sélectionner un patient", variant: "destructive" });
+      return;
+    }
+
+    const startTime = setMinutes(setHours(selectedSlot.date, selectedSlot.time.hours), selectedSlot.time.minutes);
+    const endTime = new Date(startTime.getTime() + duration * 60000);
+
+    const { error } = await supabase.from("appointments").insert({
+      user_id: user?.id,
+      patient_id: selectedPatientId,
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      notes: appointmentNotes || null,
+    });
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Rendez-vous créé" });
+      setIsDialogOpen(false);
+      fetchAppointments();
+    }
+  };
+
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    if (!confirm("Supprimer ce rendez-vous ?")) return;
+    
+    const { error } = await supabase.from("appointments").delete().eq("id", appointmentId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Rendez-vous supprimé" });
+      fetchAppointments();
+    }
+  };
+
+  const handleAddToPatientTreatment = async (appointment: Appointment) => {
+    if (!appointment.patient) return;
+    navigate(`/patients/${appointment.patient_id}`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const getAppointmentsForSlot = (date: Date, time: { hours: number; minutes: number }) => {
+    return appointments.filter(apt => {
+      const aptStart = parseISO(apt.start_time);
+      return isSameDay(aptStart, date) && 
+             aptStart.getHours() === time.hours && 
+             aptStart.getMinutes() === time.minutes;
+    });
+  };
+
+  const navigateDate = (direction: "prev" | "next") => {
+    if (viewMode === "week") {
+      setCurrentDate(direction === "prev" ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
+    } else {
+      setCurrentDate(direction === "prev" ? addDays(currentDate, -1) : addDays(currentDate, 1));
+    }
+  };
+
+  if (authLoading || loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  const weekDays = getWeekDays();
+  const displayDays = viewMode === "week" ? weekDays : [currentDate];
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-purple-500/10">
+              <Calendar className="w-6 h-6 text-purple-500" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-display font-bold">Planning</h1>
+              <p className="text-muted-foreground">
+                {viewMode === "week" 
+                  ? `Semaine du ${format(weekDays[0], "d MMMM", { locale: fr })} au ${format(weekDays[6], "d MMMM yyyy", { locale: fr })}`
+                  : format(currentDate, "EEEE d MMMM yyyy", { locale: fr })
+                }
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Select value={viewMode} onValueChange={(v: ViewMode) => setViewMode(v)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Semaine</SelectItem>
+                <SelectItem value="day">Jour</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setCurrentDate(new Date())}>
+              Aujourd'hui
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => navigateDate("prev")}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => navigateDate("next")}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" onClick={handlePrint} className="print:hidden">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <Card className="print:shadow-none print:border-none">
+          <CardContent className="p-0" ref={printRef}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[800px]">
+                <thead>
+                  <tr>
+                    <th className="border p-2 bg-muted/50 w-20 text-xs font-medium">Heure</th>
+                    {displayDays.map((day, idx) => (
+                      <th 
+                        key={idx} 
+                        className={`border p-2 bg-muted/50 text-xs font-medium ${
+                          isSameDay(day, new Date()) ? "bg-primary/10 text-primary" : ""
+                        }`}
+                      >
+                        <div>{format(day, "EEE", { locale: fr })}</div>
+                        <div className="text-lg font-bold">{format(day, "d")}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {TIME_SLOTS.map((slot, slotIdx) => (
+                    <tr key={slotIdx} className={slot.minutes === 0 ? "border-t-2" : ""}>
+                      <td className="border p-1 text-xs text-muted-foreground text-center bg-muted/30">
+                        {slot.minutes === 0 ? slot.label : ""}
+                      </td>
+                      {displayDays.map((day, dayIdx) => {
+                        const slotAppointments = getAppointmentsForSlot(day, slot);
+                        return (
+                          <td 
+                            key={dayIdx} 
+                            className={`border p-0.5 h-8 cursor-pointer hover:bg-primary/5 transition-colors relative ${
+                              isSameDay(day, new Date()) ? "bg-primary/5" : ""
+                            }`}
+                            onClick={() => slotAppointments.length === 0 && handleSlotClick(day, slot)}
+                          >
+                            {slotAppointments.map((apt) => (
+                              <div 
+                                key={apt.id}
+                                className="absolute inset-0.5 bg-primary/20 border border-primary/30 rounded text-xs p-1 overflow-hidden group"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-medium truncate">{apt.patient?.name || "Patient"}</span>
+                                  <div className="hidden group-hover:flex gap-1 print:hidden">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-4 w-4 p-0"
+                                      onClick={() => handleAddToPatientTreatment(apt)}
+                                      title="Voir le patient"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-4 w-4 p-0 text-destructive"
+                                      onClick={() => handleDeleteAppointment(apt.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Legend */}
+        <div className="mt-4 flex gap-4 text-sm text-muted-foreground print:hidden">
+          <span>Cliquez sur un créneau pour ajouter un rendez-vous</span>
+        </div>
+      </div>
+
+      {/* Create Appointment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nouveau rendez-vous</DialogTitle>
+          </DialogHeader>
+          {selectedSlot && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium">
+                  {format(selectedSlot.date, "EEEE d MMMM yyyy", { locale: fr })}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  à {selectedSlot.time.hours.toString().padStart(2, "0")}:{selectedSlot.time.minutes.toString().padStart(2, "0")}
+                </p>
+              </div>
+
+              <div>
+                <Label>Patient *</Label>
+                <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un patient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.numero && `(${p.numero})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Durée</Label>
+                <Select value={duration.toString()} onValueChange={(v) => setDuration(parseInt(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 minutes</SelectItem>
+                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="45">45 minutes</SelectItem>
+                    <SelectItem value="60">1 heure</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={appointmentNotes}
+                  onChange={(e) => setAppointmentNotes(e.target.value)}
+                  placeholder="Notes optionnelles..."
+                  rows={3}
+                />
+              </div>
+
+              <Button onClick={handleCreateAppointment} className="w-full gradient-primary text-primary-foreground">
+                Créer le rendez-vous
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          #root {
+            visibility: visible;
+          }
+          #root > * {
+            visibility: visible;
+          }
+          .container {
+            max-width: 100% !important;
+            padding: 0 !important;
+          }
+          table {
+            font-size: 10px !important;
+          }
+        }
+      `}</style>
+    </Layout>
+  );
+}

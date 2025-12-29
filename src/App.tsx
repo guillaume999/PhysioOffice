@@ -23,6 +23,7 @@ import Videos from "./pages/Videos";
 import Admin from "./pages/Admin";
 import PatientSessionView from "./pages/PatientSessionView";
 import Pricing from "./pages/Pricing";
+import Planning from "./pages/Planning";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/patient-session" element={<PatientSessionView />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/planning" element={<Planning />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
