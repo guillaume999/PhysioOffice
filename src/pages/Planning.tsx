@@ -278,26 +278,27 @@ export default function Planning() {
                             {slotAppointments.map((apt) => (
                               <div 
                                 key={apt.id}
-                                className="absolute inset-0.5 bg-primary/20 border border-primary/30 rounded text-xs p-1 overflow-hidden group"
+                                className="absolute inset-0.5 bg-primary/20 border border-primary/30 rounded text-xs p-1 overflow-hidden"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex items-center justify-between gap-1">
-                                  <span className="font-medium truncate">{apt.patient?.name || "Patient"}</span>
-                                  <div className="hidden group-hover:flex gap-1 print:hidden">
+                                  <span className="font-medium truncate flex-1">{apt.patient?.name || "Patient"}</span>
+                                  <div className="flex gap-0.5 shrink-0 print:hidden">
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className="h-4 w-4 p-0"
+                                      className="h-5 w-5 p-0 bg-primary/20 hover:bg-primary/40"
                                       onClick={() => handleAddToPatientTreatment(apt)}
-                                      title="Voir le patient"
+                                      title="Ajouter séance au traitement"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </Button>
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className="h-4 w-4 p-0 text-destructive"
+                                      className="h-5 w-5 p-0 bg-destructive/20 hover:bg-destructive/40 text-destructive"
                                       onClick={() => handleDeleteAppointment(apt.id)}
+                                      title="Supprimer le rendez-vous"
                                     >
                                       <Trash2 className="h-3 w-3" />
                                     </Button>
