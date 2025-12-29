@@ -104,6 +104,17 @@ interface CertificatModel {
   created_at: string;
 }
 
+interface SubscriptionLimit {
+  id: string;
+  tier: "free" | "basic" | "premium";
+  max_patients: number;
+  max_exercices: number;
+  max_seances: number;
+  max_traitements: number;
+  can_share_exercices: boolean;
+  can_use_ai: boolean;
+}
+
 interface Stats {
   totalUsers: number;
   premiumUsers: number;
@@ -134,6 +145,9 @@ export default function Admin() {
   const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
   const [selectedExercice, setSelectedExercice] = useState<ExerciceType | null>(null);
   const [exerciceDialogOpen, setExerciceDialogOpen] = useState(false);
+  const [subscriptionLimits, setSubscriptionLimits] = useState<SubscriptionLimit[]>([]);
+  const [editingLimits, setEditingLimits] = useState<Record<string, Partial<SubscriptionLimit>>>({});
+  const [savingLimits, setSavingLimits] = useState(false);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     premiumUsers: 0,
@@ -269,6 +283,14 @@ export default function Admin() {
         .order("created_at", { ascending: false });
       
       setCertificatModels(modelsData || []);
+
+      // Fetch subscription limits
+      const { data: limitsData } = await supabase
+        .from("subscription_limits")
+        .select("*")
+        .order("tier");
+      
+      setSubscriptionLimits(limitsData || []);
 
       // Calculate stats
       const now = new Date();
@@ -482,6 +504,63 @@ export default function Admin() {
       });
     }
   };
+
+  const updateLimitField = (tier: string, field: keyof SubscriptionLimit, value: number | boolean) => {
+    setEditingLimits(prev => ({
+      ...prev,
+      [tier]: {
+        ...prev[tier],
+        [field]: value
+      }
+    }));
+  };
+
+  const saveSubscriptionLimits = async () => {
+    setSavingLimits(true);
+    try {
+      for (const limit of subscriptionLimits) {
+        const edits = editingLimits[limit.tier];
+        if (edits && Object.keys(edits).length > 0) {
+          const { error } = await supabase
+            .from("subscription_limits")
+            .update(edits)
+            .eq("id", limit.id);
+          
+          if (error) throw error;
+        }
+      }
+
+      toast({
+        title: "Succès",
+        description: "Limites mises à jour avec succès.",
+      });
+
+      setEditingLimits({});
+      fetchData();
+    } catch (error) {
+      console.error("Error updating limits:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour les limites.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLimits(false);
+    }
+  };
+
+  const getLimitValue = (tier: string, field: keyof SubscriptionLimit): number | boolean => {
+    const edits = editingLimits[tier];
+    if (edits && field in edits) {
+      return edits[field] as number | boolean;
+    }
+    const limit = subscriptionLimits.find(l => l.tier === tier);
+    return limit ? limit[field] as number | boolean : field.startsWith('can_') ? false : 0;
+  };
+
+  const hasUnsavedChanges = Object.keys(editingLimits).some(tier => 
+    Object.keys(editingLimits[tier]).length > 0
+  );
 
   const toggleTraitementValidation = async (traitementId: string, currentStatus: boolean) => {
     try {
@@ -929,6 +1008,10 @@ export default function Admin() {
             <TabsTrigger value="certificats" className="flex items-center gap-2">
               <BookTemplate className="w-4 h-4" />
               Modèles certificats
+            </TabsTrigger>
+            <TabsTrigger value="permissions" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Permissions
             </TabsTrigger>
           </TabsList>
 
@@ -1506,6 +1589,166 @@ export default function Admin() {
                       </div>
                     ))
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="permissions">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Permissions par type de compte</CardTitle>
+                {hasUnsavedChanges && (
+                  <Button onClick={saveSubscriptionLimits} disabled={savingLimits}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {savingLimits ? "Enregistrement..." : "Enregistrer les modifications"}
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4">Fonctionnalité</th>
+                        <th className="text-center py-3 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <CreditCard className="w-4 h-4 text-muted-foreground" />
+                            Gratuit
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <Crown className="w-4 h-4 text-blue-500" />
+                            Basic
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <Crown className="w-4 h-4 text-amber-500" />
+                            Premium
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-muted-foreground" />
+                            Nombre max de patients
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Input
+                              type="number"
+                              min="0"
+                              className="w-24 mx-auto text-center"
+                              value={getLimitValue(tier, "max_patients") as number}
+                              onChange={(e) => updateLimitField(tier, "max_patients", parseInt(e.target.value) || 0)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Dumbbell className="w-4 h-4 text-muted-foreground" />
+                            Nombre max d'exercices
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Input
+                              type="number"
+                              min="0"
+                              className="w-24 mx-auto text-center"
+                              value={getLimitValue(tier, "max_exercices") as number}
+                              onChange={(e) => updateLimitField(tier, "max_exercices", parseInt(e.target.value) || 0)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground" />
+                            Nombre max de séances
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Input
+                              type="number"
+                              min="0"
+                              className="w-24 mx-auto text-center"
+                              value={getLimitValue(tier, "max_seances") as number}
+                              onChange={(e) => updateLimitField(tier, "max_seances", parseInt(e.target.value) || 0)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                            Nombre max de traitements
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Input
+                              type="number"
+                              min="0"
+                              className="w-24 mx-auto text-center"
+                              value={getLimitValue(tier, "max_traitements") as number}
+                              onChange={(e) => updateLimitField(tier, "max_traitements", parseInt(e.target.value) || 0)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground" />
+                            Partage d'exercices
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Switch
+                              checked={getLimitValue(tier, "can_share_exercices") as boolean}
+                              onCheckedChange={(checked) => updateLimitField(tier, "can_share_exercices", checked)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-4 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-muted-foreground" />
+                            Accès à l'IA
+                          </div>
+                        </td>
+                        {(["free", "basic", "premium"] as const).map(tier => (
+                          <td key={tier} className="py-4 px-4 text-center">
+                            <Switch
+                              checked={getLimitValue(tier, "can_use_ai") as boolean}
+                              onCheckedChange={(checked) => updateLimitField(tier, "can_use_ai", checked)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Note :</strong> Les administrateurs ont un accès illimité à toutes les fonctionnalités, 
+                    indépendamment des limites définies ici.
+                  </p>
                 </div>
               </CardContent>
             </Card>
