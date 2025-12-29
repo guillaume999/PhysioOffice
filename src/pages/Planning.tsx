@@ -394,25 +394,33 @@ export default function Planning() {
         @media print {
           @page {
             size: A4 landscape;
-            margin: 0.5cm;
+            margin: 3mm;
+          }
+          
+          * {
+            box-sizing: border-box !important;
           }
           
           html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
+            width: 297mm !important;
+            height: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            font-size: 8px !important;
           }
           
-          nav, footer, header, .print\\:hidden, [class*="MobileBottomNav"] {
+          nav, footer, header, .print\\:hidden, [class*="MobileBottomNav"], .mt-4, button {
             display: none !important;
           }
           
           #root {
             height: auto !important;
             overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
           
           .container {
@@ -422,40 +430,95 @@ export default function Planning() {
             margin: 0 !important;
           }
           
+          .py-8 {
+            padding: 2mm 0 0 0 !important;
+          }
+          
+          .mb-8 {
+            margin-bottom: 2mm !important;
+          }
+          
+          .flex.items-center.gap-3 {
+            gap: 2mm !important;
+          }
+          
+          .p-3 {
+            padding: 1mm !important;
+          }
+          
+          .rounded-xl {
+            border-radius: 2px !important;
+          }
+          
+          .w-6, .h-6 {
+            width: 10px !important;
+            height: 10px !important;
+          }
+          
+          h1, .text-3xl {
+            font-size: 12px !important;
+            line-height: 1.2 !important;
+            margin: 0 !important;
+          }
+          
+          .text-muted-foreground {
+            font-size: 8px !important;
+          }
+          
+          .overflow-x-auto {
+            overflow: visible !important;
+          }
+          
           table {
-            font-size: 7px !important;
+            font-size: 6px !important;
             width: 100% !important;
             table-layout: fixed !important;
+            border-collapse: collapse !important;
             page-break-inside: avoid !important;
           }
           
-          thead {
-            display: table-header-group;
+          thead th {
+            font-size: 7px !important;
+            padding: 1mm !important;
+            height: auto !important;
+          }
+          
+          thead th .text-lg {
+            font-size: 9px !important;
           }
           
           tbody tr {
-            height: 12px !important;
-            max-height: 12px !important;
+            height: 3.2mm !important;
+            max-height: 3.2mm !important;
           }
           
           th, td {
-            padding: 1px !important;
-            height: 12px !important;
-            max-height: 12px !important;
+            padding: 0.3mm !important;
+            height: 3.2mm !important;
+            max-height: 3.2mm !important;
             overflow: hidden !important;
             line-height: 1 !important;
+            border: 0.5px solid #ddd !important;
           }
           
           th:first-child, td:first-child {
-            width: 35px !important;
+            width: 25px !important;
+            font-size: 5px !important;
           }
           
-          .absolute {
+          .h-8 {
+            height: 3.2mm !important;
+          }
+          
+          .absolute.inset-0\\.5 {
             position: absolute !important;
+            inset: 0.2mm !important;
+            padding: 0.2mm !important;
+            font-size: 5px !important;
           }
           
           .bg-primary\\/20 {
-            background-color: rgba(147, 51, 234, 0.3) !important;
+            background-color: rgba(147, 51, 234, 0.4) !important;
           }
           
           .bg-primary\\/5 {
@@ -463,50 +526,19 @@ export default function Planning() {
           }
           
           .bg-primary\\/10 {
-            background-color: rgba(147, 51, 234, 0.1) !important;
+            background-color: rgba(147, 51, 234, 0.15) !important;
           }
           
-          .bg-muted\\/50, .bg-muted\\/30 {
-            background-color: rgba(200, 200, 200, 0.3) !important;
+          .bg-muted\\/50 {
+            background-color: rgba(200, 200, 200, 0.4) !important;
           }
           
-          h1 {
-            font-size: 14px !important;
-            margin: 0 !important;
+          .bg-muted\\/30 {
+            background-color: rgba(200, 200, 200, 0.2) !important;
           }
           
-          .text-3xl {
-            font-size: 14px !important;
-          }
-          
-          .text-muted-foreground {
-            font-size: 10px !important;
-          }
-          
-          .p-3, .p-2, .p-4 {
-            padding: 4px !important;
-          }
-          
-          .gap-3, .gap-4 {
-            gap: 4px !important;
-          }
-          
-          .mb-8 {
-            margin-bottom: 8px !important;
-          }
-          
-          .py-8 {
-            padding-top: 4px !important;
-            padding-bottom: 0 !important;
-          }
-          
-          .rounded-xl {
-            border-radius: 4px !important;
-          }
-          
-          .w-6, .h-6 {
-            width: 14px !important;
-            height: 14px !important;
+          .border-t-2 {
+            border-top: 1px solid #999 !important;
           }
         }
       `}</style>
