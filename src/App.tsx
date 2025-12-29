@@ -24,6 +24,7 @@ import Admin from "./pages/Admin";
 import PatientSessionView from "./pages/PatientSessionView";
 import Pricing from "./pages/Pricing";
 import Planning from "./pages/Planning";
+import Formation from "./pages/Formation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/patient-session" element={<PatientSessionView />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/planning" element={<Planning />} />
+            <Route path="/formation" element={<Formation />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
