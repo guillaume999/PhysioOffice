@@ -100,6 +100,14 @@ export function Navbar() {
                 >
                   Notes
                 </Link>
+                <Link
+                  to="/formation"
+                  className={`font-medium transition-colors hover:text-primary ${
+                    isActive("/formation") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  Formation
+                </Link>
                 {isAdmin && (
                   <Link
                     to="/admin"
