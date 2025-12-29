@@ -61,6 +61,14 @@ export function Navbar() {
                   IA Diag
                 </Link>
                 <Link
+                  to="/news"
+                  className={`font-medium transition-colors hover:text-primary ${
+                    isActive("/news") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  News
+                </Link>
+                <Link
                   to="/seance-type"
                   className={`font-medium transition-colors hover:text-primary ${
                     isActive("/seance-type") ? "text-primary" : "text-muted-foreground"
