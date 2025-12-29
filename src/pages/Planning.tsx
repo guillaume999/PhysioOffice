@@ -393,36 +393,69 @@ export default function Planning() {
       <style>{`
         @media print {
           @page {
-            size: landscape;
-            margin: 1cm;
+            size: A4 landscape;
+            margin: 0.5cm;
           }
           
-          body {
+          html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           
-          nav, footer, header, .print\\:hidden {
+          nav, footer, header, .print\\:hidden, [class*="MobileBottomNav"] {
             display: none !important;
+          }
+          
+          #root {
+            height: auto !important;
+            overflow: visible !important;
           }
           
           .container {
             max-width: 100% !important;
+            width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
           }
           
           table {
-            font-size: 9px !important;
+            font-size: 7px !important;
             width: 100% !important;
+            table-layout: fixed !important;
+            page-break-inside: avoid !important;
+          }
+          
+          thead {
+            display: table-header-group;
+          }
+          
+          tbody tr {
+            height: 12px !important;
+            max-height: 12px !important;
           }
           
           th, td {
-            padding: 2px !important;
+            padding: 1px !important;
+            height: 12px !important;
+            max-height: 12px !important;
+            overflow: hidden !important;
+            line-height: 1 !important;
+          }
+          
+          th:first-child, td:first-child {
+            width: 35px !important;
+          }
+          
+          .absolute {
+            position: absolute !important;
           }
           
           .bg-primary\\/20 {
-            background-color: rgba(147, 51, 234, 0.2) !important;
+            background-color: rgba(147, 51, 234, 0.3) !important;
           }
           
           .bg-primary\\/5 {
@@ -431,6 +464,49 @@ export default function Planning() {
           
           .bg-primary\\/10 {
             background-color: rgba(147, 51, 234, 0.1) !important;
+          }
+          
+          .bg-muted\\/50, .bg-muted\\/30 {
+            background-color: rgba(200, 200, 200, 0.3) !important;
+          }
+          
+          h1 {
+            font-size: 14px !important;
+            margin: 0 !important;
+          }
+          
+          .text-3xl {
+            font-size: 14px !important;
+          }
+          
+          .text-muted-foreground {
+            font-size: 10px !important;
+          }
+          
+          .p-3, .p-2, .p-4 {
+            padding: 4px !important;
+          }
+          
+          .gap-3, .gap-4 {
+            gap: 4px !important;
+          }
+          
+          .mb-8 {
+            margin-bottom: 8px !important;
+          }
+          
+          .py-8 {
+            padding-top: 4px !important;
+            padding-bottom: 0 !important;
+          }
+          
+          .rounded-xl {
+            border-radius: 4px !important;
+          }
+          
+          .w-6, .h-6 {
+            width: 14px !important;
+            height: 14px !important;
           }
         }
       `}</style>
