@@ -1,41 +1,17 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, Video } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
   {
-    title: "Liste Patients",
+    title: "Patients",
     description: "Gérez vos patients avec leurs informations complètes",
     icon: Users,
     href: "/patients",
     color: "from-blue-500 to-cyan-500",
     bgColor: "bg-blue-500/10",
-  },
-  {
-    title: "Exercices",
-    description: "Gérez vos exercices de rééducation",
-    icon: Dumbbell,
-    href: "/exercices",
-    color: "from-green-500 to-emerald-500",
-    bgColor: "bg-green-500/10",
-  },
-  {
-    title: "Vidéos",
-    description: "Accédez à votre vidéothèque",
-    icon: Video,
-    href: "/videos",
-    color: "from-purple-500 to-violet-500",
-    bgColor: "bg-purple-500/10",
-  },
-  {
-    title: "IA Diagnostic",
-    description: "Assistant IA pour l'analyse des symptômes",
-    icon: Brain,
-    href: "/ia-diagnostic",
-    color: "from-emerald-500 to-teal-500",
-    bgColor: "bg-emerald-500/10",
   },
   {
     title: "Notes",
@@ -46,7 +22,31 @@ const features = [
     bgColor: "bg-orange-500/10",
   },
   {
-    title: "Traitement Type",
+    title: "IA Diagnostic",
+    description: "Assistant IA pour l'analyse des symptômes",
+    icon: Brain,
+    href: "/ia-diagnostic",
+    color: "from-emerald-500 to-teal-500",
+    bgColor: "bg-emerald-500/10",
+  },
+  {
+    title: "Séance",
+    description: "Modèles de séances prédéfinies",
+    icon: Calendar,
+    href: "/seance-type",
+    color: "from-indigo-500 to-violet-500",
+    bgColor: "bg-indigo-500/10",
+  },
+  {
+    title: "Exercices",
+    description: "Gérez vos exercices de rééducation",
+    icon: Dumbbell,
+    href: "/exercices",
+    color: "from-green-500 to-emerald-500",
+    bgColor: "bg-green-500/10",
+  },
+  {
+    title: "TTT",
     description: "Modèles de traitements standardisés",
     icon: ClipboardList,
     href: "/traitement-type",
@@ -54,12 +54,12 @@ const features = [
     bgColor: "bg-rose-500/10",
   },
   {
-    title: "Séance Type",
-    description: "Modèles de séances prédéfinies",
-    icon: Calendar,
-    href: "/seance-type",
-    color: "from-indigo-500 to-violet-500",
-    bgColor: "bg-indigo-500/10",
+    title: "Formation",
+    description: "Développez vos compétences avec nos formations",
+    icon: GraduationCap,
+    href: "/formation",
+    color: "from-purple-500 to-violet-500",
+    bgColor: "bg-purple-500/10",
   },
 ];
 

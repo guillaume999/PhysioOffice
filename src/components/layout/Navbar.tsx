@@ -34,14 +34,6 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Link
-              to="/"
-              className={`font-medium transition-colors hover:text-primary ${
-                isActive("/") ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              Accueil
-            </Link>
             {user && (
               <>
                 <Link
@@ -51,6 +43,22 @@ export function Navbar() {
                   }`}
                 >
                   Patients
+                </Link>
+                <Link
+                  to="/notes"
+                  className={`font-medium transition-colors hover:text-primary ${
+                    isActive("/notes") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  Notes
+                </Link>
+                <Link
+                  to="/ia-diagnostic"
+                  className={`font-medium transition-colors hover:text-primary ${
+                    isActive("/ia-diagnostic") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  IA Diag
                 </Link>
                 <Link
                   to="/seance-type"
@@ -69,36 +77,12 @@ export function Navbar() {
                   Exercices
                 </Link>
                 <Link
-                  to="/videos"
-                  className={`font-medium transition-colors hover:text-primary ${
-                    isActive("/videos") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Vidéos
-                </Link>
-                <Link
                   to="/traitement-type"
                   className={`font-medium transition-colors hover:text-primary ${
                     isActive("/traitement-type") ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
                   TTT
-                </Link>
-                <Link
-                  to="/ia-diagnostic"
-                  className={`font-medium transition-colors hover:text-primary ${
-                    isActive("/ia-diagnostic") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  IA Diagnostic
-                </Link>
-                <Link
-                  to="/notes"
-                  className={`font-medium transition-colors hover:text-primary ${
-                    isActive("/notes") ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  Notes
                 </Link>
                 <Link
                   to="/formation"
