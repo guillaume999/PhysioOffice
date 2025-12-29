@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2 } from "lucide-react";
+import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -446,6 +447,16 @@ export default function PatientDetail() {
             >
               <Copy className="w-4 h-4" />
             </Button>
+            <ShareResourceDialog
+              resourceType="patient"
+              resourceId={id}
+              resourceName={patient.name}
+              trigger={
+                <Button variant="outline" size="icon" title="Partager ce patient" className="shrink-0">
+                  <Share2 className="w-4 h-4" />
+                </Button>
+              }
+            />
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="icon" className="shrink-0">

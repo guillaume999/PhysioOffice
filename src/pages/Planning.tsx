@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy, Share2 } from "lucide-react";
+import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, setHours, setMinutes, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -322,6 +323,15 @@ export default function Planning() {
               <Copy className="w-4 h-4 mr-2" />
               Dupliquer
             </Button>
+            <ShareResourceDialog
+              resourceType="planning"
+              trigger={
+                <Button variant="outline" className="print:hidden">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Partager
+                </Button>
+              }
+            />
           </div>
         </div>
 

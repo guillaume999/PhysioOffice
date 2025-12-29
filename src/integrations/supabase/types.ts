@@ -807,6 +807,42 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_shares: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          owner_user_id: string
+          permission: string
+          resource_id: string | null
+          resource_type: string
+          shared_with_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          owner_user_id: string
+          permission?: string
+          resource_id?: string | null
+          resource_type: string
+          shared_with_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          owner_user_id?: string
+          permission?: string
+          resource_id?: string | null
+          resource_type?: string
+          shared_with_user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       seance_comments: {
         Row: {
           content: string
@@ -1246,6 +1282,16 @@ export type Database = {
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_shared_access: {
+        Args: {
+          _owner_id: string
+          _required_permission?: string
+          _resource_id?: string
+          _resource_type: string
           _user_id: string
         }
         Returns: boolean
