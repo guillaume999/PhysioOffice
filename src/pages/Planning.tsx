@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, setHours, setMinutes, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +54,12 @@ export default function Planning() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [duration, setDuration] = useState<number>(30);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [duplicateMode, setDuplicateMode] = useState<"day" | "week">("week");
+  const [sourceDayIndex, setSourceDayIndex] = useState<number>(0);
+  const [targetDayIndex, setTargetDayIndex] = useState<number>(1);
+  const [targetWeekOffset, setTargetWeekOffset] = useState<number>(1);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -163,6 +169,83 @@ export default function Planning() {
     window.print();
   };
 
+  const handleDuplicate = async () => {
+    setIsDuplicating(true);
+    try {
+      if (duplicateMode === "week") {
+        // Duplicate entire week to target week
+        const targetWeekStart = addWeeks(startOfWeek(currentDate, { weekStartsOn: 1 }), targetWeekOffset);
+        
+        const appointmentsToDuplicate = appointments.map(apt => {
+          const originalStart = parseISO(apt.start_time);
+          const originalEnd = parseISO(apt.end_time);
+          const dayOfWeek = originalStart.getDay() === 0 ? 6 : originalStart.getDay() - 1; // Monday = 0
+          
+          const newStartDate = addDays(targetWeekStart, dayOfWeek);
+          const newStart = setMinutes(setHours(newStartDate, originalStart.getHours()), originalStart.getMinutes());
+          const newEnd = setMinutes(setHours(newStartDate, originalEnd.getHours()), originalEnd.getMinutes());
+          
+          return {
+            user_id: user?.id,
+            patient_id: apt.patient_id,
+            start_time: newStart.toISOString(),
+            end_time: newEnd.toISOString(),
+            notes: apt.notes,
+          };
+        });
+        
+        if (appointmentsToDuplicate.length > 0) {
+          const { error } = await supabase.from("appointments").insert(appointmentsToDuplicate);
+          if (error) throw error;
+        }
+        
+        toast({ title: "Semaine dupliquée", description: `${appointmentsToDuplicate.length} rendez-vous copiés` });
+      } else {
+        // Duplicate day to another day
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+        const sourceDay = addDays(weekStart, sourceDayIndex);
+        const targetDay = addDays(weekStart, targetDayIndex);
+        
+        const dayAppointments = appointments.filter(apt => {
+          const aptStart = parseISO(apt.start_time);
+          return isSameDay(aptStart, sourceDay);
+        });
+        
+        const appointmentsToDuplicate = dayAppointments.map(apt => {
+          const originalStart = parseISO(apt.start_time);
+          const originalEnd = parseISO(apt.end_time);
+          
+          const newStart = setMinutes(setHours(targetDay, originalStart.getHours()), originalStart.getMinutes());
+          const newEnd = setMinutes(setHours(targetDay, originalEnd.getHours()), originalEnd.getMinutes());
+          
+          return {
+            user_id: user?.id,
+            patient_id: apt.patient_id,
+            start_time: newStart.toISOString(),
+            end_time: newEnd.toISOString(),
+            notes: apt.notes,
+          };
+        });
+        
+        if (appointmentsToDuplicate.length > 0) {
+          const { error } = await supabase.from("appointments").insert(appointmentsToDuplicate);
+          if (error) throw error;
+        }
+        
+        toast({ title: "Jour dupliqué", description: `${appointmentsToDuplicate.length} rendez-vous copiés` });
+      }
+      
+      setIsDuplicateDialogOpen(false);
+      fetchAppointments();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
+  const DAY_NAMES = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
   const getAppointmentsForSlot = (date: Date, time: { hours: number; minutes: number }) => {
     return appointments.filter(apt => {
       const aptStart = parseISO(apt.start_time);
@@ -234,6 +317,10 @@ export default function Planning() {
             <Button variant="outline" onClick={handlePrint} className="print:hidden">
               <Printer className="w-4 h-4 mr-2" />
               Imprimer
+            </Button>
+            <Button variant="outline" onClick={() => setIsDuplicateDialogOpen(true)} className="print:hidden">
+              <Copy className="w-4 h-4 mr-2" />
+              Dupliquer
             </Button>
           </div>
         </div>
@@ -386,6 +473,96 @@ export default function Planning() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Dialog */}
+      <Dialog open={isDuplicateDialogOpen} onOpenChange={setIsDuplicateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dupliquer les rendez-vous</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Mode de duplication</Label>
+              <Select value={duplicateMode} onValueChange={(v: "day" | "week") => setDuplicateMode(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="week">Dupliquer la semaine entière</SelectItem>
+                  <SelectItem value="day">Dupliquer un jour</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {duplicateMode === "week" ? (
+              <div>
+                <Label>Vers quelle semaine ?</Label>
+                <Select value={targetWeekOffset.toString()} onValueChange={(v) => setTargetWeekOffset(parseInt(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Semaine prochaine (+1)</SelectItem>
+                    <SelectItem value="2">Dans 2 semaines (+2)</SelectItem>
+                    <SelectItem value="3">Dans 3 semaines (+3)</SelectItem>
+                    <SelectItem value="4">Dans 4 semaines (+4)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {appointments.length} rendez-vous seront dupliqués
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>Jour source</Label>
+                  <Select value={sourceDayIndex.toString()} onValueChange={(v) => setSourceDayIndex(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAY_NAMES.map((name, idx) => (
+                        <SelectItem key={idx} value={idx.toString()}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Vers quel jour ?</Label>
+                  <Select value={targetDayIndex.toString()} onValueChange={(v) => setTargetDayIndex(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAY_NAMES.map((name, idx) => (
+                        <SelectItem key={idx} value={idx.toString()} disabled={idx === sourceDayIndex}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {appointments.filter(apt => {
+                    const aptStart = parseISO(apt.start_time);
+                    const sourceDay = addDays(startOfWeek(currentDate, { weekStartsOn: 1 }), sourceDayIndex);
+                    return isSameDay(aptStart, sourceDay);
+                  }).length} rendez-vous seront dupliqués
+                </p>
+              </>
+            )}
+
+            <Button 
+              onClick={handleDuplicate} 
+              disabled={isDuplicating}
+              className="w-full gradient-primary text-primary-foreground"
+            >
+              {isDuplicating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Dupliquer
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
