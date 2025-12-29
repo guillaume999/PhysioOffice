@@ -34,7 +34,9 @@ import {
   X,
   Sparkles,
   CreditCard,
+  Newspaper,
 } from "lucide-react";
+import { NewsManagement } from "@/components/admin/NewsManagement";
 
 interface UserProfile {
   id: string;
@@ -1013,6 +1015,10 @@ export default function Admin() {
               <Shield className="w-4 h-4" />
               Permissions
             </TabsTrigger>
+            <TabsTrigger value="news" className="flex items-center gap-2">
+              <Newspaper className="w-4 h-4" />
+              News
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1752,6 +1758,10 @@ export default function Admin() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="news">
+            <NewsManagement />
           </TabsContent>
         </Tabs>
 
