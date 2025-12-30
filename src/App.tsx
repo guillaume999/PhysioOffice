@@ -26,6 +26,7 @@ import Pricing from "./pages/Pricing";
 import Planning from "./pages/Planning";
 import Formation from "./pages/Formation";
 import News from "./pages/News";
+import Annonces from "./pages/Annonces";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/planning" element={<Planning />} />
             <Route path="/formation" element={<Formation />} />
             <Route path="/news" element={<News />} />
+            <Route path="/annonces" element={<Annonces />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

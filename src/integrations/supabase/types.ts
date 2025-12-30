@@ -67,6 +67,87 @@ export type Database = {
           },
         ]
       }
+      annonce_settings: {
+        Row: {
+          created_at: string
+          extension_duration_days: number
+          extension_price_cents: number
+          featured_price_cents: number
+          free_duration_days: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          extension_duration_days?: number
+          extension_price_cents?: number
+          featured_price_cents?: number
+          free_duration_days?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          extension_duration_days?: number
+          extension_price_cents?: number
+          featured_price_cents?: number
+          free_duration_days?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      annonces: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          departement: string | null
+          description: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          region: string
+          title: string
+          type: Database["public"]["Enums"]["annonce_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          departement?: string | null
+          description: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          region: string
+          title: string
+          type: Database["public"]["Enums"]["annonce_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          departement?: string | null
+          description?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          region?: string
+          title?: string
+          type?: Database["public"]["Enums"]["annonce_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           created_at: string
@@ -1332,6 +1413,14 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      annonce_type:
+        | "remplacement_recherche"
+        | "remplacement_offre"
+        | "emploi_offre"
+        | "emploi_recherche"
+        | "association"
+        | "vente_cabinet"
+        | "autre"
       app_role: "admin" | "user"
       subscription_tier: "free" | "basic" | "premium"
     }
@@ -1461,6 +1550,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      annonce_type: [
+        "remplacement_recherche",
+        "remplacement_offre",
+        "emploi_offre",
+        "emploi_recherche",
+        "association",
+        "vente_cabinet",
+        "autre",
+      ],
       app_role: ["admin", "user"],
       subscription_tier: ["free", "basic", "premium"],
     },

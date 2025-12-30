@@ -2,7 +2,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
-import { LogOut, User, Shield } from "lucide-react";
+import { LogOut, User, Shield, Megaphone } from "lucide-react";
 
 export function Navbar() {
   const { user, signOut } = useAuth();
@@ -99,6 +99,15 @@ export function Navbar() {
                   }`}
                 >
                   Formation
+                </Link>
+                <Link
+                  to="/annonces"
+                  className={`font-medium transition-colors hover:text-primary flex items-center gap-1 ${
+                    isActive("/annonces") ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Megaphone className="w-4 h-4" />
+                  Annonces
                 </Link>
                 {isAdmin && (
                   <Link
