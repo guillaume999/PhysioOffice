@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const features = [
@@ -76,6 +76,14 @@ const features = [
     href: "/formation",
     color: "from-purple-500 to-violet-500",
     bgColor: "bg-purple-500/10",
+  },
+  {
+    title: "Annonces",
+    description: "Offres d'emploi et remplacements entre kinés",
+    icon: Megaphone,
+    href: "/annonces",
+    color: "from-yellow-500 to-orange-500",
+    bgColor: "bg-yellow-500/10",
   },
 ];
 
