@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Save, X, Newspaper } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, Newspaper, Tag } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -24,19 +24,22 @@ interface NewsItem {
   created_by: string;
 }
 
-const CATEGORIES = ["Nouveauté", "Formation", "Amélioration", "Annonce"];
+const DEFAULT_CATEGORIES = ["Nouveauté", "Formation", "Amélioration", "Annonce"];
 
 export function NewsManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
 
   // New news form
   const [showNewForm, setShowNewForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] = useState("Nouveauté");
+  const [newCustomCategory, setNewCustomCategory] = useState("");
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
   const [newIsNew, setNewIsNew] = useState(true);
 
   // Edit form
@@ -44,11 +47,20 @@ export function NewsManagement() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editCategory, setEditCategory] = useState("");
+  const [editCustomCategory, setEditCustomCategory] = useState("");
+  const [useEditCustomCategory, setUseEditCustomCategory] = useState(false);
   const [editIsNew, setEditIsNew] = useState(false);
 
   useEffect(() => {
     fetchNews();
   }, []);
+
+  // Extract unique categories from existing news
+  useEffect(() => {
+    const existingCategories = news.map((n) => n.category);
+    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...existingCategories])];
+    setCategories(allCategories);
+  }, [news]);
 
   const fetchNews = async () => {
     try {
@@ -74,13 +86,16 @@ export function NewsManagement() {
   const handleAddNews = async () => {
     if (!newTitle.trim() || !newDescription.trim() || !user) return;
 
+    const categoryToUse = useCustomCategory ? newCustomCategory.trim() : newCategory;
+    if (!categoryToUse) return;
+
     try {
       const { data, error } = await supabase
         .from("news")
         .insert({
           title: newTitle,
           description: newDescription,
-          category: newCategory,
+          category: categoryToUse,
           is_new: newIsNew,
           created_by: user.id,
         })
@@ -93,6 +108,8 @@ export function NewsManagement() {
       setNewTitle("");
       setNewDescription("");
       setNewCategory("Nouveauté");
+      setNewCustomCategory("");
+      setUseCustomCategory(false);
       setNewIsNew(true);
       setShowNewForm(false);
       toast({ title: "Actualité ajoutée" });
@@ -110,7 +127,18 @@ export function NewsManagement() {
     setEditingId(item.id);
     setEditTitle(item.title);
     setEditDescription(item.description);
-    setEditCategory(item.category);
+    
+    // Check if category is custom (not in default list)
+    if (!DEFAULT_CATEGORIES.includes(item.category)) {
+      setUseEditCustomCategory(true);
+      setEditCustomCategory(item.category);
+      setEditCategory("");
+    } else {
+      setUseEditCustomCategory(false);
+      setEditCategory(item.category);
+      setEditCustomCategory("");
+    }
+    
     setEditIsNew(item.is_new);
   };
 
@@ -119,11 +147,16 @@ export function NewsManagement() {
     setEditTitle("");
     setEditDescription("");
     setEditCategory("");
+    setEditCustomCategory("");
+    setUseEditCustomCategory(false);
     setEditIsNew(false);
   };
 
   const handleSaveEdit = async () => {
     if (!editingId || !editTitle.trim() || !editDescription.trim()) return;
+
+    const categoryToUse = useEditCustomCategory ? editCustomCategory.trim() : editCategory;
+    if (!categoryToUse) return;
 
     try {
       const { error } = await supabase
@@ -131,7 +164,7 @@ export function NewsManagement() {
         .update({
           title: editTitle,
           description: editDescription,
-          category: editCategory,
+          category: categoryToUse,
           is_new: editIsNew,
         })
         .eq("id", editingId);
@@ -140,7 +173,7 @@ export function NewsManagement() {
 
       setNews(news.map((n) =>
         n.id === editingId
-          ? { ...n, title: editTitle, description: editDescription, category: editCategory, is_new: editIsNew }
+          ? { ...n, title: editTitle, description: editDescription, category: categoryToUse, is_new: editIsNew }
           : n
       ));
       handleCancelEdit();
@@ -176,6 +209,14 @@ export function NewsManagement() {
         variant: "destructive",
       });
     }
+  };
+
+  const getSelectedCategory = () => {
+    return useCustomCategory ? newCustomCategory.trim() : newCategory;
+  };
+
+  const getEditSelectedCategory = () => {
+    return useEditCustomCategory ? editCustomCategory.trim() : editCategory;
   };
 
   if (loading) {
@@ -221,18 +262,38 @@ export function NewsManagement() {
                   rows={3}
                 />
                 <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-[150px]">
-                    <Label className="text-sm text-muted-foreground mb-1 block">Catégorie</Label>
-                    <Select value={newCategory} onValueChange={setNewCategory}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm text-muted-foreground">Catégorie</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-1 text-xs"
+                        onClick={() => setUseCustomCategory(!useCustomCategory)}
+                      >
+                        <Tag className="w-3 h-3 mr-1" />
+                        {useCustomCategory ? "Choisir existante" : "Nouvelle catégorie"}
+                      </Button>
+                    </div>
+                    {useCustomCategory ? (
+                      <Input
+                        placeholder="Nom de la nouvelle catégorie"
+                        value={newCustomCategory}
+                        onChange={(e) => setNewCustomCategory(e.target.value)}
+                      />
+                    ) : (
+                      <Select value={newCategory} onValueChange={setNewCategory}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 pt-6">
                     <Switch
@@ -245,7 +306,10 @@ export function NewsManagement() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleAddNews} disabled={!newTitle.trim() || !newDescription.trim()}>
+                <Button 
+                  onClick={handleAddNews} 
+                  disabled={!newTitle.trim() || !newDescription.trim() || !getSelectedCategory()}
+                >
                   <Save className="w-4 h-4 mr-2" />
                   Ajouter
                 </Button>
@@ -281,18 +345,38 @@ export function NewsManagement() {
                       rows={3}
                     />
                     <div className="flex flex-wrap gap-4">
-                      <div className="flex-1 min-w-[150px]">
-                        <Label className="text-sm text-muted-foreground mb-1 block">Catégorie</Label>
-                        <Select value={editCategory} onValueChange={setEditCategory}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CATEGORIES.map((cat) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="flex-1 min-w-[200px]">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-sm text-muted-foreground">Catégorie</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-1 text-xs"
+                            onClick={() => setUseEditCustomCategory(!useEditCustomCategory)}
+                          >
+                            <Tag className="w-3 h-3 mr-1" />
+                            {useEditCustomCategory ? "Choisir existante" : "Nouvelle catégorie"}
+                          </Button>
+                        </div>
+                        {useEditCustomCategory ? (
+                          <Input
+                            placeholder="Nom de la nouvelle catégorie"
+                            value={editCustomCategory}
+                            onChange={(e) => setEditCustomCategory(e.target.value)}
+                          />
+                        ) : (
+                          <Select value={editCategory} onValueChange={setEditCategory}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 pt-6">
                         <Switch
@@ -304,7 +388,11 @@ export function NewsManagement() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={handleSaveEdit} size="sm">
+                      <Button 
+                        onClick={handleSaveEdit} 
+                        size="sm"
+                        disabled={!getEditSelectedCategory()}
+                      >
                         <Save className="w-4 h-4 mr-2" />
                         Enregistrer
                       </Button>
