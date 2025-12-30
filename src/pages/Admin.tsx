@@ -35,8 +35,10 @@ import {
   Sparkles,
   CreditCard,
   Newspaper,
+  Megaphone,
 } from "lucide-react";
 import { NewsManagement } from "@/components/admin/NewsManagement";
+import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
 
 interface UserProfile {
   id: string;
@@ -1019,6 +1021,10 @@ export default function Admin() {
               <Newspaper className="w-4 h-4" />
               News
             </TabsTrigger>
+            <TabsTrigger value="annonces" className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4" />
+              Annonces
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1762,6 +1768,10 @@ export default function Admin() {
 
           <TabsContent value="news">
             <NewsManagement />
+          </TabsContent>
+
+          <TabsContent value="annonces">
+            <AnnoncesManagement />
           </TabsContent>
         </Tabs>
 
