@@ -279,12 +279,12 @@ export function NewsManagement() {
               className="pl-10"
             />
           </div>
-          <Select value={filterCategory || ""} onValueChange={(v) => setFilterCategory(v || null)}>
+          <Select value={filterCategory || "all"} onValueChange={(v) => setFilterCategory(v === "all" ? null : v)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Toutes catégories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Toutes catégories</SelectItem>
+              <SelectItem value="all">Toutes catégories</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat} value={cat}>{cat}</SelectItem>
               ))}
