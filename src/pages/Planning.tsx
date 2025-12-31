@@ -443,8 +443,8 @@ export default function Planning() {
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner un patient" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {patients.map(p => (
+                  <SelectContent className="max-h-[60vh] overflow-y-auto">
+                    {patients.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.numero && `(${p.numero})`}
                       </SelectItem>
