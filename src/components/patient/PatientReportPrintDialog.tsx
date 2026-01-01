@@ -161,34 +161,36 @@ export function PatientReportPrintDialog({
     }
     sections.push(`</div>`);
 
+    const emptyLines = '<span style="color: #999;">_________________________________________________<br/>_________________________________________________<br/>_________________________________________________</span>';
+
     if (options.includeAllergies) {
       sections.push(`<h2 class="section-title">Allergies</h2>`);
-      sections.push(`<p class="multiline">${patient.allergies || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${patient.allergies || emptyLines}</p>`);
     }
 
     if (options.includeAntecedents) {
       sections.push(`<h2 class="section-title">Antécédents</h2>`);
-      sections.push(`<p class="multiline">${patient.antecedents || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${patient.antecedents || emptyLines}</p>`);
     }
 
     if (options.includeMedicalNotes) {
       sections.push(`<h2 class="section-title">Notes médicales</h2>`);
-      sections.push(`<p class="multiline">${patient.medical_notes || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${patient.medical_notes || emptyLines}</p>`);
     }
 
     if (options.includeMotifConsultation) {
       sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
-      sections.push(`<p class="multiline">${carePlan.motif_consultation || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${carePlan.motif_consultation || emptyLines}</p>`);
     }
 
     if (options.includeBilanKine) {
       sections.push(`<h2 class="section-title">Bilan kiné</h2>`);
-      sections.push(`<p class="multiline">${carePlan.bilan_kine || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${carePlan.bilan_kine || emptyLines}</p>`);
     }
 
     if (options.includeObjectifs) {
       sections.push(`<h2 class="section-title">Objectifs de prise en charge</h2>`);
-      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge || emptyLines}</p>`);
     }
 
     if (options.includeTraitement) {
@@ -224,7 +226,7 @@ export function PatientReportPrintDialog({
 
     if (options.includeComments) {
       sections.push(`<h2 class="section-title">Commentaires</h2>`);
-      sections.push(`<p class="multiline">${carePlan.comments || '<span style="color: #999;">_________________________________________________</span>'}</p>`);
+      sections.push(`<p class="multiline">${carePlan.comments || emptyLines}</p>`);
     }
 
     return sections.join("\n");
