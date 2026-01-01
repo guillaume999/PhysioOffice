@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, Eye, User, FileText, Stethoscope, Settings2 } from "lucide-react";
+import { Printer, Eye, User, FileText, Stethoscope, Settings2, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TraitementSeance {
@@ -12,6 +12,24 @@ interface TraitementSeance {
   seance_date: string | null;
   objectifs_principaux: string[];
   pathologies: string[];
+}
+
+interface BilanIntermediaire {
+  id: string;
+  position_after_seance: number;
+  bilan_date: string | null;
+  content: string | null;
+}
+
+interface BilanInitialData {
+  profession?: string;
+  situation_fam?: string;
+  pathologie?: string;
+  plainte_patient?: string;
+  atcd?: string;
+  medicaments?: string;
+  commentaires?: string;
+  [key: string]: any;
 }
 
 interface PatientReportPrintDialogProps {
@@ -39,6 +57,8 @@ interface PatientReportPrintDialogProps {
   };
   activeTraitementName: string | null;
   traitementSeances?: TraitementSeance[];
+  bilanInitialData?: BilanInitialData | null;
+  bilansIntermediaires?: BilanIntermediaire[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -70,7 +90,9 @@ type OptionKey =
   | "includeBilanKine"
   | "includeObjectifs"
   | "includeTraitement"
-  | "includeDate";
+  | "includeDate"
+  | "includeBilanInitial"
+  | "includeBilansIntermediaires";
 
 interface OptionGroup {
   title: string;
@@ -95,6 +117,14 @@ const optionGroups: OptionGroup[] = [
     ],
   },
   {
+    title: "Bilans",
+    icon: <ClipboardList className="w-4 h-4" />,
+    options: [
+      { key: "includeBilanInitial", label: "Bilan initial" },
+      { key: "includeBilansIntermediaires", label: "Bilans intermédiaires" },
+    ],
+  },
+  {
     title: "Prise en charge",
     icon: <FileText className="w-4 h-4" />,
     options: [
@@ -114,6 +144,8 @@ export function PatientReportPrintDialog({
   carePlan,
   activeTraitementName,
   traitementSeances = [],
+  bilanInitialData = null,
+  bilansIntermediaires = [],
 }: PatientReportPrintDialogProps) {
   const [options, setOptions] = useState<Record<OptionKey, boolean>>({
     includePatientInfo: true,
@@ -132,6 +164,8 @@ export function PatientReportPrintDialog({
     includeObjectifs: true,
     includeTraitement: true,
     includeDate: true,
+    includeBilanInitial: true,
+    includeBilansIntermediaires: true,
   });
 
   const [activeTab, setActiveTab] = useState<"options" | "preview">("options");
@@ -140,6 +174,45 @@ export function PatientReportPrintDialog({
     setOptions({ ...options, [key]: !options[key] });
   };
 
+  const generateBilanInitialContent = () => {
+    if (!bilanInitialData) return "";
+    
+    const fields = [
+      { key: "profession", label: "Profession" },
+      { key: "situation_fam", label: "Situation familiale" },
+      { key: "pathologie", label: "Pathologie" },
+      { key: "plainte_patient", label: "Plainte patient" },
+      { key: "atcd", label: "Antécédents" },
+      { key: "medicaments", label: "Médicaments" },
+      { key: "commentaires", label: "Commentaires" },
+    ];
+
+    const content: string[] = [];
+    fields.forEach(({ key, label }) => {
+      if (bilanInitialData[key]) {
+        content.push(`<p><strong>${label} :</strong> ${bilanInitialData[key]}</p>`);
+      }
+    });
+
+    return content.join("\n");
+  };
+
+  const generateBilansIntermediairesContent = () => {
+    if (bilansIntermediaires.length === 0) return "";
+    
+    const content: string[] = [];
+    bilansIntermediaires.forEach((bilan, index) => {
+      const dateStr = bilan.bilan_date 
+        ? new Date(bilan.bilan_date).toLocaleDateString("fr-FR") 
+        : "Date non définie";
+      content.push(`<div style="margin-bottom: 15px;">`);
+      content.push(`<p><strong>Bilan ${index + 1}</strong> (après séance ${bilan.position_after_seance}) - ${dateStr}</p>`);
+      content.push(`<p style="white-space: pre-wrap;">${bilan.content || "Aucun contenu"}</p>`);
+      content.push(`</div>`);
+    });
+
+    return content.join("\n");
+  };
 
   const generatePreviewContent = () => {
     const sections: string[] = [];
@@ -174,6 +247,26 @@ export function PatientReportPrintDialog({
     if (options.includeMedicalNotes) {
       sections.push(`<h2 class="section-title">Notes médicales</h2>`);
       sections.push(`<p class="multiline">${patient.medical_notes ? patient.medical_notes + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeBilanInitial) {
+      sections.push(`<h2 class="section-title">Bilan initial</h2>`);
+      const bilanContent = generateBilanInitialContent();
+      if (bilanContent) {
+        sections.push(bilanContent);
+      } else {
+        sections.push(`<p class="multiline">${emptyLines}</p>`);
+      }
+    }
+
+    if (options.includeBilansIntermediaires) {
+      sections.push(`<h2 class="section-title">Bilans intermédiaires</h2>`);
+      const bilansContent = generateBilansIntermediairesContent();
+      if (bilansContent) {
+        sections.push(bilansContent);
+      } else {
+        sections.push(`<p><em>Aucun bilan intermédiaire</em></p>`);
+      }
     }
 
     if (options.includeMotifConsultation) {

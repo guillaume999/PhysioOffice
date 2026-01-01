@@ -91,6 +91,13 @@ export default function PatientDetail() {
     objectifs_principaux: string[];
     pathologies: string[];
   }[]>([]);
+  const [bilanInitialData, setBilanInitialData] = useState<Record<string, any> | null>(null);
+  const [bilansIntermediaires, setBilansIntermediaires] = useState<{
+    id: string;
+    position_after_seance: number;
+    bilan_date: string | null;
+    content: string | null;
+  }[]>([]);
   
   
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
@@ -138,7 +145,7 @@ export default function PatientDetail() {
   const fetchCarePlan = async () => {
     const { data, error } = await supabase
       .from("patient_care_plans")
-      .select("*")
+      .select("*, bilan_initial_data")
       .eq("patient_id", id)
       .maybeSingle();
     
@@ -153,6 +160,18 @@ export default function PatientDetail() {
         bilan_initial_date: data.bilan_initial_date || null,
         traitement_start_date: data.traitement_start_date || null,
       });
+
+      // Parse bilan initial data
+      if (data.bilan_initial_data) {
+        try {
+          const parsed = JSON.parse(data.bilan_initial_data);
+          setBilanInitialData(parsed);
+        } catch {
+          setBilanInitialData(null);
+        }
+      } else {
+        setBilanInitialData(null);
+      }
       
       if (data.active_traitement_id) {
         const { data: traitement } = await supabase
@@ -200,11 +219,28 @@ export default function PatientDetail() {
           }));
           setTraitementSeances(seances);
         }
+
+        // Fetch bilans intermediaires
+        const { data: bilansData } = await supabase
+          .from("patient_bilans")
+          .select("id, position_after_seance, bilan_date, content")
+          .eq("patient_id", id)
+          .eq("traitement_id", data.active_traitement_id)
+          .order("position_after_seance", { ascending: true });
+
+        if (bilansData) {
+          setBilansIntermediaires(bilansData);
+        } else {
+          setBilansIntermediaires([]);
+        }
       } else {
         setTraitementSeances([]);
+        setBilansIntermediaires([]);
       }
     } else {
       setTraitementSeances([]);
+      setBilanInitialData(null);
+      setBilansIntermediaires([]);
     }
   };
 
@@ -805,6 +841,8 @@ export default function PatientDetail() {
           }}
           activeTraitementName={activeTraitementName}
           traitementSeances={traitementSeances}
+          bilanInitialData={bilanInitialData}
+          bilansIntermediaires={bilansIntermediaires}
         />
       </div>
     </Layout>
