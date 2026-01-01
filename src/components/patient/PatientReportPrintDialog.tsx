@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, Eye } from "lucide-react";
+import { Printer, Eye, CheckSquare, Square, User, FileText, Stethoscope } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PatientReportPrintDialogProps {
   open: boolean;
@@ -45,6 +46,66 @@ const prescriptionLabels: Record<string, string> = {
   renouv_kine: "Renouv. kiné",
 };
 
+type OptionKey = 
+  | "includePatientInfo"
+  | "includeStatus"
+  | "includeMutual"
+  | "includeRemainingSessions"
+  | "includePrescription"
+  | "includeAddress"
+  | "includeMedicalNotes"
+  | "includeAllergies"
+  | "includeBloodType"
+  | "includeAntecedents"
+  | "includeComments"
+  | "includeMotifConsultation"
+  | "includeBilanKine"
+  | "includeObjectifs"
+  | "includeTraitement"
+  | "includeDate";
+
+interface OptionGroup {
+  title: string;
+  icon: React.ReactNode;
+  options: { key: OptionKey; label: string }[];
+}
+
+const optionGroups: OptionGroup[] = [
+  {
+    title: "Informations patient",
+    icon: <User className="w-4 h-4" />,
+    options: [
+      { key: "includePatientInfo", label: "Nom et numéro" },
+      { key: "includeStatus", label: "Statut" },
+      { key: "includeAddress", label: "Adresse" },
+      { key: "includeMutual", label: "Mutuelle" },
+      { key: "includeBloodType", label: "Groupe sanguin" },
+    ],
+  },
+  {
+    title: "Données médicales",
+    icon: <Stethoscope className="w-4 h-4" />,
+    options: [
+      { key: "includeAllergies", label: "Allergies" },
+      { key: "includeAntecedents", label: "Antécédents" },
+      { key: "includeMedicalNotes", label: "Notes médicales" },
+    ],
+  },
+  {
+    title: "Prise en charge",
+    icon: <FileText className="w-4 h-4" />,
+    options: [
+      { key: "includeMotifConsultation", label: "Motif de consultation" },
+      { key: "includeBilanKine", label: "Bilan kiné" },
+      { key: "includeObjectifs", label: "Objectifs" },
+      { key: "includeTraitement", label: "Plan de traitement" },
+      { key: "includePrescription", label: "Ordonnance" },
+      { key: "includeRemainingSessions", label: "Séances restantes" },
+      { key: "includeComments", label: "Commentaires" },
+    ],
+  },
+];
+
 export function PatientReportPrintDialog({
   open,
   onOpenChange,
@@ -52,7 +113,7 @@ export function PatientReportPrintDialog({
   carePlan,
   activeTraitementName,
 }: PatientReportPrintDialogProps) {
-  const [options, setOptions] = useState({
+  const [options, setOptions] = useState<Record<OptionKey, boolean>>({
     includePatientInfo: true,
     includeStatus: true,
     includeMutual: true,
@@ -71,9 +132,26 @@ export function PatientReportPrintDialog({
     includeDate: true,
   });
 
-  const toggleOption = (key: keyof typeof options) => {
+  const toggleOption = (key: OptionKey) => {
     setOptions({ ...options, [key]: !options[key] });
   };
+
+  const selectAll = () => {
+    const allTrue = Object.fromEntries(
+      Object.keys(options).map((key) => [key, true])
+    ) as Record<OptionKey, boolean>;
+    setOptions(allTrue);
+  };
+
+  const deselectAll = () => {
+    const allFalse = Object.fromEntries(
+      Object.keys(options).map((key) => [key, false])
+    ) as Record<OptionKey, boolean>;
+    setOptions(allFalse);
+  };
+
+  const selectedCount = Object.values(options).filter(Boolean).length;
+  const totalCount = Object.keys(options).length;
 
   const generatePreviewContent = () => {
     const sections: string[] = [];
@@ -242,208 +320,113 @@ export function PatientReportPrintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Printer className="w-5 h-5" />
-            Imprimer le compte-rendu patient
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <Printer className="w-5 h-5 text-primary" />
+            Imprimer le compte-rendu
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {patient.name}
+          </p>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Options */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Éléments à inclure
-            </h3>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includePatientInfo"
-                    checked={options.includePatientInfo}
-                    onCheckedChange={() => toggleOption("includePatientInfo")}
-                  />
-                  <Label htmlFor="includePatientInfo" className="cursor-pointer">
-                    Informations patient (nom, numéro)
-                  </Label>
-                </div>
+          <div className="flex flex-col space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">
+                {selectedCount}/{totalCount} éléments
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={selectAll}
+                  className="h-8 text-xs"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                  Tout
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={deselectAll}
+                  className="h-8 text-xs"
+                >
+                  <Square className="w-3.5 h-3.5 mr-1.5" />
+                  Aucun
+                </Button>
+              </div>
+            </div>
 
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeStatus"
-                    checked={options.includeStatus}
-                    onCheckedChange={() => toggleOption("includeStatus")}
-                  />
-                  <Label htmlFor="includeStatus" className="cursor-pointer">
-                    Statut
-                  </Label>
-                </div>
+            <ScrollArea className="flex-1 pr-3">
+              <div className="space-y-4">
+                {optionGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                      {group.icon}
+                      {group.title}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
+                      {group.options.map(({ key, label }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                            options[key] && "bg-accent/50"
+                          )}
+                          onClick={() => toggleOption(key)}
+                        >
+                          <Checkbox
+                            id={key}
+                            checked={options[key]}
+                            onCheckedChange={() => toggleOption(key)}
+                            className="h-4 w-4"
+                          />
+                          <Label
+                            htmlFor={key}
+                            className="cursor-pointer text-sm leading-tight"
+                          >
+                            {label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
 
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeMutual"
-                    checked={options.includeMutual}
-                    onCheckedChange={() => toggleOption("includeMutual")}
-                  />
-                  <Label htmlFor="includeMutual" className="cursor-pointer">
-                    Mutuelle
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeRemainingSessions"
-                    checked={options.includeRemainingSessions}
-                    onCheckedChange={() => toggleOption("includeRemainingSessions")}
-                  />
-                  <Label htmlFor="includeRemainingSessions" className="cursor-pointer">
-                    Séances restantes
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includePrescription"
-                    checked={options.includePrescription}
-                    onCheckedChange={() => toggleOption("includePrescription")}
-                  />
-                  <Label htmlFor="includePrescription" className="cursor-pointer">
-                    Ordonnance
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeAddress"
-                    checked={options.includeAddress}
-                    onCheckedChange={() => toggleOption("includeAddress")}
-                  />
-                  <Label htmlFor="includeAddress" className="cursor-pointer">
-                    Adresse
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeBloodType"
-                    checked={options.includeBloodType}
-                    onCheckedChange={() => toggleOption("includeBloodType")}
-                  />
-                  <Label htmlFor="includeBloodType" className="cursor-pointer">
-                    Groupe sanguin
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeAllergies"
-                    checked={options.includeAllergies}
-                    onCheckedChange={() => toggleOption("includeAllergies")}
-                  />
-                  <Label htmlFor="includeAllergies" className="cursor-pointer">
-                    Allergies
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeAntecedents"
-                    checked={options.includeAntecedents}
-                    onCheckedChange={() => toggleOption("includeAntecedents")}
-                  />
-                  <Label htmlFor="includeAntecedents" className="cursor-pointer">
-                    Antécédents
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeMedicalNotes"
-                    checked={options.includeMedicalNotes}
-                    onCheckedChange={() => toggleOption("includeMedicalNotes")}
-                  />
-                  <Label htmlFor="includeMedicalNotes" className="cursor-pointer">
-                    Notes médicales
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeMotifConsultation"
-                    checked={options.includeMotifConsultation}
-                    onCheckedChange={() => toggleOption("includeMotifConsultation")}
-                  />
-                  <Label htmlFor="includeMotifConsultation" className="cursor-pointer">
-                    Motif de consultation
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeBilanKine"
-                    checked={options.includeBilanKine}
-                    onCheckedChange={() => toggleOption("includeBilanKine")}
-                  />
-                  <Label htmlFor="includeBilanKine" className="cursor-pointer">
-                    Bilan kiné
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeObjectifs"
-                    checked={options.includeObjectifs}
-                    onCheckedChange={() => toggleOption("includeObjectifs")}
-                  />
-                  <Label htmlFor="includeObjectifs" className="cursor-pointer">
-                    Objectifs de prise en charge
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeTraitement"
-                    checked={options.includeTraitement}
-                    onCheckedChange={() => toggleOption("includeTraitement")}
-                  />
-                  <Label htmlFor="includeTraitement" className="cursor-pointer">
-                    Plan de traitement
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeComments"
-                    checked={options.includeComments}
-                    onCheckedChange={() => toggleOption("includeComments")}
-                  />
-                  <Label htmlFor="includeComments" className="cursor-pointer">
-                    Commentaires
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="includeDate"
-                    checked={options.includeDate}
-                    onCheckedChange={() => toggleOption("includeDate")}
-                  />
-                  <Label htmlFor="includeDate" className="cursor-pointer">
-                    Date d'impression
-                  </Label>
+                {/* Date option séparée */}
+                <div className="pt-2 border-t">
+                  <div
+                    className={cn(
+                      "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                      options.includeDate && "bg-accent/50"
+                    )}
+                    onClick={() => toggleOption("includeDate")}
+                  >
+                    <Checkbox
+                      id="includeDate"
+                      checked={options.includeDate}
+                      onCheckedChange={() => toggleOption("includeDate")}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="includeDate" className="cursor-pointer text-sm">
+                      Inclure la date d'impression
+                    </Label>
+                  </div>
                 </div>
               </div>
             </ScrollArea>
           </div>
 
           {/* Preview */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          <div className="flex flex-col space-y-2 min-h-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
               <Eye className="w-4 h-4" />
               Aperçu
-            </h3>
-            <ScrollArea className="h-[400px] border rounded-lg">
+            </div>
+            <ScrollArea className="flex-1 border rounded-lg bg-white dark:bg-zinc-900">
               <div
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
                 className="min-h-full"
@@ -452,11 +435,15 @@ export function PatientReportPrintDialog({
           </div>
         </div>
 
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="flex-1 sm:flex-none"
+          >
             Annuler
           </Button>
-          <Button onClick={handlePrint}>
+          <Button onClick={handlePrint} className="flex-1 sm:flex-none">
             <Printer className="w-4 h-4 mr-2" />
             Imprimer
           </Button>
