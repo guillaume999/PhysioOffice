@@ -609,6 +609,7 @@ export type Database = {
       patient_care_plans: {
         Row: {
           active_traitement_id: string | null
+          bilan_initial_data: string | null
           bilan_initial_date: string | null
           bilan_kine: string | null
           comments: string | null
@@ -623,6 +624,7 @@ export type Database = {
         }
         Insert: {
           active_traitement_id?: string | null
+          bilan_initial_data?: string | null
           bilan_initial_date?: string | null
           bilan_kine?: string | null
           comments?: string | null
@@ -637,6 +639,7 @@ export type Database = {
         }
         Update: {
           active_traitement_id?: string | null
+          bilan_initial_data?: string | null
           bilan_initial_date?: string | null
           bilan_kine?: string | null
           comments?: string | null

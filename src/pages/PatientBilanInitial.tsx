@@ -153,18 +153,18 @@ export default function PatientBilanInitial() {
 
     const { data: carePlan } = await supabase
       .from("patient_care_plans")
-      .select("bilan_kine")
+      .select("bilan_initial_data")
       .eq("patient_id", id)
       .maybeSingle();
 
-    if (carePlan?.bilan_kine) {
+    if (carePlan?.bilan_initial_data) {
       try {
-        const parsed = JSON.parse(carePlan.bilan_kine);
+        const parsed = JSON.parse(carePlan.bilan_initial_data);
         if (typeof parsed === "object") {
           setBilan({ ...defaultBilan, ...parsed });
         }
       } catch {
-        setBilan(prev => ({ ...prev, commentaires: carePlan.bilan_kine || "" }));
+        // If parsing fails, start fresh
       }
     }
 
@@ -186,7 +186,7 @@ export default function PatientBilanInitial() {
     if (existingPlan) {
       await supabase
         .from("patient_care_plans")
-        .update({ bilan_kine: bilanJson })
+        .update({ bilan_initial_data: bilanJson })
         .eq("id", existingPlan.id);
     } else {
       await supabase
@@ -194,7 +194,7 @@ export default function PatientBilanInitial() {
         .insert({
           patient_id: id,
           user_id: user.id,
-          bilan_kine: bilanJson,
+          bilan_initial_data: bilanJson,
         });
     }
 
