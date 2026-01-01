@@ -304,124 +304,124 @@ export function PatientReportPrintDialog({
     </div>
   `;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-hidden flex flex-col p-4 sm:p-6">
-        <DialogHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <Printer className="w-5 h-5 text-primary" />
-              Imprimer
-            </DialogTitle>
-            <div className="flex gap-1 bg-muted rounded-lg p-1">
-              <Button
-                variant={activeTab === "options" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("options")}
-                className="h-8 px-3 text-xs"
-              >
-                <Settings2 className="w-4 h-4 mr-1.5" />
-                Options
-              </Button>
-              <Button
-                variant={activeTab === "preview" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab("preview")}
-                className="h-8 px-3 text-xs"
-              >
-                <Eye className="w-4 h-4 mr-1.5" />
-                Aperçu
-              </Button>
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col p-4 sm:p-6">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Printer className="w-5 h-5 text-primary" />
+                Imprimer
+              </DialogTitle>
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={activeTab === "options" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("options")}
+                  className="h-8 px-3 text-xs"
+                >
+                  <Settings2 className="w-4 h-4 mr-1.5" />
+                  Options
+                </Button>
+                <Button
+                  variant={activeTab === "preview" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("preview")}
+                  className="h-8 px-3 text-xs"
+                >
+                  <Eye className="w-4 h-4 mr-1.5" />
+                  Aperçu
+                </Button>
+              </div>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground">{patient.name}</p>
-        </DialogHeader>
+            <p className="text-sm text-muted-foreground">{patient.name}</p>
+          </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {/* Options */}
-          {activeTab === "options" && (
-            <ScrollArea className="h-full">
-              <div className="space-y-4 pr-3">
-                {optionGroups.map((group) => (
-                  <div key={group.title} className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
-                      {group.icon}
-                      {group.title}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
-                      {group.options.map(({ key, label }) => (
-                        <div
-                          key={key}
-                          className={cn(
-                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                            options[key] && "bg-accent/50"
-                          )}
-                          onClick={() => toggleOption(key)}
-                        >
-                          <Checkbox
-                            id={key}
-                            checked={options[key]}
-                            onCheckedChange={() => toggleOption(key)}
-                            className="h-4 w-4"
-                          />
-                          <Label
-                            htmlFor={key}
-                            className="cursor-pointer text-sm leading-tight"
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {/* Options */}
+            {activeTab === "options" && (
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="space-y-4 pr-3">
+                  {optionGroups.map((group) => (
+                    <div key={group.title} className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                        {group.icon}
+                        {group.title}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
+                        {group.options.map(({ key, label }) => (
+                          <div
+                            key={key}
+                            className={cn(
+                              "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                              options[key] && "bg-accent/50"
+                            )}
+                            onClick={() => toggleOption(key)}
                           >
-                            {label}
-                          </Label>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={key}
+                              checked={options[key]}
+                              onCheckedChange={() => toggleOption(key)}
+                              className="h-4 w-4"
+                            />
+                            <Label
+                              htmlFor={key}
+                              className="cursor-pointer text-sm leading-tight"
+                            >
+                              {label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Date option séparée */}
-                <div className="pt-2 border-t">
-                  <div
-                    className={cn(
-                      "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                      options.includeDate && "bg-accent/50"
-                    )}
-                    onClick={() => toggleOption("includeDate")}
-                  >
-                    <Checkbox
-                      id="includeDate"
-                      checked={options.includeDate}
-                      onCheckedChange={() => toggleOption("includeDate")}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor="includeDate" className="cursor-pointer text-sm">
-                      Inclure la date d'impression
-                    </Label>
+                  {/* Date option séparée */}
+                  <div className="pt-2 border-t">
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                        options.includeDate && "bg-accent/50"
+                      )}
+                      onClick={() => toggleOption("includeDate")}
+                    >
+                      <Checkbox
+                        id="includeDate"
+                        checked={options.includeDate}
+                        onCheckedChange={() => toggleOption("includeDate")}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="includeDate" className="cursor-pointer text-sm">
+                        Inclure la date d'impression
+                      </Label>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </ScrollArea>
-          )}
+              </ScrollArea>
+            )}
 
-          {/* Preview */}
-          {activeTab === "preview" && (
-            <ScrollArea className="h-full border rounded-lg bg-card">
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
-            </ScrollArea>
-          )}
-        </div>
+            {/* Preview */}
+            {activeTab === "preview" && (
+              <ScrollArea className="flex-1 min-h-0 border rounded-lg bg-card">
+                <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
+              </ScrollArea>
+            )}
+          </div>
 
-        <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="flex-1 sm:flex-none"
-          >
-            Annuler
-          </Button>
-          <Button onClick={handlePrint} className="flex-1 sm:flex-none">
-            <Printer className="w-4 h-4 mr-2" />
-            Imprimer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+          <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 sm:flex-none"
+            >
+              Annuler
+            </Button>
+            <Button onClick={handlePrint} className="flex-1 sm:flex-none">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
 }
