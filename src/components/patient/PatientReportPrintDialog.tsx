@@ -331,7 +331,7 @@ export function PatientReportPrintDialog({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Compte-rendu - ${patient.name}</title>
+          <title>Compte-rendu Patient</title>
           <style>
             body {
               font-family: Arial, sans-serif;
