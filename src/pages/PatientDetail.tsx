@@ -85,17 +85,6 @@ export default function PatientDetail() {
     traitement_start_date: null,
   });
   const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
-  const [traitementSeances, setTraitementSeances] = useState<{
-    ordre: number;
-    seance_date: string | null;
-    objectifs_principaux: string[];
-    pathologies: string[];
-  }[]>([]);
-  const [bilansIntermediaires, setBilansIntermediaires] = useState<{
-    id: string;
-    bilan_date: string | null;
-    position_after_seance: number;
-  }[]>([]);
   
   
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
@@ -117,22 +106,8 @@ export default function PatientDetail() {
     if (user && id) {
       fetchPatient();
       fetchCarePlan();
-      fetchBilansIntermediaires();
     }
   }, [user, id]);
-
-  const fetchBilansIntermediaires = async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from("patient_bilans")
-      .select("id, bilan_date, position_after_seance")
-      .eq("patient_id", id)
-      .order("position_after_seance", { ascending: true });
-    
-    if (data) {
-      setBilansIntermediaires(data);
-    }
-  };
 
   const fetchPatient = async () => {
     const { data, error } = await supabase
@@ -183,47 +158,7 @@ export default function PatientDetail() {
         if (traitement) {
           setActiveTraitementName(traitement.pathologie);
         }
-
-        // Fetch seances of the treatment with their dates
-        const { data: traitementSeancesData } = await supabase
-          .from("traitement_seances")
-          .select(`
-            ordre,
-            seance_type_id,
-            seance_types (
-              objectifs_principaux,
-              pathologies
-            )
-          `)
-          .eq("traitement_type_id", data.active_traitement_id)
-          .order("ordre", { ascending: true });
-
-        // Fetch seance dates for this patient and treatment
-        const { data: seanceDatesData } = await supabase
-          .from("patient_traitement_seance_dates")
-          .select("seance_ordre, seance_date")
-          .eq("patient_id", id)
-          .eq("traitement_id", data.active_traitement_id);
-
-        const datesMap = new Map<number, string | null>();
-        seanceDatesData?.forEach((d) => {
-          datesMap.set(d.seance_ordre, d.seance_date);
-        });
-
-        if (traitementSeancesData) {
-          const seances = traitementSeancesData.map((ts: any) => ({
-            ordre: ts.ordre,
-            seance_date: datesMap.get(ts.ordre) || null,
-            objectifs_principaux: ts.seance_types?.objectifs_principaux || [],
-            pathologies: ts.seance_types?.pathologies || [],
-          }));
-          setTraitementSeances(seances);
-        }
-      } else {
-        setTraitementSeances([]);
       }
-    } else {
-      setTraitementSeances([]);
     }
   };
 
@@ -758,11 +693,8 @@ export default function PatientDetail() {
             motif_consultation: carePlan.motif_consultation,
             bilan_kine: carePlan.bilan_kine,
             objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-            bilan_initial_date: carePlan.bilan_initial_date,
           }}
           activeTraitementName={activeTraitementName}
-          traitementSeances={traitementSeances}
-          bilansIntermediaires={bilansIntermediaires}
         />
       </div>
     </Layout>
