@@ -4,8 +4,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, Eye, User, FileText, Stethoscope } from "lucide-react";
+import { Printer, Eye, User, FileText, Stethoscope, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface TraitementSeance {
+  ordre: number;
+  seance_date: string | null;
+  objectifs_principaux: string[];
+  pathologies: string[];
+}
 
 interface PatientReportPrintDialogProps {
   open: boolean;
@@ -31,6 +38,7 @@ interface PatientReportPrintDialogProps {
     objectifs_prise_en_charge: string;
   };
   activeTraitementName: string | null;
+  traitementSeances?: TraitementSeance[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -75,11 +83,7 @@ const optionGroups: OptionGroup[] = [
     title: "Informations patient",
     icon: <User className="w-4 h-4" />,
     options: [
-      { key: "includePatientInfo", label: "Nom et numéro" },
-      { key: "includeStatus", label: "Statut" },
-      { key: "includeAddress", label: "Adresse" },
-      { key: "includeMutual", label: "Mutuelle" },
-      { key: "includeBloodType", label: "Groupe sanguin" },
+      { key: "includePatientInfo", label: "Numéro" },
     ],
   },
   {
@@ -88,7 +92,6 @@ const optionGroups: OptionGroup[] = [
     options: [
       { key: "includeAllergies", label: "Allergies" },
       { key: "includeAntecedents", label: "Antécédents" },
-      { key: "includeMedicalNotes", label: "Notes médicales" },
     ],
   },
   {
@@ -99,8 +102,6 @@ const optionGroups: OptionGroup[] = [
       { key: "includeBilanKine", label: "Bilan kiné" },
       { key: "includeObjectifs", label: "Objectifs" },
       { key: "includeTraitement", label: "Plan de traitement" },
-      { key: "includePrescription", label: "Ordonnance" },
-      { key: "includeRemainingSessions", label: "Séances restantes" },
       { key: "includeComments", label: "Commentaires" },
     ],
   },
@@ -112,6 +113,7 @@ export function PatientReportPrintDialog({
   patient,
   carePlan,
   activeTraitementName,
+  traitementSeances = [],
 }: PatientReportPrintDialogProps) {
   const [options, setOptions] = useState<Record<OptionKey, boolean>>({
     includePatientInfo: true,
@@ -132,6 +134,8 @@ export function PatientReportPrintDialog({
     includeDate: true,
   });
 
+  const [activeTab, setActiveTab] = useState<"options" | "preview">("options");
+
   const toggleOption = (key: OptionKey) => {
     setOptions({ ...options, [key]: !options[key] });
   };
@@ -140,77 +144,87 @@ export function PatientReportPrintDialog({
   const generatePreviewContent = () => {
     const sections: string[] = [];
     
-    if (options.includePatientInfo) {
-      sections.push(`<h2 class="section-title">Informations patient</h2>`);
-      sections.push(`<p><strong>Nom :</strong> ${patient.name}</p>`);
-      if (patient.numero) {
-        sections.push(`<p><strong>N° Patient :</strong> ${patient.numero}</p>`);
+    // Toujours afficher les champs d'identification vides en 2 colonnes
+    sections.push(`<h2 class="section-title">Informations patient</h2>`);
+    sections.push(`<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">`);
+    sections.push(`<p><strong>Nom :</strong> ____________________</p>`);
+    sections.push(`<p><strong>Prénom :</strong> ____________________</p>`);
+    sections.push(`<p><strong>N° Téléphone :</strong> ____________________</p>`);
+    sections.push(`<p><strong>Mutuelle :</strong> ____________________</p>`);
+    sections.push(`<p><strong>N° Sécu. Soc. :</strong> ____________________</p>`);
+    sections.push(`<p><strong>Médecin prescripteur :</strong> ____________________</p>`);
+    if (options.includePatientInfo && patient.numero) {
+      sections.push(`<p><strong>N° Patient :</strong> ${patient.numero}</p>`);
+    }
+    sections.push(`</div>`);
+
+    const emptyLines = '<span style="color: #999;">_________________________________________________<br/>_________________________________________________<br/>_________________________________________________</span>';
+    const extraLines = '<br/><span style="color: #999;">_________________________________________________<br/>_________________________________________________</span>';
+
+    if (options.includeAllergies) {
+      sections.push(`<h2 class="section-title">Allergies</h2>`);
+      sections.push(`<p class="multiline">${patient.allergies ? patient.allergies + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeAntecedents) {
+      sections.push(`<h2 class="section-title">Antécédents</h2>`);
+      sections.push(`<p class="multiline">${patient.antecedents ? patient.antecedents + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeMedicalNotes) {
+      sections.push(`<h2 class="section-title">Notes médicales</h2>`);
+      sections.push(`<p class="multiline">${patient.medical_notes ? patient.medical_notes + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeMotifConsultation) {
+      sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
+      sections.push(`<p class="multiline">${carePlan.motif_consultation ? carePlan.motif_consultation + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeBilanKine) {
+      sections.push(`<h2 class="section-title">Bilan kiné</h2>`);
+      sections.push(`<p class="multiline">${carePlan.bilan_kine ? carePlan.bilan_kine + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeObjectifs) {
+      sections.push(`<h2 class="section-title">Objectifs de prise en charge</h2>`);
+      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge ? carePlan.objectifs_prise_en_charge + extraLines : emptyLines}</p>`);
+    }
+
+    if (options.includeTraitement) {
+      sections.push(`<h2 class="section-title">Plan de traitement</h2>`);
+      sections.push(`<p><strong>Traitement :</strong> ${activeTraitementName || '____________________'}</p>`);
+      
+      if (traitementSeances.length > 0) {
+        sections.push(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">`);
+        sections.push(`<thead><tr style="background: #f5f5f5;">`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">N°</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs</th>`);
+        sections.push(`</tr></thead><tbody>`);
+        
+        traitementSeances.forEach((seance) => {
+          const dateStr = seance.seance_date 
+            ? new Date(seance.seance_date).toLocaleDateString("fr-FR") 
+            : "____/____/________";
+          const objectifs = seance.objectifs_principaux.length > 0 
+            ? seance.objectifs_principaux.join(", ") 
+            : seance.pathologies.join(", ") || "-";
+          
+          sections.push(`<tr>`);
+          sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${seance.ordre}</td>`);
+          sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${dateStr}</td>`);
+          sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifs}</td>`);
+          sections.push(`</tr>`);
+        });
+        
+        sections.push(`</tbody></table>`);
       }
     }
 
-    if (options.includeStatus) {
-      sections.push(`<p><strong>Statut :</strong> ${statusLabels[patient.status] || patient.status}</p>`);
-    }
-
-    if (options.includeMutual) {
-      sections.push(`<p><strong>Mutuelle :</strong> ${patient.has_mutual ? "Oui" : "Non"}</p>`);
-    }
-
-    if (options.includeRemainingSessions && patient.remaining_sessions !== null) {
-      sections.push(`<p><strong>Séances restantes :</strong> ${patient.remaining_sessions}</p>`);
-    }
-
-    if (options.includePrescription && patient.prescription) {
-      sections.push(`<p><strong>Ordonnance :</strong> ${prescriptionLabels[patient.prescription] || patient.prescription}</p>`);
-    }
-
-    if (options.includeAddress && (patient.address || patient.postal_code)) {
-      const addressParts = [patient.address, patient.postal_code].filter(Boolean).join(", ");
-      sections.push(`<p><strong>Adresse :</strong> ${addressParts}</p>`);
-    }
-
-    if (options.includeBloodType && patient.blood_type) {
-      sections.push(`<p><strong>Groupe sanguin :</strong> ${patient.blood_type}</p>`);
-    }
-
-    if (options.includeAllergies && patient.allergies) {
-      sections.push(`<h2 class="section-title">Allergies</h2>`);
-      sections.push(`<p class="multiline">${patient.allergies}</p>`);
-    }
-
-    if (options.includeAntecedents && patient.antecedents) {
-      sections.push(`<h2 class="section-title">Antécédents</h2>`);
-      sections.push(`<p class="multiline">${patient.antecedents}</p>`);
-    }
-
-    if (options.includeMedicalNotes && patient.medical_notes) {
-      sections.push(`<h2 class="section-title">Notes médicales</h2>`);
-      sections.push(`<p class="multiline">${patient.medical_notes}</p>`);
-    }
-
-    if (options.includeMotifConsultation && carePlan.motif_consultation) {
-      sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
-      sections.push(`<p class="multiline">${carePlan.motif_consultation}</p>`);
-    }
-
-    if (options.includeBilanKine && carePlan.bilan_kine) {
-      sections.push(`<h2 class="section-title">Bilan kiné</h2>`);
-      sections.push(`<p class="multiline">${carePlan.bilan_kine}</p>`);
-    }
-
-    if (options.includeObjectifs && carePlan.objectifs_prise_en_charge) {
-      sections.push(`<h2 class="section-title">Objectifs de prise en charge</h2>`);
-      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge}</p>`);
-    }
-
-    if (options.includeTraitement && activeTraitementName) {
-      sections.push(`<h2 class="section-title">Plan de traitement</h2>`);
-      sections.push(`<p>${activeTraitementName}</p>`);
-    }
-
-    if (options.includeComments && carePlan.comments) {
+    if (options.includeComments) {
       sections.push(`<h2 class="section-title">Commentaires</h2>`);
-      sections.push(`<p class="multiline">${carePlan.comments}</p>`);
+      sections.push(`<p class="multiline">${carePlan.comments ? carePlan.comments + extraLines : emptyLines}</p>`);
     }
 
     return sections.join("\n");
@@ -302,106 +316,124 @@ export function PatientReportPrintDialog({
     </div>
   `;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-hidden flex flex-col p-4 sm:p-6">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <Printer className="w-5 h-5 text-primary" />
-            Imprimer le compte-rendu
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">{patient.name}</p>
-        </DialogHeader>
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col p-4 sm:p-6">
+          <DialogHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Printer className="w-5 h-5 text-primary" />
+                Imprimer
+              </DialogTitle>
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={activeTab === "options" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("options")}
+                  className="h-8 px-3 text-xs"
+                >
+                  <Settings2 className="w-4 h-4 mr-1.5" />
+                  Options
+                </Button>
+                <Button
+                  variant={activeTab === "preview" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("preview")}
+                  className="h-8 px-3 text-xs"
+                >
+                  <Eye className="w-4 h-4 mr-1.5" />
+                  Aperçu
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">{patient.name}</p>
+          </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Options */}
-          <div className="flex flex-col min-h-0">
-            <ScrollArea className="flex-1 min-h-0 pr-3">
-              <div className="space-y-4">
-                {optionGroups.map((group) => (
-                  <div key={group.title} className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
-                      {group.icon}
-                      {group.title}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
-                      {group.options.map(({ key, label }) => (
-                        <div
-                          key={key}
-                          className={cn(
-                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                            options[key] && "bg-accent/50"
-                          )}
-                          onClick={() => toggleOption(key)}
-                        >
-                          <Checkbox
-                            id={key}
-                            checked={options[key]}
-                            onCheckedChange={() => toggleOption(key)}
-                            className="h-4 w-4"
-                          />
-                          <Label
-                            htmlFor={key}
-                            className="cursor-pointer text-sm leading-tight"
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {/* Options */}
+            {activeTab === "options" && (
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="space-y-4 pr-3">
+                  {optionGroups.map((group) => (
+                    <div key={group.title} className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                        {group.icon}
+                        {group.title}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
+                        {group.options.map(({ key, label }) => (
+                          <div
+                            key={key}
+                            className={cn(
+                              "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                              options[key] && "bg-accent/50"
+                            )}
+                            onClick={() => toggleOption(key)}
                           >
-                            {label}
-                          </Label>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={key}
+                              checked={options[key]}
+                              onCheckedChange={() => toggleOption(key)}
+                              className="h-4 w-4"
+                            />
+                            <Label
+                              htmlFor={key}
+                              className="cursor-pointer text-sm leading-tight"
+                            >
+                              {label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Date option séparée */}
-                <div className="pt-2 border-t">
-                  <div
-                    className={cn(
-                      "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                      options.includeDate && "bg-accent/50"
-                    )}
-                    onClick={() => toggleOption("includeDate")}
-                  >
-                    <Checkbox
-                      id="includeDate"
-                      checked={options.includeDate}
-                      onCheckedChange={() => toggleOption("includeDate")}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor="includeDate" className="cursor-pointer text-sm">
-                      Inclure la date d'impression
-                    </Label>
+                  {/* Date option séparée */}
+                  <div className="pt-2 border-t">
+                    <div
+                      className={cn(
+                        "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                        options.includeDate && "bg-accent/50"
+                      )}
+                      onClick={() => toggleOption("includeDate")}
+                    >
+                      <Checkbox
+                        id="includeDate"
+                        checked={options.includeDate}
+                        onCheckedChange={() => toggleOption("includeDate")}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="includeDate" className="cursor-pointer text-sm">
+                        Inclure la date d'impression
+                      </Label>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            )}
+
+            {/* Preview */}
+            {activeTab === "preview" && (
+              <ScrollArea className="flex-1 min-h-0 border rounded-lg bg-card">
+                <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
+              </ScrollArea>
+            )}
           </div>
 
-          {/* Preview */}
-          <div className="flex flex-col space-y-2 min-h-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <Eye className="w-4 h-4" />
-              Aperçu
-            </div>
-            <ScrollArea className="flex-1 min-h-0 border rounded-lg bg-card">
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
-            </ScrollArea>
-          </div>
-        </div>
-
-        <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="flex-1 sm:flex-none"
-          >
-            Annuler
-          </Button>
-          <Button onClick={handlePrint} className="flex-1 sm:flex-none">
-            <Printer className="w-4 h-4 mr-2" />
-            Imprimer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+          <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 sm:flex-none"
+            >
+              Annuler
+            </Button>
+            <Button onClick={handlePrint} className="flex-1 sm:flex-none">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
 }
