@@ -139,6 +139,7 @@ export function PatientTraitementCard({
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [editConfirmDialogOpen, setEditConfirmDialogOpen] = useState(false);
   const [canReplaceTraitement, setCanReplaceTraitement] = useState(true);
+  const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -650,7 +651,7 @@ export function PatientTraitementCard({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={onRemoveTraitement}
+                        onClick={() => setRemoveConfirmDialogOpen(true)}
                         className="text-destructive h-8 w-8"
                         title="Retirer le traitement"
                       >
@@ -1067,6 +1068,29 @@ export function PatientTraitementCard({
         seance={editingSeance}
         onSuccess={handleSeanceFormSuccess}
       />
+
+      <AlertDialog open={removeConfirmDialogOpen} onOpenChange={setRemoveConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer le traitement ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir retirer ce traitement du patient ? Cette action ne supprimera pas le traitement de votre bibliothèque.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onRemoveTraitement();
+                setRemoveConfirmDialogOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Retirer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
