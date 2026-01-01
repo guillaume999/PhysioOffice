@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, Eye, CheckSquare, Square, User, FileText, Stethoscope } from "lucide-react";
+import { Printer, Eye, User, FileText, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PatientReportPrintDialogProps {
@@ -136,22 +136,6 @@ export function PatientReportPrintDialog({
     setOptions({ ...options, [key]: !options[key] });
   };
 
-  const selectAll = () => {
-    const allTrue = Object.fromEntries(
-      Object.keys(options).map((key) => [key, true])
-    ) as Record<OptionKey, boolean>;
-    setOptions(allTrue);
-  };
-
-  const deselectAll = () => {
-    const allFalse = Object.fromEntries(
-      Object.keys(options).map((key) => [key, false])
-    ) as Record<OptionKey, boolean>;
-    setOptions(allFalse);
-  };
-
-  const selectedCount = Object.values(options).filter(Boolean).length;
-  const totalCount = Object.keys(options).length;
 
   const generatePreviewContent = () => {
     const sections: string[] = [];
@@ -331,33 +315,7 @@ export function PatientReportPrintDialog({
 
         <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Options */}
-          <div className="flex flex-col space-y-3 min-h-0">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">
-                {selectedCount}/{totalCount} éléments
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={selectAll}
-                  className="h-8 text-xs"
-                >
-                  <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
-                  Tout
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={deselectAll}
-                  className="h-8 text-xs"
-                >
-                  <Square className="w-3.5 h-3.5 mr-1.5" />
-                  Aucun
-                </Button>
-              </div>
-            </div>
-
+          <div className="flex flex-col min-h-0">
             <ScrollArea className="flex-1 min-h-0 pr-3">
               <div className="space-y-4">
                 {optionGroups.map((group) => (
