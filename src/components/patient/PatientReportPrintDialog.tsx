@@ -150,14 +150,6 @@ export function PatientReportPrintDialog({
       sections.push(`<p><strong>N° Patient :</strong> ${patient.numero}</p>`);
     }
 
-    if (options.includeRemainingSessions && patient.remaining_sessions !== null) {
-      sections.push(`<p><strong>Séances restantes :</strong> ${patient.remaining_sessions}</p>`);
-    }
-
-    if (options.includePrescription && patient.prescription) {
-      sections.push(`<p><strong>Ordonnance :</strong> ${prescriptionLabels[patient.prescription] || patient.prescription}</p>`);
-    }
-
     if (options.includeAllergies && patient.allergies) {
       sections.push(`<h2 class="section-title">Allergies</h2>`);
       sections.push(`<p class="multiline">${patient.allergies}</p>`);
