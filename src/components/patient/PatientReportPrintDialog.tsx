@@ -162,35 +162,36 @@ export function PatientReportPrintDialog({
     sections.push(`</div>`);
 
     const emptyLines = '<span style="color: #999;">_________________________________________________<br/>_________________________________________________<br/>_________________________________________________</span>';
+    const extraLines = '<br/><span style="color: #999;">_________________________________________________<br/>_________________________________________________</span>';
 
     if (options.includeAllergies) {
       sections.push(`<h2 class="section-title">Allergies</h2>`);
-      sections.push(`<p class="multiline">${patient.allergies || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${patient.allergies ? patient.allergies + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeAntecedents) {
       sections.push(`<h2 class="section-title">Antécédents</h2>`);
-      sections.push(`<p class="multiline">${patient.antecedents || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${patient.antecedents ? patient.antecedents + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeMedicalNotes) {
       sections.push(`<h2 class="section-title">Notes médicales</h2>`);
-      sections.push(`<p class="multiline">${patient.medical_notes || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${patient.medical_notes ? patient.medical_notes + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeMotifConsultation) {
       sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
-      sections.push(`<p class="multiline">${carePlan.motif_consultation || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${carePlan.motif_consultation ? carePlan.motif_consultation + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeBilanKine) {
       sections.push(`<h2 class="section-title">Bilan kiné</h2>`);
-      sections.push(`<p class="multiline">${carePlan.bilan_kine || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${carePlan.bilan_kine ? carePlan.bilan_kine + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeObjectifs) {
       sections.push(`<h2 class="section-title">Objectifs de prise en charge</h2>`);
-      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge ? carePlan.objectifs_prise_en_charge + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeTraitement) {
@@ -226,7 +227,7 @@ export function PatientReportPrintDialog({
 
     if (options.includeComments) {
       sections.push(`<h2 class="section-title">Commentaires</h2>`);
-      sections.push(`<p class="multiline">${carePlan.comments || emptyLines}</p>`);
+      sections.push(`<p class="multiline">${carePlan.comments ? carePlan.comments + extraLines : emptyLines}</p>`);
     }
 
     return sections.join("\n");
