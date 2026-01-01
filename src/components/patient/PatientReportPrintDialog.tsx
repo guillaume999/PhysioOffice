@@ -435,7 +435,6 @@ export function PatientReportPrintDialog({
                 </Button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">{patient.name}</p>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
