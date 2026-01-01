@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, Eye, User, FileText, Stethoscope, Settings2 } from "lucide-react";
+import { Printer, Eye, User, FileText, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PatientReportPrintDialogProps {
@@ -132,11 +132,10 @@ export function PatientReportPrintDialog({
     includeDate: true,
   });
 
-  const [activeTab, setActiveTab] = useState<"options" | "preview">("options");
-
   const toggleOption = (key: OptionKey) => {
     setOptions({ ...options, [key]: !options[key] });
   };
+
 
   const generatePreviewContent = () => {
     const sections: string[] = [];
@@ -303,77 +302,10 @@ export function PatientReportPrintDialog({
     </div>
   `;
 
-  const OptionsContent = () => (
-    <ScrollArea className="h-full [&_[data-radix-scroll-area-viewport]]:!block [&_[data-radix-scroll-area-scrollbar]]:!opacity-100 [&_[data-radix-scroll-area-scrollbar]]:w-2.5 [&_[data-radix-scroll-area-thumb]]:bg-border">
-      <div className="space-y-4 pr-4 pb-4">
-        {optionGroups.map((group) => (
-          <div key={group.title} className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
-              {group.icon}
-              {group.title}
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
-              {group.options.map(({ key, label }) => (
-                <div
-                  key={key}
-                  className={cn(
-                    "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                    options[key] && "bg-accent/50"
-                  )}
-                  onClick={() => toggleOption(key)}
-                >
-                  <Checkbox
-                    id={key}
-                    checked={options[key]}
-                    onCheckedChange={() => toggleOption(key)}
-                    className="h-4 w-4"
-                  />
-                  <Label
-                    htmlFor={key}
-                    className="cursor-pointer text-sm leading-tight"
-                  >
-                    {label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Date option séparée */}
-        <div className="pt-2 border-t">
-          <div
-            className={cn(
-              "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-              options.includeDate && "bg-accent/50"
-            )}
-            onClick={() => toggleOption("includeDate")}
-          >
-            <Checkbox
-              id="includeDate"
-              checked={options.includeDate}
-              onCheckedChange={() => toggleOption("includeDate")}
-              className="h-4 w-4"
-            />
-            <Label htmlFor="includeDate" className="cursor-pointer text-sm">
-              Inclure la date d'impression
-            </Label>
-          </div>
-        </div>
-      </div>
-    </ScrollArea>
-  );
-
-  const PreviewContent = () => (
-    <ScrollArea className="h-full border rounded-lg bg-card [&_[data-radix-scroll-area-viewport]]:!block [&_[data-radix-scroll-area-scrollbar]]:!opacity-100 [&_[data-radix-scroll-area-scrollbar]]:w-2.5 [&_[data-radix-scroll-area-thumb]]:bg-border">
-      <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-    </ScrollArea>
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl h-[calc(100dvh-1rem)] sm:h-auto sm:max-h-[85vh] overflow-hidden flex flex-col p-4 sm:p-6">
-        <DialogHeader className="pb-2 flex-shrink-0">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Printer className="w-5 h-5 text-primary" />
             Imprimer le compte-rendu
@@ -381,65 +313,82 @@ export function PatientReportPrintDialog({
           <p className="text-sm text-muted-foreground">{patient.name}</p>
         </DialogHeader>
 
-        {/* Mobile Tabs */}
-        <div className="flex lg:hidden border-b mb-2 flex-shrink-0">
-          <button
-            onClick={() => setActiveTab("options")}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors border-b-2",
-              activeTab === "options"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Settings2 className="w-4 h-4" />
-            Options
-          </button>
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors border-b-2",
-              activeTab === "preview"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Eye className="w-4 h-4" />
-            Aperçu
-          </button>
-        </div>
+        <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Options */}
+          <div className="flex flex-col min-h-0">
+            <ScrollArea className="flex-1 min-h-0 pr-3">
+              <div className="space-y-4">
+                {optionGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                      {group.icon}
+                      {group.title}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
+                      {group.options.map(({ key, label }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                            options[key] && "bg-accent/50"
+                          )}
+                          onClick={() => toggleOption(key)}
+                        >
+                          <Checkbox
+                            id={key}
+                            checked={options[key]}
+                            onCheckedChange={() => toggleOption(key)}
+                            className="h-4 w-4"
+                          />
+                          <Label
+                            htmlFor={key}
+                            className="cursor-pointer text-sm leading-tight"
+                          >
+                            {label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
 
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {/* Mobile: Single view based on tab */}
-          <div className="lg:hidden h-full">
-            {activeTab === "options" ? <OptionsContent /> : <PreviewContent />}
+                {/* Date option séparée */}
+                <div className="pt-2 border-t">
+                  <div
+                    className={cn(
+                      "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                      options.includeDate && "bg-accent/50"
+                    )}
+                    onClick={() => toggleOption("includeDate")}
+                  >
+                    <Checkbox
+                      id="includeDate"
+                      checked={options.includeDate}
+                      onCheckedChange={() => toggleOption("includeDate")}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="includeDate" className="cursor-pointer text-sm">
+                      Inclure la date d'impression
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
           </div>
 
-          {/* Desktop: Side by side */}
-          <div className="hidden lg:grid lg:grid-cols-2 gap-4 h-full">
-            <div className="flex flex-col min-h-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-2 flex-shrink-0">
-                <Settings2 className="w-4 h-4" />
-                Options
-              </div>
-              <div className="flex-1 min-h-0">
-                <OptionsContent />
-              </div>
+          {/* Preview */}
+          <div className="flex flex-col space-y-2 min-h-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <Eye className="w-4 h-4" />
+              Aperçu
             </div>
-            <div className="flex flex-col min-h-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-2 flex-shrink-0">
-                <Eye className="w-4 h-4" />
-                Aperçu
-              </div>
-              <div className="flex-1 min-h-0">
-                <PreviewContent />
-              </div>
-            </div>
+            <ScrollArea className="flex-1 min-h-0 border rounded-lg bg-card">
+              <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
+            </ScrollArea>
           </div>
         </div>
 
-        <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2 flex-shrink-0">
+        <DialogFooter className="pt-4 border-t flex-row gap-2 sm:gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
