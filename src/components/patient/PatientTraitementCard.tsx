@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -589,6 +589,80 @@ export function PatientTraitementCard({
     });
   };
 
+  const handlePrintBilan = (bilan: PatientBilan, seancePosition: number) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const dateStr = bilan.bilan_date 
+      ? new Date(bilan.bilan_date).toLocaleDateString("fr-FR") 
+      : "Non définie";
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Bilan intermédiaire - Après séance ${seancePosition}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 40px;
+              max-width: 800px;
+              margin: 0 auto;
+              color: #333;
+            }
+            h1 {
+              text-align: center;
+              margin-bottom: 30px;
+              font-size: 24px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 15px;
+            }
+            .info {
+              margin-bottom: 20px;
+              font-size: 14px;
+            }
+            .content {
+              white-space: pre-wrap;
+              line-height: 1.6;
+              margin-top: 20px;
+              padding: 20px;
+              background: #f9f9f9;
+              border-radius: 8px;
+            }
+            .date {
+              margin-top: 40px;
+              text-align: right;
+              font-style: italic;
+            }
+            .signature {
+              margin-top: 60px;
+              text-align: right;
+            }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Bilan intermédiaire</h1>
+          <div class="info">
+            <p><strong>Patient :</strong> ${patientName}</p>
+            <p><strong>Traitement :</strong> ${traitement?.pathologie || "Non défini"}</p>
+            <p><strong>Position :</strong> Après séance ${seancePosition}</p>
+            <p><strong>Date du bilan :</strong> ${dateStr}</p>
+          </div>
+          <div class="content">${bilan.content || "Aucun contenu"}</div>
+          <div class="date">Imprimé le : ${new Date().toLocaleDateString("fr-FR")}</div>
+          <div class="signature">Signature :</div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const getSeanceDate = (seanceOrdre: number): string => {
     const date = traitement?.seanceDates.find(sd => sd.seance_ordre === seanceOrdre);
     return date?.seance_date || "";
@@ -947,15 +1021,26 @@ export function PatientTraitementCard({
                                           />
                                           <span>Bilan après séance {i + 1}</span>
                                         </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 text-xs"
-                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
-                                        >
-                                          <Edit className="w-3 h-3 mr-1" />
-                                          Modifier
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs"
+                                            onClick={() => handlePrintBilan(bilanAfterSeance, i + 1)}
+                                            title="Imprimer le bilan"
+                                          >
+                                            <Printer className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs"
+                                            onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
+                                          >
+                                            <Edit className="w-3 h-3 mr-1" />
+                                            Modifier
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
                                   ) : (
