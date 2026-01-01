@@ -103,8 +103,6 @@ const optionGroups: OptionGroup[] = [
       { key: "includeBilanKine", label: "Bilan kiné" },
       { key: "includeObjectifs", label: "Objectifs" },
       { key: "includeTraitement", label: "Plan de traitement" },
-      { key: "includePrescription", label: "Ordonnance" },
-      { key: "includeRemainingSessions", label: "Séances restantes" },
       { key: "includeComments", label: "Commentaires" },
     ],
   },
