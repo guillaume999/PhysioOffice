@@ -75,11 +75,7 @@ const optionGroups: OptionGroup[] = [
     title: "Informations patient",
     icon: <User className="w-4 h-4" />,
     options: [
-      { key: "includePatientInfo", label: "Nom et numéro" },
-      { key: "includeStatus", label: "Statut" },
-      { key: "includeAddress", label: "Adresse" },
-      { key: "includeMutual", label: "Mutuelle" },
-      { key: "includeBloodType", label: "Groupe sanguin" },
+      { key: "includePatientInfo", label: "Numéro" },
     ],
   },
   {
@@ -142,20 +138,16 @@ export function PatientReportPrintDialog({
   const generatePreviewContent = () => {
     const sections: string[] = [];
     
-    if (options.includePatientInfo) {
-      sections.push(`<h2 class="section-title">Informations patient</h2>`);
-      sections.push(`<p><strong>Nom :</strong> ${patient.name}</p>`);
-      if (patient.numero) {
-        sections.push(`<p><strong>N° Patient :</strong> ${patient.numero}</p>`);
-      }
-    }
-
-    if (options.includeStatus) {
-      sections.push(`<p><strong>Statut :</strong> ${statusLabels[patient.status] || patient.status}</p>`);
-    }
-
-    if (options.includeMutual) {
-      sections.push(`<p><strong>Mutuelle :</strong> ${patient.has_mutual ? "Oui" : "Non"}</p>`);
+    // Toujours afficher les champs d'identification vides
+    sections.push(`<h2 class="section-title">Informations patient</h2>`);
+    sections.push(`<p><strong>Nom :</strong> ____________________</p>`);
+    sections.push(`<p><strong>Prénom :</strong> ____________________</p>`);
+    sections.push(`<p><strong>N° Téléphone :</strong> ____________________</p>`);
+    sections.push(`<p><strong>Mutuelle :</strong> ____________________</p>`);
+    sections.push(`<p><strong>N° Sécu. Soc. :</strong> ____________________</p>`);
+    
+    if (options.includePatientInfo && patient.numero) {
+      sections.push(`<p><strong>N° Patient :</strong> ${patient.numero}</p>`);
     }
 
     if (options.includeRemainingSessions && patient.remaining_sessions !== null) {
@@ -164,15 +156,6 @@ export function PatientReportPrintDialog({
 
     if (options.includePrescription && patient.prescription) {
       sections.push(`<p><strong>Ordonnance :</strong> ${prescriptionLabels[patient.prescription] || patient.prescription}</p>`);
-    }
-
-    if (options.includeAddress && (patient.address || patient.postal_code)) {
-      const addressParts = [patient.address, patient.postal_code].filter(Boolean).join(", ");
-      sections.push(`<p><strong>Adresse :</strong> ${addressParts}</p>`);
-    }
-
-    if (options.includeBloodType && patient.blood_type) {
-      sections.push(`<p><strong>Groupe sanguin :</strong> ${patient.blood_type}</p>`);
     }
 
     if (options.includeAllergies && patient.allergies) {
