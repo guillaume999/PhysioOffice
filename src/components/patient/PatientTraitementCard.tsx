@@ -733,6 +733,9 @@ export function PatientTraitementCard({
               .info-grid {
                 background: #f8fafc !important;
               }
+              @page {
+                margin: 1cm;
+              }
             }
           </style>
         </head>
