@@ -5,9 +5,10 @@ import { MessageSquare } from "lucide-react";
 interface PatientCommentsCardProps {
   comments: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
 }
 
-export function PatientCommentsCard({ comments, onChange }: PatientCommentsCardProps) {
+export function PatientCommentsCard({ comments, onChange, onBlur }: PatientCommentsCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -21,6 +22,7 @@ export function PatientCommentsCard({ comments, onChange }: PatientCommentsCardP
           placeholder="Ajoutez vos commentaires sur ce patient..."
           value={comments}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           className="min-h-[120px]"
         />
       </CardContent>

@@ -348,6 +348,64 @@ export default function PatientDetail() {
     setCarePlan({ ...carePlan, [field]: value });
   };
 
+  const handleAutoSave = async () => {
+    if (!id || !user) return;
+    
+    // Save patient data
+    await supabase
+      .from("patients")
+      .update({
+        name: formData.name,
+        status: formData.status,
+        has_mutual: formData.has_mutual ?? false,
+        remaining_sessions: formData.remaining_sessions,
+        prescription: formData.prescription,
+        address: formData.address,
+        postal_code: formData.postal_code,
+        medical_notes: formData.medical_notes,
+        allergies: formData.allergies,
+        blood_type: formData.blood_type,
+        antecedents: formData.antecedents,
+      })
+      .eq("id", id);
+
+    // Save or update care plan
+    if (carePlan.id) {
+      await supabase
+        .from("patient_care_plans")
+        .update({
+          comments: carePlan.comments,
+          motif_consultation: carePlan.motif_consultation,
+          bilan_kine: carePlan.bilan_kine,
+          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+          active_traitement_id: carePlan.active_traitement_id,
+          bilan_initial_date: carePlan.bilan_initial_date,
+          traitement_start_date: carePlan.traitement_start_date,
+        })
+        .eq("id", carePlan.id);
+    } else {
+      const { data: newPlan } = await supabase
+        .from("patient_care_plans")
+        .insert({
+          patient_id: id,
+          user_id: user.id,
+          comments: carePlan.comments,
+          motif_consultation: carePlan.motif_consultation,
+          bilan_kine: carePlan.bilan_kine,
+          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+          active_traitement_id: carePlan.active_traitement_id,
+          bilan_initial_date: carePlan.bilan_initial_date,
+          traitement_start_date: carePlan.traitement_start_date,
+        })
+        .select()
+        .single();
+      
+      if (newPlan) {
+        setCarePlan(prev => ({ ...prev, id: newPlan.id }));
+      }
+    }
+  };
+
   const handleSelectTraitement = async (traitementId: string) => {
     const newCarePlan = { ...carePlan, active_traitement_id: traitementId };
     setCarePlan(newCarePlan);
@@ -541,6 +599,7 @@ export default function PatientDetail() {
           <PatientCommentsCard
             comments={carePlan.comments}
             onChange={(value) => handleCarePlanChange("comments", value)}
+            onBlur={handleAutoSave}
           />
         </div>
 
@@ -553,6 +612,7 @@ export default function PatientDetail() {
               bilan_initial_date: carePlan.bilan_initial_date,
             }}
             onChange={handleCarePlanChange}
+            onBlur={handleAutoSave}
             onBilanInitial={() => navigate(`/patients/${id}/bilan-initial`)}
             onCertificats={() => navigate(`/patients/${id}/certificats`)}
           />
@@ -571,6 +631,7 @@ export default function PatientDetail() {
               placeholder="Antécédents médicaux, chirurgicaux, familiaux..."
               value={formData.antecedents || ""}
               onChange={(e) => setFormData({ ...formData, antecedents: e.target.value })}
+              onBlur={handleAutoSave}
               className="min-h-[120px]"
             />
           </CardContent>
@@ -587,6 +648,7 @@ export default function PatientDetail() {
                 <Input 
                   value={formData.name || ""} 
                   onChange={e => setFormData({...formData, name: e.target.value})} 
+                  onBlur={handleAutoSave}
                 />
               </div>
               <div>
@@ -597,7 +659,7 @@ export default function PatientDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Statut</Label>
-                <Select value={formData.status || "active"} onValueChange={value => setFormData({...formData, status: value})}>
+                <Select value={formData.status || "active"} onValueChange={value => { setFormData({...formData, status: value}); setTimeout(handleAutoSave, 0); }}>
                   <SelectTrigger>
                     <SelectValue>{statusLabels[formData.status || "active"]}</SelectValue>
                   </SelectTrigger>
@@ -614,7 +676,7 @@ export default function PatientDetail() {
                 <div className="flex items-center gap-3 h-10">
                   <Switch
                     checked={formData.has_mutual ?? false}
-                    onCheckedChange={(checked) => setFormData({...formData, has_mutual: checked})}
+                    onCheckedChange={(checked) => { setFormData({...formData, has_mutual: checked}); setTimeout(handleAutoSave, 0); }}
                   />
                   <span className="text-sm text-muted-foreground">
                     {formData.has_mutual ? "Oui" : "Non"}
@@ -630,11 +692,12 @@ export default function PatientDetail() {
                   min="0"
                   value={formData.remaining_sessions ?? 0} 
                   onChange={e => setFormData({...formData, remaining_sessions: parseInt(e.target.value) || 0})} 
+                  onBlur={handleAutoSave}
                 />
               </div>
               <div>
                 <Label>Prescription</Label>
-                <Select value={formData.prescription || "none"} onValueChange={value => setFormData({...formData, prescription: value})}>
+                <Select value={formData.prescription || "none"} onValueChange={value => { setFormData({...formData, prescription: value}); setTimeout(handleAutoSave, 0); }}>
                   <SelectTrigger>
                     <SelectValue>{prescriptionLabels[formData.prescription || "none"]}</SelectValue>
                   </SelectTrigger>

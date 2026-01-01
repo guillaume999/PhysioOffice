@@ -16,6 +16,7 @@ interface CarePlanData {
 interface PatientCareObjectivesCardProps {
   carePlan: CarePlanData;
   onChange: (field: keyof CarePlanData, value: string) => void;
+  onBlur?: () => void;
   onBilanInitial?: () => void;
   onCertificats?: () => void;
 }
@@ -23,6 +24,7 @@ interface PatientCareObjectivesCardProps {
 export function PatientCareObjectivesCard({
   carePlan,
   onChange,
+  onBlur,
   onBilanInitial,
   onCertificats,
 }: PatientCareObjectivesCardProps) {
@@ -43,6 +45,7 @@ export function PatientCareObjectivesCard({
                 type="date"
                 value={carePlan.bilan_initial_date || ""}
                 onChange={(e) => onChange("bilan_initial_date", e.target.value)}
+                onBlur={onBlur}
                 className="flex-1 sm:w-36 h-9 text-xs"
               />
               <Button variant="outline" size="sm" onClick={onBilanInitial} className="shrink-0">
@@ -67,6 +70,7 @@ export function PatientCareObjectivesCard({
             placeholder="Décrivez le motif de consultation..."
             value={carePlan.motif_consultation}
             onChange={(e) => onChange("motif_consultation", e.target.value)}
+            onBlur={onBlur}
             className="mt-1"
           />
         </div>
@@ -77,6 +81,7 @@ export function PatientCareObjectivesCard({
             placeholder="Décrivez le bilan kinésithérapique..."
             value={carePlan.bilan_kine}
             onChange={(e) => onChange("bilan_kine", e.target.value)}
+            onBlur={onBlur}
             className="mt-1"
           />
         </div>
@@ -87,6 +92,7 @@ export function PatientCareObjectivesCard({
             placeholder="Décrivez les objectifs de prise en charge..."
             value={carePlan.objectifs_prise_en_charge}
             onChange={(e) => onChange("objectifs_prise_en_charge", e.target.value)}
+            onBlur={onBlur}
             className="mt-1"
           />
         </div>
