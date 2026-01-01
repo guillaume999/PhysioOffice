@@ -232,10 +232,6 @@ export function PatientReportPrintDialog({
       sections.push(`<p class="multiline">${patient.antecedents ? patient.antecedents + extraLines : emptyLines}</p>`);
     }
 
-    if (options.includeMedicalNotes) {
-      sections.push(`<h2 class="section-title">Notes médicales</h2>`);
-      sections.push(`<p class="multiline">${patient.medical_notes ? patient.medical_notes + extraLines : emptyLines}</p>`);
-    }
 
     if (options.includeMotifConsultation) {
       sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
