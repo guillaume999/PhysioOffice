@@ -337,10 +337,10 @@ export function PatientReportPrintDialog({
           <p className="text-sm text-muted-foreground">{patient.name}</p>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {/* Options */}
           {activeTab === "options" && (
-            <ScrollArea className="flex-1 h-0">
+            <ScrollArea className="h-full">
               <div className="space-y-4 pr-3">
                 {optionGroups.map((group) => (
                   <div key={group.title} className="space-y-2">
@@ -402,7 +402,7 @@ export function PatientReportPrintDialog({
 
           {/* Preview */}
           {activeTab === "preview" && (
-            <ScrollArea className="flex-1 h-0 border rounded-lg bg-card">
+            <ScrollArea className="h-full border rounded-lg bg-card">
               <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
             </ScrollArea>
           )}
