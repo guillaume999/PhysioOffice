@@ -76,22 +76,22 @@ export function PatientCareObjectivesCard({
         </div>
 
         <div>
-          <Label>Objectifs de prise en charge</Label>
+          <Label>Bilan kiné</Label>
           <Textarea
-            placeholder="Décrivez les objectifs de prise en charge..."
-            value={carePlan.objectifs_prise_en_charge}
-            onChange={(e) => onChange("objectifs_prise_en_charge", e.target.value)}
+            placeholder="Décrivez le bilan kinésithérapique..."
+            value={carePlan.bilan_kine}
+            onChange={(e) => onChange("bilan_kine", e.target.value)}
             onBlur={onBlur}
             className="mt-1"
           />
         </div>
 
         <div>
-          <Label>Bilan kiné</Label>
+          <Label>Objectifs de prise en charge</Label>
           <Textarea
-            placeholder="Décrivez le bilan kinésithérapique..."
-            value={carePlan.bilan_kine}
-            onChange={(e) => onChange("bilan_kine", e.target.value)}
+            placeholder="Décrivez les objectifs de prise en charge..."
+            value={carePlan.objectifs_prise_en_charge}
+            onChange={(e) => onChange("objectifs_prise_en_charge", e.target.value)}
             onBlur={onBlur}
             className="mt-1"
           />
