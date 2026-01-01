@@ -594,66 +594,200 @@ export function PatientTraitementCard({
     if (!printWindow) return;
 
     const dateStr = bilan.bilan_date 
-      ? new Date(bilan.bilan_date).toLocaleDateString("fr-FR") 
+      ? new Date(bilan.bilan_date).toLocaleDateString("fr-FR", { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }) 
       : "Non définie";
 
     const printContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Bilan intermédiaire - Après séance ${seancePosition}</title>
+          <title>Bilan Intermédiaire</title>
           <style>
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
             body {
-              font-family: Arial, sans-serif;
-              padding: 40px;
-              max-width: 800px;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              padding: 40px 50px;
+              max-width: 850px;
               margin: 0 auto;
-              color: #333;
+              color: #1a1a1a;
+              line-height: 1.5;
             }
-            h1 {
+            .header {
               text-align: center;
-              margin-bottom: 30px;
-              font-size: 24px;
-              border-bottom: 2px solid #333;
-              padding-bottom: 15px;
+              margin-bottom: 40px;
+              padding-bottom: 25px;
+              border-bottom: 3px solid #2563eb;
             }
-            .info {
-              margin-bottom: 20px;
+            .header h1 {
+              font-size: 28px;
+              font-weight: 700;
+              color: #1e3a5f;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .header .subtitle {
+              font-size: 16px;
+              color: #64748b;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              margin-bottom: 35px;
+              background: #f8fafc;
+              padding: 25px;
+              border-radius: 12px;
+              border: 1px solid #e2e8f0;
+            }
+            .info-item {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            }
+            .info-item .label {
+              font-size: 12px;
+              text-transform: uppercase;
+              color: #64748b;
+              font-weight: 600;
+              letter-spacing: 0.5px;
+            }
+            .info-item .value {
+              font-size: 15px;
+              color: #1e293b;
+              font-weight: 500;
+            }
+            .section-title {
               font-size: 14px;
+              text-transform: uppercase;
+              color: #2563eb;
+              font-weight: 700;
+              letter-spacing: 0.5px;
+              margin-bottom: 15px;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #e2e8f0;
             }
-            .content {
+            .content-box {
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              padding: 25px 30px;
+              margin-bottom: 40px;
+              min-height: 200px;
+            }
+            .content-text {
               white-space: pre-wrap;
-              line-height: 1.6;
-              margin-top: 20px;
-              padding: 20px;
-              background: #f9f9f9;
-              border-radius: 8px;
+              line-height: 1.8;
+              font-size: 14px;
+              color: #334155;
             }
-            .date {
-              margin-top: 40px;
-              text-align: right;
+            .content-empty {
+              color: #94a3b8;
               font-style: italic;
+              text-align: center;
+              padding: 40px 0;
             }
-            .signature {
-              margin-top: 60px;
-              text-align: right;
+            .footer {
+              margin-top: 50px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 40px;
+            }
+            .footer-section {
+              padding: 20px;
+              border: 1px dashed #cbd5e1;
+              border-radius: 8px;
+              min-height: 100px;
+            }
+            .footer-section .label {
+              font-size: 12px;
+              text-transform: uppercase;
+              color: #64748b;
+              font-weight: 600;
+              letter-spacing: 0.5px;
+              margin-bottom: 10px;
+            }
+            .print-info {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 11px;
+              color: #94a3b8;
+              padding-top: 20px;
+              border-top: 1px solid #e2e8f0;
             }
             @media print {
-              body { padding: 20px; }
+              body { 
+                padding: 30px; 
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .info-grid {
+                background: #f8fafc !important;
+              }
             }
           </style>
         </head>
         <body>
-          <h1>Bilan intermédiaire</h1>
-          <div class="info">
-            <p><strong>Patient :</strong> ${patientName}</p>
-            <p><strong>Traitement :</strong> ${traitement?.pathologie || "Non défini"}</p>
-            <p><strong>Position :</strong> Après séance ${seancePosition}</p>
-            <p><strong>Date du bilan :</strong> ${dateStr}</p>
+          <div class="header">
+            <h1>Bilan Intermédiaire</h1>
+            <div class="subtitle">Évaluation après séance ${seancePosition}</div>
           </div>
-          <div class="content">${bilan.content || "Aucun contenu"}</div>
-          <div class="date">Imprimé le : ${new Date().toLocaleDateString("fr-FR")}</div>
-          <div class="signature">Signature :</div>
+          
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Patient</span>
+              <span class="value">${patientName}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Date du bilan</span>
+              <span class="value">${dateStr}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Traitement</span>
+              <span class="value">${traitement?.pathologie || "Non défini"}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Position</span>
+              <span class="value">Après la séance n°${seancePosition}</span>
+            </div>
+          </div>
+
+          <div class="section-title">Observations et évolution</div>
+          <div class="content-box">
+            ${bilan.content 
+              ? `<div class="content-text">${bilan.content}</div>` 
+              : `<div class="content-empty">Aucune observation enregistrée</div>`
+            }
+          </div>
+
+          <div class="footer">
+            <div class="footer-section">
+              <div class="label">Date et signature du praticien</div>
+            </div>
+            <div class="footer-section">
+              <div class="label">Cachet</div>
+            </div>
+          </div>
+
+          <div class="print-info">
+            Document généré le ${new Date().toLocaleDateString("fr-FR", { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </div>
         </body>
       </html>
     `;
