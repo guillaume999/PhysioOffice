@@ -337,78 +337,74 @@ export function PatientReportPrintDialog({
           <p className="text-sm text-muted-foreground">{patient.name}</p>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {/* Options */}
           {activeTab === "options" && (
-            <div className="flex flex-col h-full min-h-0">
-              <ScrollArea className="flex-1 min-h-0 pr-3">
-                <div className="space-y-4">
-                  {optionGroups.map((group) => (
-                    <div key={group.title} className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
-                        {group.icon}
-                        {group.title}
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
-                        {group.options.map(({ key, label }) => (
-                          <div
-                            key={key}
-                            className={cn(
-                              "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                              options[key] && "bg-accent/50"
-                            )}
-                            onClick={() => toggleOption(key)}
-                          >
-                            <Checkbox
-                              id={key}
-                              checked={options[key]}
-                              onCheckedChange={() => toggleOption(key)}
-                              className="h-4 w-4"
-                            />
-                            <Label
-                              htmlFor={key}
-                              className="cursor-pointer text-sm leading-tight"
-                            >
-                              {label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
+            <ScrollArea className="flex-1 h-0">
+              <div className="space-y-4 pr-3">
+                {optionGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                      {group.icon}
+                      {group.title}
                     </div>
-                  ))}
-
-                  {/* Date option séparée */}
-                  <div className="pt-2 border-t">
-                    <div
-                      className={cn(
-                        "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
-                        options.includeDate && "bg-accent/50"
-                      )}
-                      onClick={() => toggleOption("includeDate")}
-                    >
-                      <Checkbox
-                        id="includeDate"
-                        checked={options.includeDate}
-                        onCheckedChange={() => toggleOption("includeDate")}
-                        className="h-4 w-4"
-                      />
-                      <Label htmlFor="includeDate" className="cursor-pointer text-sm">
-                        Inclure la date d'impression
-                      </Label>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-1">
+                      {group.options.map(({ key, label }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                            options[key] && "bg-accent/50"
+                          )}
+                          onClick={() => toggleOption(key)}
+                        >
+                          <Checkbox
+                            id={key}
+                            checked={options[key]}
+                            onCheckedChange={() => toggleOption(key)}
+                            className="h-4 w-4"
+                          />
+                          <Label
+                            htmlFor={key}
+                            className="cursor-pointer text-sm leading-tight"
+                          >
+                            {label}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                ))}
+
+                {/* Date option séparée */}
+                <div className="pt-2 border-t">
+                  <div
+                    className={cn(
+                      "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                      options.includeDate && "bg-accent/50"
+                    )}
+                    onClick={() => toggleOption("includeDate")}
+                  >
+                    <Checkbox
+                      id="includeDate"
+                      checked={options.includeDate}
+                      onCheckedChange={() => toggleOption("includeDate")}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="includeDate" className="cursor-pointer text-sm">
+                      Inclure la date d'impression
+                    </Label>
+                  </div>
                 </div>
-              </ScrollArea>
-            </div>
+              </div>
+            </ScrollArea>
           )}
 
           {/* Preview */}
           {activeTab === "preview" && (
-            <div className="flex flex-col h-full min-h-0">
-              <ScrollArea className="flex-1 min-h-0 border rounded-lg bg-card">
-                <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
-              </ScrollArea>
-            </div>
+            <ScrollArea className="flex-1 h-0 border rounded-lg bg-card">
+              <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="min-h-full" />
+            </ScrollArea>
           )}
         </div>
 
