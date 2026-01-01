@@ -304,9 +304,9 @@ export function PatientReportPrintDialog({
             
             sections.push(`<tr style="background: #f9f9f9;">`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">Bilan</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">Bilan intermédiaire</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${dateStr}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${bilan.content ? bilan.content.substring(0, 50) + (bilan.content.length > 50 ? '...' : '') : '-'}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
             sections.push(`</tr>`);
           }
         });
