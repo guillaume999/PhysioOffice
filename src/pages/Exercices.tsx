@@ -25,6 +25,7 @@ interface VideoLibraryItem {
 
 interface Exercice {
   id: string;
+  code: string;
   title: string;
   description: string | null;
   pathologie_tags: string[];
@@ -118,11 +119,12 @@ export default function Exercices() {
       );
     }
 
-    // Apply search
+    // Apply search (including code)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (e) =>
+          e.code?.toLowerCase().includes(query) ||
           e.title.toLowerCase().includes(query) ||
           e.description?.toLowerCase().includes(query) ||
           e.pathologie_tags.some(tag => tag.toLowerCase().includes(query)) ||
@@ -839,9 +841,14 @@ export default function Exercices() {
                       {/* Title & Description */}
                       <TableCell>
                         <div>
-                          <p className="font-medium">{exercice.title}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50">
+                              {exercice.code}
+                            </Badge>
+                            <p className="font-medium">{exercice.title}</p>
+                          </div>
                           {exercice.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-1">
+                            <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
                               {exercice.description}
                             </p>
                           )}

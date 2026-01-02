@@ -31,6 +31,7 @@ interface SeanceExercice {
 
 interface SeanceType {
   id: string;
+  code: string;
   pathologie: string;
   pathologies: string[];
   objectif_principal: string;
@@ -109,7 +110,7 @@ export default function SeanceType() {
       );
     }
 
-    // Apply search
+    // Apply search (including code)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter((s) => {
@@ -117,6 +118,7 @@ export default function SeanceType() {
         const objPrincipaux = s.objectifs_principaux?.length > 0 ? s.objectifs_principaux : [s.objectif_principal];
         
         return (
+          s.code?.toLowerCase().includes(query) ||
           s.author_name?.toLowerCase().includes(query) ||
           pathos.some(p => p.toLowerCase().includes(query)) ||
           objPrincipaux.some(o => o.toLowerCase().includes(query))
@@ -517,6 +519,9 @@ export default function SeanceType() {
                         {/* Header - Always visible */}
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                            <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
+                              {seance.code}
+                            </Badge>
                             {pathologies.map((p, i) => (
                               <Badge key={i} variant="outline" className="text-xs flex-shrink-0">{p}</Badge>
                             ))}

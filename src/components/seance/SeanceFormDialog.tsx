@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 interface Exercice {
   id: string;
+  code: string;
   title: string;
   description: string | null;
   video_url: string | null;
@@ -118,7 +119,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
     // Fetch exercices (only user's own exercices)
     const { data: exData } = await supabase
       .from("exercices")
-      .select("id, title, description, video_url, thumbnail_url")
+      .select("id, code, title, description, video_url, thumbnail_url")
       .eq("user_id", user.id)
       .order("title");
     setAvailableExercices(exData || []);
@@ -559,7 +560,10 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
                               <SelectContent>
                                 <SelectItem value="custom">Personnalisé</SelectItem>
                                 {availableExercices.map(e => (
-                                  <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
+                                  <SelectItem key={e.id} value={e.id}>
+                                    <span className="font-mono text-xs uppercase text-muted-foreground mr-2">{e.code}</span>
+                                    {e.title}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>

@@ -29,6 +29,7 @@ interface SeanceExercice {
 
 interface SeanceOption {
   id: string;
+  code: string;
   pathologie: string;
   pathologies: string[];
   objectif_principal: string;
@@ -45,6 +46,7 @@ interface TraitementSeanceItem {
 
 interface ExerciceOption {
   id: string;
+  code: string;
   title: string;
   description: string | null;
   thumbnail_url: string | null;
@@ -141,12 +143,13 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     // Fetch seances (user's own seances)
     const { data: seancesData } = await supabase
       .from("seance_types")
-      .select("id, pathologie, pathologies, objectif_principal, objectifs_principaux")
+      .select("id, code, pathologie, pathologies, objectif_principal, objectifs_principaux")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     
     setAvailableSeances(seancesData?.map(s => ({
       ...s,
+      code: s.code || '',
       pathologies: s.pathologies || [],
       objectifs_principaux: s.objectifs_principaux || []
     })) || []);
@@ -154,11 +157,14 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     // Fetch exercices (user's own + platform exercices)
     const { data: exercicesData } = await supabase
       .from("exercices")
-      .select("id, title, description, thumbnail_url, pathologie_tags")
+      .select("id, code, title, description, thumbnail_url, pathologie_tags")
       .or(`user_id.eq.${user.id},status.eq.shared`)
       .order("title", { ascending: true });
     
-    setAvailableExercices(exercicesData || []);
+    setAvailableExercices(exercicesData?.map(e => ({
+      ...e,
+      code: e.code || ''
+    })) || []);
   };
 
   const toggleSeanceExpansion = async (seanceId: string) => {
@@ -455,7 +461,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{item.exercice?.title}</p>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-xs uppercase text-muted-foreground">{item.exercice?.code || ''}</span>
+                          <p className="font-medium truncate">{item.exercice?.title}</p>
+                        </div>
                         {item.exercice?.description && (
                           <p className="text-sm text-muted-foreground truncate">{item.exercice.description}</p>
                         )}
@@ -510,7 +519,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{exercice.title}</p>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-xs uppercase text-muted-foreground">{exercice.code}</span>
+                          <p className="text-sm font-medium truncate">{exercice.title}</p>
+                        </div>
                         {exercice.description && (
                           <p className="text-xs text-muted-foreground truncate">{exercice.description}</p>
                         )}
@@ -560,6 +572,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
+                        <span className="font-mono text-xs uppercase text-muted-foreground mr-1">{item.seance?.code || ''}</span>
                         <div className="flex flex-wrap gap-1">
                           {getDisplayPathologies(item.seance!).map((p, i) => (
                             <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
@@ -633,7 +646,8 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                           <Plus className="w-4 h-4 text-primary flex-shrink-0" />
                           <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="font-mono text-xs uppercase text-muted-foreground">{seance.code}</span>
                               {getDisplayPathologies(seance).map((p, i) => (
                                 <span key={i} className="text-sm">{p}</span>
                               ))}

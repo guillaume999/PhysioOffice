@@ -287,6 +287,7 @@ export type Database = {
       exercices: {
         Row: {
           author_name: string | null
+          code: string
           created_at: string
           deleted_by_author: boolean | null
           description: string | null
@@ -306,6 +307,7 @@ export type Database = {
         }
         Insert: {
           author_name?: string | null
+          code?: string
           created_at?: string
           deleted_by_author?: boolean | null
           description?: string | null
@@ -325,6 +327,7 @@ export type Database = {
         }
         Update: {
           author_name?: string | null
+          code?: string
           created_at?: string
           deleted_by_author?: boolean | null
           description?: string | null
@@ -1102,6 +1105,7 @@ export type Database = {
       seance_types: {
         Row: {
           author_name: string | null
+          code: string
           created_at: string
           id: string
           is_copy: boolean | null
@@ -1120,6 +1124,7 @@ export type Database = {
         }
         Insert: {
           author_name?: string | null
+          code?: string
           created_at?: string
           id?: string
           is_copy?: boolean | null
@@ -1138,6 +1143,7 @@ export type Database = {
         }
         Update: {
           author_name?: string | null
+          code?: string
           created_at?: string
           id?: string
           is_copy?: boolean | null
@@ -1311,6 +1317,7 @@ export type Database = {
       traitement_types: {
         Row: {
           author_name: string | null
+          code: string
           created_at: string
           description: string | null
           id: string
@@ -1325,6 +1332,7 @@ export type Database = {
         }
         Insert: {
           author_name?: string | null
+          code?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -1339,6 +1347,7 @@ export type Database = {
         }
         Update: {
           author_name?: string | null
+          code?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -1416,6 +1425,7 @@ export type Database = {
         Args: { _item_type: string; _user_id: string }
         Returns: boolean
       }
+      generate_unique_code: { Args: { table_name: string }; Returns: string }
       get_user_subscription_tier: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]

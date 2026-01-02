@@ -60,6 +60,7 @@ interface TraitementSeance {
 
 interface TraitementType {
   id: string;
+  code: string;
   pathologie: string;
   description: string | null;
   author_name: string | null;
@@ -136,11 +137,12 @@ export default function TraitementType() {
       );
     }
 
-    // Apply search
+    // Apply search (including code)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (t) =>
+          t.code?.toLowerCase().includes(query) ||
           t.author_name?.toLowerCase().includes(query) ||
           t.pathologie.toLowerCase().includes(query) ||
           t.description?.toLowerCase().includes(query)
@@ -544,6 +546,9 @@ export default function TraitementType() {
                         {/* Header - Always visible */}
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
+                              {traitement.code}
+                            </Badge>
                             <Badge variant="outline" className="text-sm flex-shrink-0">{traitement.pathologie}</Badge>
                             {traitement.is_copy && (
                               <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
