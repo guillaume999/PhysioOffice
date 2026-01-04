@@ -299,7 +299,7 @@ export default function Planning() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-purple-500/10">
-              <Calendar className="w-6 h-6 text-purple-500" />
+              <CalendarIcon className="w-6 h-6 text-purple-500" />
             </div>
             <div>
               <h1 className="text-3xl font-display font-bold">Planning</h1>
