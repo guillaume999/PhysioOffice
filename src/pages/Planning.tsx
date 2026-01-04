@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy, Share2 } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy, Share2 } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay, setHours, setMinutes, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -59,7 +62,7 @@ export default function Planning() {
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [duplicateMode, setDuplicateMode] = useState<"day" | "week">("week");
   const [sourceDayIndex, setSourceDayIndex] = useState<number>(0);
-  const [targetDayIndex, setTargetDayIndex] = useState<number>(1);
+  const [targetDate, setTargetDate] = useState<Date | undefined>(addDays(new Date(), 1));
   const [targetWeekOffset, setTargetWeekOffset] = useState<number>(1);
   const [isDuplicating, setIsDuplicating] = useState(false);
 
@@ -203,10 +206,15 @@ export default function Planning() {
         
         toast({ title: "Semaine dupliquée", description: `${appointmentsToDuplicate.length} rendez-vous copiés` });
       } else {
-        // Duplicate day to another day
+        // Duplicate day to target date
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         const sourceDay = addDays(weekStart, sourceDayIndex);
-        const targetDay = addDays(weekStart, targetDayIndex);
+        
+        if (!targetDate) {
+          toast({ title: "Erreur", description: "Veuillez sélectionner une date cible", variant: "destructive" });
+          setIsDuplicating(false);
+          return;
+        }
         
         const dayAppointments = appointments.filter(apt => {
           const aptStart = parseISO(apt.start_time);
@@ -217,8 +225,8 @@ export default function Planning() {
           const originalStart = parseISO(apt.start_time);
           const originalEnd = parseISO(apt.end_time);
           
-          const newStart = setMinutes(setHours(targetDay, originalStart.getHours()), originalStart.getMinutes());
-          const newEnd = setMinutes(setHours(targetDay, originalEnd.getHours()), originalEnd.getMinutes());
+          const newStart = setMinutes(setHours(targetDate, originalStart.getHours()), originalStart.getMinutes());
+          const newEnd = setMinutes(setHours(targetDate, originalEnd.getHours()), originalEnd.getMinutes());
           
           return {
             user_id: user?.id,
@@ -564,19 +572,31 @@ export default function Planning() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Vers quel jour ?</Label>
-                  <Select value={targetDayIndex.toString()} onValueChange={(v) => setTargetDayIndex(parseInt(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAY_NAMES.map((name, idx) => (
-                        <SelectItem key={idx} value={idx.toString()} disabled={idx === sourceDayIndex}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Vers quelle date ?</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !targetDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {targetDate ? format(targetDate, "PPP", { locale: fr }) : <span>Choisir une date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={targetDate}
+                        onSelect={setTargetDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                        locale={fr}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {appointments.filter(apt => {
