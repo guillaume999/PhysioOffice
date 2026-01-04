@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Brain, Send, Loader2, Bot, User } from "lucide-react";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface Message { role: "user" | "assistant"; content: string; }
 
@@ -82,6 +83,7 @@ export default function IADiagnostic() {
 
   return (
     <Layout>
+      <PagePopup pageKey="ia-diagnostic" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-xl bg-emerald-500/10"><Brain className="w-6 h-6 text-emerald-500" /></div>

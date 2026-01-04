@@ -3,6 +3,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 const features = [
   {
@@ -92,6 +93,7 @@ export default function Index() {
 
   return (
     <Layout>
+      <PagePopup pageKey="home" />
       <section className="relative overflow-hidden py-12 md:py-20 lg:py-32">
         <div className="absolute inset-0 gradient-primary opacity-5" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />

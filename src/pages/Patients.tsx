@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface Patient {
   id: string;
@@ -154,6 +155,7 @@ export default function Patients() {
 
   return (
     <Layout>
+      <PagePopup pageKey="patients" />
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">

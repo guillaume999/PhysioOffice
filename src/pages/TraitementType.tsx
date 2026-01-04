@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface TraitementTest {
   id: string;
@@ -450,6 +451,7 @@ export default function TraitementType() {
 
   return (
     <Layout>
+      <PagePopup pageKey="traitements" />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">

@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface Patient {
   id: string;
@@ -294,6 +295,7 @@ export default function Planning() {
 
   return (
     <Layout>
+      <PagePopup pageKey="planning" />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">

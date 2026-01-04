@@ -28,6 +28,7 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
+import { PagePopup } from "@/components/popup/PagePopup";
 import { format, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -250,6 +251,7 @@ export default function Annonces() {
 
   return (
     <Layout>
+      <PagePopup pageKey="annonces" />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">

@@ -36,9 +36,11 @@ import {
   CreditCard,
   Newspaper,
   Megaphone,
+  MessageSquare,
 } from "lucide-react";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
+import { PopupsManagement } from "@/components/admin/PopupsManagement";
 
 interface UserProfile {
   id: string;
@@ -1025,6 +1027,10 @@ export default function Admin() {
               <Megaphone className="w-4 h-4" />
               Annonces
             </TabsTrigger>
+            <TabsTrigger value="popups" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Pop-ups
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1772,6 +1778,17 @@ export default function Admin() {
 
           <TabsContent value="annonces">
             <AnnoncesManagement />
+          </TabsContent>
+
+          <TabsContent value="popups">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestion des pop-ups</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PopupsManagement />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

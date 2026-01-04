@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Check, Loader2, Sparkles, Crown, Users } from "lucide-react";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 // Stripe price IDs
 const PRICES = {
@@ -128,6 +129,7 @@ export default function Pricing() {
 
   return (
     <Layout>
+      <PagePopup pageKey="pricing" />
       <div className="container max-w-6xl mx-auto py-12 px-4">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Choisissez votre forfait</h1>

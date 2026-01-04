@@ -8,6 +8,7 @@ import { Newspaper, Calendar, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface NewsItem {
   id: string;
@@ -87,6 +88,7 @@ export default function News() {
 
   return (
     <Layout>
+      <PagePopup pageKey="news" />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

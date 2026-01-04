@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Play, Clock, BookOpen, Award, Video } from "lucide-react";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 const formations = [
   {
@@ -46,6 +47,7 @@ const formations = [
 export default function Formation() {
   return (
     <Layout>
+      <PagePopup pageKey="formation" />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

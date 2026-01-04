@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_popups: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          page_key: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          page_key: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          page_key?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           created_at: string
@@ -1361,6 +1391,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_dismissed_popups: {
+        Row: {
+          dismissed_at: string
+          id: string
+          popup_id: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          id?: string
+          popup_id: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          popup_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_dismissed_popups_popup_id_fkey"
+            columns: ["popup_id"]
+            isOneToOne: false
+            referencedRelation: "admin_popups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

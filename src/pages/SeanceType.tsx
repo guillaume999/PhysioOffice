@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface SeanceExercice {
   id: string;
@@ -421,6 +422,7 @@ export default function SeanceType() {
 
   return (
     <Layout>
+      <PagePopup pageKey="seances" />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">

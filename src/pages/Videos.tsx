@@ -10,6 +10,7 @@ import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface VideoItem {
   id: string;
@@ -448,6 +449,7 @@ export default function Videos() {
 
   return (
     <Layout>
+      <PagePopup pageKey="videos" />
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>

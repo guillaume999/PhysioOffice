@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
+import { PagePopup } from "@/components/popup/PagePopup";
 
 interface VideoLibraryItem {
   id: string;
@@ -713,6 +714,7 @@ export default function Exercices() {
 
   return (
     <Layout>
+      <PagePopup pageKey="exercices" />
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col gap-6">
           {/* Header */}
