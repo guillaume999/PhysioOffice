@@ -346,20 +346,7 @@ export default function Planning() {
           <Alert className="mb-4">
             <AlertTitle>Aucun rendez-vous affiché</AlertTitle>
             <AlertDescription>
-              <p>
-                Vous êtes connecté en tant que <span className="font-medium">{user?.email}</span>. Ce compte n’a aucun rendez-vous enregistré.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    await signOut();
-                    navigate("/auth");
-                  }}
-                >
-                  Se reconnecter
-                </Button>
-              </div>
+              Vous êtes connecté en tant que <span className="font-medium">{user?.email}</span>. Ce compte n'a aucun rendez-vous enregistré.
             </AlertDescription>
           </Alert>
         )}
