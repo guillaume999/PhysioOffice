@@ -256,6 +256,12 @@ export default function Planning() {
     });
   };
 
+  const getPatientCountForDay = (date: Date) => {
+    const dayAppointments = appointments.filter(apt => isSameDay(parseISO(apt.start_time), date));
+    const uniquePatients = new Set(dayAppointments.map(apt => apt.patient_id));
+    return uniquePatients.size;
+  };
+
   const navigateDate = (direction: "prev" | "next") => {
     if (viewMode === "week") {
       setCurrentDate(direction === "prev" ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
@@ -343,17 +349,25 @@ export default function Planning() {
                 <thead>
                   <tr>
                     <th className="border p-2 bg-muted/50 w-20 text-xs font-medium">Heure</th>
-                    {displayDays.map((day, idx) => (
-                      <th 
-                        key={idx} 
-                        className={`border p-2 bg-muted/50 text-xs font-medium ${
-                          isSameDay(day, new Date()) ? "bg-primary/10 text-primary" : ""
-                        }`}
-                      >
-                        <div>{format(day, "EEE", { locale: fr })}</div>
-                        <div className="text-lg font-bold">{format(day, "d")}</div>
-                      </th>
-                    ))}
+                    {displayDays.map((day, idx) => {
+                      const patientCount = getPatientCountForDay(day);
+                      return (
+                        <th 
+                          key={idx} 
+                          className={`border p-2 bg-muted/50 text-xs font-medium ${
+                            isSameDay(day, new Date()) ? "bg-primary/10 text-primary" : ""
+                          }`}
+                        >
+                          <div>
+                            {format(day, "EEE", { locale: fr })}
+                            {patientCount > 0 && (
+                              <span className="ml-1 text-muted-foreground">({patientCount})</span>
+                            )}
+                          </div>
+                          <div className="text-lg font-bold">{format(day, "d")}</div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
