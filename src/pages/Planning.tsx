@@ -627,7 +627,7 @@ export default function Planning() {
         @media print {
           @page {
             size: A4 landscape;
-            margin: 0 !important;
+            margin: 5mm !important;
           }
           
           * {
@@ -635,8 +635,8 @@ export default function Planning() {
           }
           
           html, body {
-            width: 297mm !important;
-            height: 210mm !important;
+            width: 287mm !important;
+            height: 200mm !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: hidden !important;
@@ -650,8 +650,8 @@ export default function Planning() {
           }
           
           #root {
-            height: 210mm !important;
-            max-height: 210mm !important;
+            height: 200mm !important;
+            max-height: 200mm !important;
             overflow: hidden !important;
             padding: 0 !important;
             margin: 0 !important;
@@ -660,7 +660,7 @@ export default function Planning() {
           .container {
             max-width: 100% !important;
             width: 100% !important;
-            padding: 0 2mm !important;
+            padding: 0 !important;
             margin: 0 !important;
           }
           
@@ -750,7 +750,7 @@ export default function Planning() {
             position: absolute !important;
             inset: 0.2mm !important;
             padding: 0.3mm !important;
-            font-size: 7px !important;
+            font-size: 9px !important;
             font-weight: 600 !important;
           }
           
