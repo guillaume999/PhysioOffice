@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Patient {
   id: string;
@@ -40,7 +41,7 @@ const TIME_SLOTS = Array.from({ length: 52 }, (_, i) => {
 }).filter(slot => slot.hours < 20); // End at 19:45 (last slot before 20:00)
 
 export default function Planning() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
@@ -340,6 +341,28 @@ export default function Planning() {
             />
           </div>
         </div>
+
+        {appointments.length === 0 && (
+          <Alert className="mb-4">
+            <AlertTitle>Aucun rendez-vous affiché</AlertTitle>
+            <AlertDescription>
+              <p>
+                Vous êtes connecté en tant que <span className="font-medium">{user?.email}</span>. Ce compte n’a aucun rendez-vous enregistré.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await signOut();
+                    navigate("/auth");
+                  }}
+                >
+                  Se reconnecter
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Calendar Grid */}
         <Card className="print:shadow-none print:border-none">
