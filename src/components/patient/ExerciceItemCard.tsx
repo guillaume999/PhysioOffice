@@ -1,11 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +17,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2, MessageSquare, ChevronUp, ChevronDown } from "lucide-react";
+import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2, MessageSquare, ChevronUp, ChevronDown, Library, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { CommentDialog } from "./CommentDialog";
+
+interface VideoLibraryItem {
+  id: string;
+  title: string;
+  video_url: string;
+  thumbnail_url: string | null;
+}
 
 interface ExerciceItemCardProps {
   exercice: {
@@ -75,9 +83,16 @@ export function ExerciceItemCard({
     name: exercice.exercice?.title || exercice.name || "",
     description: exercice.exercice?.description || exercice.description || "",
     video_url: exercice.exercice?.video_url || null,
+    thumbnail_url: exercice.exercice?.thumbnail_url || null,
   });
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  
+  // Video library state
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
+  const [libraryVideos, setLibraryVideos] = useState<VideoLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
   
   // Check if exercise is shared/platform (visible in exercise list)
   const isSharedOrPlatform = exercice.exercice?.status === "shared" || exercice.exercice?.status === "pending";
@@ -88,7 +103,7 @@ export function ExerciceItemCard({
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const thumbnailUrl = exercice.exercice?.thumbnail_url || null;
+  const thumbnailUrl = editValues.thumbnail_url || exercice.exercice?.thumbnail_url || null;
   const videoUrl = editValues.video_url || exercice.exercice?.video_url || null;
   const exerciceName = editValues.name || exercice.exercice?.title || exercice.name || `Exercice ${index + 1}`;
   const hasVideo = thumbnailUrl || videoUrl;
@@ -136,7 +151,7 @@ export function ExerciceItemCard({
         console.error("Error adding to video library:", videoError);
       }
 
-      setEditValues({ ...editValues, video_url: publicUrl });
+      setEditValues({ ...editValues, video_url: publicUrl, thumbnail_url: null });
       toast.success("Vidéo uploadée avec succès");
     } catch (error) {
       console.error("Error uploading video:", error);
@@ -147,8 +162,48 @@ export function ExerciceItemCard({
   };
 
   const removeVideo = () => {
-    setEditValues({ ...editValues, video_url: null });
+    setEditValues({ ...editValues, video_url: null, thumbnail_url: null });
   };
+
+  // Video library functions
+  const fetchLibraryVideos = async () => {
+    if (!user) return;
+    setLibraryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, title, video_url, thumbnail_url")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setLibraryVideos(data || []);
+    } catch (error) {
+      console.error("Error fetching library videos:", error);
+      toast.error("Erreur lors du chargement de la vidéothèque");
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const openLibraryDialog = () => {
+    fetchLibraryVideos();
+    setLibraryDialogOpen(true);
+  };
+
+  const selectLibraryVideo = (video: VideoLibraryItem) => {
+    setEditValues({
+      ...editValues,
+      video_url: video.video_url,
+      thumbnail_url: video.thumbnail_url,
+    });
+    setLibraryDialogOpen(false);
+    toast.success(`Vidéo "${video.title}" sélectionnée`);
+  };
+
+  const filteredLibraryVideos = librarySearch.trim()
+    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    : libraryVideos;
 
   const handleSaveMetrics = async () => {
     setSaving(true);
@@ -227,6 +282,7 @@ export function ExerciceItemCard({
       name: exercice.exercice?.title || exercice.name || "",
       description: exercice.exercice?.description || exercice.description || "",
       video_url: exercice.exercice?.video_url || null,
+      thumbnail_url: exercice.exercice?.thumbnail_url || null,
     });
     setIsEditing(false);
   };
@@ -427,54 +483,97 @@ export function ExerciceItemCard({
             <div className="space-y-2">
               <Label className="text-xs">Vidéo</Label>
               {editValues.video_url ? (
-                <div className="flex items-center gap-2 p-2 bg-background rounded-md border">
-                  <Video className="w-4 h-4 text-primary" />
-                  <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
+                <div className="space-y-2">
+                  <div className="relative aspect-video rounded overflow-hidden bg-muted">
+                    {editValues.thumbnail_url ? (
+                      <img 
+                        src={editValues.thumbnail_url} 
+                        alt="Vignette" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={editValues.video_url}
+                        className="w-full h-full object-cover"
+                        muted
+                      />
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <Play className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingVideo}
+                      className="flex-1"
+                    >
+                      {uploadingVideo ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3 mr-1" />
+                          Importer
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={openLibraryDialog}
+                      className="flex-1"
+                    >
+                      <Library className="w-3 h-3 mr-1" />
+                      Vidéothèque
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeVideo}
+                      className="text-destructive"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="h-6 px-2"
                     disabled={uploadingVideo}
+                    className="flex-1 gap-1"
                   >
                     {uploadingVideo ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Upload...
+                      </>
                     ) : (
-                      <Pencil className="w-3 h-3" />
+                      <>
+                        <Upload className="w-3 h-3" />
+                        Importer
+                      </>
                     )}
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={removeVideo}
-                    className="h-6 px-2"
+                    onClick={openLibraryDialog}
+                    className="flex-1 gap-1"
                   >
-                    <X className="w-3 h-3" />
+                    <Library className="w-3 h-3" />
+                    Vidéothèque
                   </Button>
                 </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingVideo}
-                  className="gap-2 w-full"
-                >
-                  {uploadingVideo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Upload en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      Ajouter une vidéo
-                    </>
-                  )}
-                </Button>
               )}
               <input
                 type="file"
@@ -724,6 +823,74 @@ export function ExerciceItemCard({
         onSave={handleSaveExerciceComment}
         saving={saving}
       />
+
+      {/* Video Library Dialog */}
+      <Dialog open={libraryDialogOpen} onOpenChange={setLibraryDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Choisir depuis la vidéothèque</DialogTitle>
+            <DialogDescription>
+              Sélectionnez une vidéo de votre vidéothèque
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une vidéo..."
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <ScrollArea className="h-[400px]">
+              {libraryLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredLibraryVideos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <Video className="w-8 h-8 mb-2" />
+                  <p className="text-sm">
+                    {librarySearch ? "Aucune vidéo trouvée" : "Aucune vidéo dans votre vidéothèque"}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredLibraryVideos.map((video) => (
+                    <button
+                      key={video.id}
+                      type="button"
+                      onClick={() => selectLibraryVideo(video)}
+                      className="flex flex-col gap-2 p-2 rounded-lg border hover:bg-muted/50 transition-colors text-left group"
+                    >
+                      <div className="relative aspect-video rounded overflow-hidden bg-muted">
+                        {video.thumbnail_url ? (
+                          <img 
+                            src={video.thumbnail_url} 
+                            alt={video.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Play className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Check className="w-8 h-8 text-primary" />
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium line-clamp-2">{video.title}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
