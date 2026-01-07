@@ -143,6 +143,21 @@ export function AddExerciceToSeanceDialog({
         data: { publicUrl },
       } = supabase.storage.from("exercice-videos").getPublicUrl(fileName);
 
+      // Also add to video library for sync
+      const { error: videoError } = await supabase
+        .from("videos")
+        .insert({
+          user_id: user.id,
+          title: name.trim() || file.name.replace(/\.[^/.]+$/, ""),
+          video_url: publicUrl,
+          name: file.name,
+          thumbnail_url: null
+        });
+
+      if (videoError) {
+        console.error("Error adding to video library:", videoError);
+      }
+
       setVideoUrl(publicUrl);
       toast.success("Vidéo uploadée avec succès");
     } catch (error) {
