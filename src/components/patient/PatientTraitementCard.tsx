@@ -1222,7 +1222,6 @@ export function PatientTraitementCard({
                                         </div>
                                         <div className="min-w-0 flex-1">
                                           <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
-                                          <span className="text-xs text-muted-foreground">Après séance {bilan.position_after_seance}</span>
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-2 pl-11 sm:pl-0">

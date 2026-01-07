@@ -29,7 +29,6 @@ export default function PatientBilanIntermediaire() {
   const { user } = useAuth();
 
   const traitementId = searchParams.get("traitement");
-  const position = parseInt(searchParams.get("position") || "0", 10);
   const bilanId = searchParams.get("bilan");
 
   const [patientName, setPatientName] = useState("");
@@ -97,39 +96,6 @@ export default function PatientBilanIntermediaire() {
             }
           }
         }
-      } else if (traitementId && patientId) {
-        // Check if there's already a bilan at this position
-        const { data: existingBilan } = await supabase
-          .from("patient_bilans")
-          .select("*")
-          .eq("patient_id", patientId)
-          .eq("traitement_id", traitementId)
-          .eq("position_after_seance", position)
-          .maybeSingle();
-
-        if (existingBilan) {
-          setExistingBilanId(existingBilan.id);
-          // Try to parse existing data if it's JSON
-          if (existingBilan.content) {
-            try {
-              const parsed = JSON.parse(existingBilan.content);
-              if (typeof parsed === "object") {
-                setBilan({
-                  douleur_localisation: parsed.douleur_localisation || "",
-                  douleur_intensite: parsed.douleur_intensite || "",
-                  douleur_type: parsed.douleur_type || "",
-                  amplitude_articulaire: parsed.amplitude_articulaire || "",
-                  force_musculaire: parsed.force_musculaire || "",
-                  tests_specifiques: parsed.tests_specifiques || "",
-                  observations: parsed.observations || "",
-                });
-              }
-            } catch {
-              // If not JSON, put it in observations
-              setBilan(prev => ({ ...prev, observations: existingBilan.content || "" }));
-            }
-          }
-        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -164,7 +130,7 @@ export default function PatientBilanIntermediaire() {
             patient_id: patientId,
             traitement_id: traitementId,
             user_id: user.id,
-            position_after_seance: position,
+            position_after_seance: 0,
             content: bilanJson,
             bilan_date: todayDate,
           })
@@ -214,7 +180,7 @@ export default function PatientBilanIntermediaire() {
               <h1 className="text-2xl font-display font-bold">Bilan intermédiaire</h1>
               <p className="text-muted-foreground flex items-center gap-1">
                 <User className="w-4 h-4" />
-                {patientName} • Après séance {position}
+                {patientName}
               </p>
             </div>
           </div>
