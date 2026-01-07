@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Select,
   SelectContent,
@@ -120,6 +121,7 @@ export default function Journal() {
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -355,6 +357,21 @@ export default function Journal() {
                             key={log.id}
                             className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                           >
+                            {/* Checkbox */}
+                            <Checkbox
+                              checked={selectedIds.has(log.id)}
+                              onCheckedChange={(checked) => {
+                                const newSelected = new Set(selectedIds);
+                                if (checked) {
+                                  newSelected.add(log.id);
+                                } else {
+                                  newSelected.delete(log.id);
+                                }
+                                setSelectedIds(newSelected);
+                              }}
+                              className="mt-1"
+                            />
+                            
                             {/* Action icon */}
                             <div className={`p-2 rounded-full ${ACTION_COLORS[log.action_type] || "bg-muted"}`}>
                               {ACTION_ICONS[log.action_type] || <FileText className="w-4 h-4" />}
