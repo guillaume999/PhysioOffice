@@ -50,9 +50,10 @@ interface SeanceFormDialogProps {
   onSuccess: (seanceDate?: string) => void;
   initialDate?: string;
   showDateField?: boolean;
+  initialPathologies?: string[];
 }
 
-export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initialDate, showDateField = false }: SeanceFormDialogProps) {
+export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initialDate, showDateField = false, initialPathologies }: SeanceFormDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
@@ -87,13 +88,17 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         setExercices(seance.exercices || []);
       } else {
         resetForm();
+        // Pre-fill pathologies from initialPathologies if provided
+        if (initialPathologies && initialPathologies.length > 0) {
+          setPathologies(initialPathologies);
+        }
       }
       // Set date
       if (showDateField) {
         setSeanceDate(initialDate || format(new Date(), 'yyyy-MM-dd'));
       }
     }
-  }, [open, user, seance, initialDate, showDateField]);
+  }, [open, user, seance, initialDate, showDateField, initialPathologies]);
 
   const fetchOptions = async () => {
     if (!user) return;
