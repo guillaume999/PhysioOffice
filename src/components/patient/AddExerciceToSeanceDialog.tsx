@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,20 +8,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Play } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, Upload, Video, Loader2, X, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
 interface Exercice {
   id: string;
+  code: string;
   title: string;
   description: string | null;
-  thumbnail_url: string | null;
   video_url: string | null;
-  pathologie_tags: string[] | null;
+  thumbnail_url: string | null;
 }
 
 interface AddExerciceToSeanceDialogProps {
@@ -40,55 +40,154 @@ export function AddExerciceToSeanceDialog({
   onSuccess,
 }: AddExerciceToSeanceDialogProps) {
   const { user } = useAuth();
-  const [exercices, setExercices] = useState<Exercice[]>([]);
+  const [availableExercices, setAvailableExercices] = useState<Exercice[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [userPseudo, setUserPseudo] = useState<string | null>(null);
+
+  // Form state
+  const [exerciceId, setExerciceId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [series, setSeries] = useState(3);
   const [repetitions, setRepetitions] = useState<number | null>(10);
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open && user) {
-      fetchExercices();
+      fetchData();
+      resetForm();
     }
   }, [open, user]);
 
-  const fetchExercices = async () => {
+  const fetchData = async () => {
     if (!user) return;
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("exercices")
-      .select("id, title, description, thumbnail_url, video_url, pathologie_tags")
-      .or(`user_id.eq.${user.id},status.eq.shared`)
-      .order("created_at", { ascending: false });
+    // Fetch user pseudo
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("pseudo")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    setUserPseudo(profileData?.pseudo || null);
 
-    if (!error && data) {
-      setExercices(data);
-    }
+    // Fetch exercices (user's own exercices)
+    const { data: exData } = await supabase
+      .from("exercices")
+      .select("id, code, title, description, video_url, thumbnail_url")
+      .eq("user_id", user.id)
+      .order("title");
+    setAvailableExercices(exData || []);
+
     setLoading(false);
   };
 
-  const filteredExercices = exercices.filter((ex) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      ex.title.toLowerCase().includes(query) ||
-      ex.pathologie_tags?.some((tag) => tag.toLowerCase().includes(query))
-    );
-  });
+  const resetForm = () => {
+    setExerciceId(null);
+    setName("");
+    setDescription("");
+    setVideoUrl(null);
+    setSeries(3);
+    setRepetitions(10);
+    setDurationSeconds(null);
+  };
 
-  const handleAddExercice = async () => {
-    if (!selectedExercice || !user) return;
+  const handleExerciceSelect = (value: string) => {
+    if (value === "custom") {
+      setExerciceId(null);
+      setName("");
+      setDescription("");
+      setVideoUrl(null);
+    } else {
+      const selectedEx = availableExercices.find((e) => e.id === value);
+      if (selectedEx) {
+        setExerciceId(selectedEx.id);
+        setName(selectedEx.title);
+        setDescription(selectedEx.description || "");
+        setVideoUrl(selectedEx.video_url);
+      }
+    }
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!user) return;
+
+    setUploadingVideo(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("videos")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("videos").getPublicUrl(fileName);
+
+      setVideoUrl(publicUrl);
+      toast.success("Vidéo uploadée avec succès");
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      toast.error("Erreur lors de l'upload de la vidéo");
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const removeVideo = () => {
+    setVideoUrl(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!user) return;
+    if (!name.trim()) {
+      toast.error("Le nom de l'exercice est requis");
+      return;
+    }
 
     setSaving(true);
     try {
+      let finalExerciceId = exerciceId;
+
+      // If it's a custom exercice (no exercice_id), create it in the exercices table
+      if (!finalExerciceId && name.trim()) {
+        const { data: newExercice, error: exerciceError } = await supabase
+          .from("exercices")
+          .insert({
+            user_id: user.id,
+            title: name.trim(),
+            description: description.trim() || null,
+            status: "draft",
+            pathologie_tags: [],
+            video_url: videoUrl || null,
+            author_name: userPseudo,
+          })
+          .select()
+          .single();
+
+        if (exerciceError) {
+          console.error("Error creating exercice:", exerciceError);
+          throw exerciceError;
+        }
+        finalExerciceId = newExercice.id;
+      }
+
+      // Add to seance_exercices
       const { error } = await supabase.from("seance_exercices").insert({
         seance_type_id: seanceTypeId,
-        exercice_id: selectedExercice.id,
-        name: selectedExercice.title,
+        exercice_id: finalExerciceId,
+        name: name.trim(),
+        description: description.trim() || null,
         series: series,
         repetitions: repetitions,
         duration_seconds: durationSeconds,
@@ -109,121 +208,143 @@ export function AddExerciceToSeanceDialog({
     }
   };
 
-  const resetForm = () => {
-    setSelectedExercice(null);
-    setSeries(3);
-    setRepetitions(10);
-    setDurationSeconds(null);
-    setSearchQuery("");
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
-        <DialogHeader className="p-4 pb-2">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
           <DialogTitle>Ajouter un exercice</DialogTitle>
         </DialogHeader>
 
-        {!selectedExercice ? (
-          <>
-            {/* Search */}
-            <div className="px-4 pb-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un exercice..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            {/* Select existing or custom */}
+            <div>
+              <Label className="text-xs">Exercice existant</Label>
+              <Select
+                value={exerciceId || "custom"}
+                onValueChange={handleExerciceSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner ou créer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Personnalisé</SelectItem>
+                  {availableExercices.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      <span className="font-mono text-xs uppercase text-muted-foreground mr-2">
+                        {e.code}
+                      </span>
+                      {e.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Exercices list */}
-            <ScrollArea className="flex-1 px-4">
-              {loading ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Chargement...
-                </p>
-              ) : filteredExercices.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Aucun exercice trouvé
-                </p>
-              ) : (
-                <div className="space-y-2 pb-4">
-                  {filteredExercices.map((ex) => (
-                    <div
-                      key={ex.id}
-                      className="flex items-center gap-3 p-2 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedExercice(ex)}
-                    >
-                      {/* Thumbnail */}
-                      <div className="w-16 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
-                        {ex.thumbnail_url ? (
-                          <img
-                            src={ex.thumbnail_url}
-                            alt={ex.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : ex.video_url ? (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Play className="w-5 h-5 text-muted-foreground" />
-                          </div>
+            {/* Name */}
+            <div>
+              <Label className="text-xs">Nom</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nom de l'exercice"
+                disabled={!!exerciceId}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Description optionnelle"
+              />
+            </div>
+
+            {/* Video section */}
+            <div className="space-y-2">
+              <Label className="text-xs">Vidéo</Label>
+              {videoUrl ? (
+                <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                  <Video className="w-4 h-4 text-primary" />
+                  <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
+                  {!exerciceId && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-6 px-2"
+                        disabled={uploadingVideo}
+                      >
+                        {uploadingVideo ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
-                          <div className="w-full h-full bg-muted" />
+                          <Pencil className="w-3 h-3" />
                         )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{ex.title}</p>
-                        {ex.pathologie_tags && ex.pathologie_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {ex.pathologie_tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <Plus className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  ))}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeVideo}
+                        className="h-6 px-2"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleVideoUpload(file);
+                    }}
+                    className="hidden"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleVideoUpload(file);
+                    }}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingVideo || !!exerciceId}
+                    className="gap-2"
+                  >
+                    {uploadingVideo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Upload en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Ajouter une vidéo
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
-            </ScrollArea>
-          </>
-        ) : (
-          /* Configuration form */
-          <div className="p-4 space-y-4">
-            {/* Selected exercise preview */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <div className="w-20 h-14 rounded overflow-hidden bg-muted flex-shrink-0">
-                {selectedExercice.thumbnail_url ? (
-                  <img
-                    src={selectedExercice.thumbnail_url}
-                    alt={selectedExercice.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Play className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{selectedExercice.title}</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-6 px-2 mt-1"
-                  onClick={() => setSelectedExercice(null)}
-                >
-                  Changer
-                </Button>
-              </div>
             </div>
 
             {/* Metrics */}
@@ -258,7 +379,9 @@ export function AddExerciceToSeanceDialog({
                   min={0}
                   value={durationSeconds || ""}
                   onChange={(e) =>
-                    setDurationSeconds(e.target.value ? parseInt(e.target.value) : null)
+                    setDurationSeconds(
+                      e.target.value ? parseInt(e.target.value) : null
+                    )
                   }
                   className="h-10"
                   placeholder="—"
@@ -271,11 +394,15 @@ export function AddExerciceToSeanceDialog({
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setSelectedExercice(null)}
+                onClick={() => onOpenChange(false)}
               >
-                Retour
+                Annuler
               </Button>
-              <Button className="flex-1" onClick={handleAddExercice} disabled={saving}>
+              <Button
+                className="flex-1"
+                onClick={handleSubmit}
+                disabled={saving || !name.trim()}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Ajouter
               </Button>
