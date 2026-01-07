@@ -77,18 +77,20 @@ export function CommentDialog({
           )}
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-4 flex-1 min-h-0">
           {isEditing ? (
-            <Textarea
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Saisissez votre commentaire ici..."
-              className="min-h-[200px] text-base resize-none"
-              autoFocus
-            />
+            <ScrollArea className="h-[50vh] max-h-[400px]">
+              <Textarea
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Saisissez votre commentaire ici..."
+                className="min-h-[200px] text-base resize-y"
+                autoFocus
+              />
+            </ScrollArea>
           ) : hasComment ? (
-            <ScrollArea className="max-h-[300px]">
-              <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap leading-relaxed">
+            <ScrollArea className="h-[50vh] max-h-[400px]">
+              <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap leading-relaxed pr-4">
                 {comment}
               </div>
             </ScrollArea>
