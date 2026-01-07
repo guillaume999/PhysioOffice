@@ -135,6 +135,7 @@ export function PatientTraitementCard({
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
+  const [newSeanceDate, setNewSeanceDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -326,6 +327,51 @@ export function PatientTraitementCard({
           .from("seance_types")
           .update({ is_hidden_from_list: true })
           .eq("id", latestSeance.id);
+      }
+    } else {
+      // Adding a new seance to the treatment
+      const { data: latestSeance } = await supabase
+        .from("seance_types")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (latestSeance) {
+        // Calculate the next ordre
+        const nextOrdre = (traitement.seances?.length || 0) + 1;
+        
+        // Add the seance to the treatment
+        await supabase
+          .from("traitement_seances")
+          .insert({
+            traitement_type_id: traitement.id,
+            seance_type_id: latestSeance.id,
+            ordre: nextOrdre
+          });
+        
+        // Mark the seance as hidden from list
+        await supabase
+          .from("seance_types")
+          .update({ is_hidden_from_list: true })
+          .eq("id", latestSeance.id);
+        
+        // Create the date entry for this seance
+        if (newSeanceDate) {
+          await supabase
+            .from("patient_traitement_seance_dates")
+            .insert({
+              patient_id: patientId,
+              traitement_id: traitement.id,
+              seance_ordre: nextOrdre,
+              seance_date: newSeanceDate,
+              user_id: user.id
+            });
+        }
+        
+        // Reset the date to today for next time
+        setNewSeanceDate(format(new Date(), 'yyyy-MM-dd'));
       }
     }
     
@@ -1082,19 +1128,29 @@ export function PatientTraitementCard({
                     </div>
 
                     {/* Add buttons section */}
-                    <div className="pt-4 border-t space-y-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start gap-2"
-                        onClick={() => {
-                          setEditingSeance(null);
-                          setEditingSeanceIndex(null);
-                          setSeanceFormDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        Ajouter une séance
-                      </Button>
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={newSeanceDate}
+                            onChange={(e) => setNewSeanceDate(e.target.value)}
+                            className="w-36 h-9"
+                          />
+                          <Button 
+                            variant="outline" 
+                            className="flex-1 justify-start gap-2"
+                            onClick={() => {
+                              setEditingSeance(null);
+                              setEditingSeanceIndex(null);
+                              setSeanceFormDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="w-4 h-4" />
+                            Ajouter une séance
+                          </Button>
+                        </div>
+                      </div>
                       <Button 
                         variant="outline" 
                         className="w-full justify-start gap-2"
