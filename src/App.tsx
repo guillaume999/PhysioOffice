@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Patients from "./pages/Patients";
 import PatientDetail from "./pages/PatientDetail";
+import PatientTraitementActif from "./pages/PatientTraitementActif";
 import PatientBilanInitial from "./pages/PatientBilanInitial";
 import PatientBilanIntermediaire from "./pages/PatientBilanIntermediaire";
 import PatientCertificats from "./pages/PatientCertificats";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/patients" element={<Patients />} />
             <Route path="/patients/:id" element={<PatientDetail />} />
+            <Route path="/patients/:id/traitement-actif" element={<PatientTraitementActif />} />
             <Route path="/patients/:id/bilan-initial" element={<PatientBilanInitial />} />
             <Route path="/patients/:id/bilan-intermediaire" element={<PatientBilanIntermediaire />} />
             <Route path="/patients/:id/certificats" element={<PatientCertificats />} />

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +18,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
 import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjectivesCard";
-import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
@@ -621,15 +620,28 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        <PatientTraitementCard
-          activeTraitementId={carePlan.active_traitement_id}
-          activeTraitementName={activeTraitementName}
-          patientId={id || ""}
-          patientName={patient.name}
-          onSelectTraitement={() => setSelectTraitementDialogOpen(true)}
-          onRemoveTraitement={handleRemoveTraitement}
-          onTraitementChanged={handleSelectTraitement}
-        />
+        {/* Lien vers le traitement actif */}
+        <Card 
+          className="cursor-pointer hover:bg-accent/50 transition-colors"
+          onClick={() => navigate(`/patients/${id}/traitement-actif`)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <ClipboardList className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Traitement actif</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {activeTraitementName || "Aucun traitement sélectionné"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mt-6">
           <PatientCommentsCard
