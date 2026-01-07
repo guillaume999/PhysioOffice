@@ -1051,6 +1051,7 @@ export type Database = {
       }
       seance_exercices: {
         Row: {
+          comment: string | null
           created_at: string
           description: string | null
           duration_seconds: number | null
@@ -1066,6 +1067,7 @@ export type Database = {
           series: number | null
         }
         Insert: {
+          comment?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
@@ -1081,6 +1083,7 @@ export type Database = {
           series?: number | null
         }
         Update: {
+          comment?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null

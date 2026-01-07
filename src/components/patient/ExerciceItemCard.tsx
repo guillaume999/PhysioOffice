@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -31,6 +32,7 @@ interface ExerciceItemCardProps {
     force_1: number | null;
     duration_seconds_2: number | null;
     force_2: number | null;
+    comment: string | null;
     ordre: number;
     exercice_id: string | null;
     exercice?: {
@@ -62,6 +64,7 @@ export function ExerciceItemCard({
     force_1: exercice.force_1 ?? null,
     duration_seconds_2: exercice.duration_seconds_2 ?? null,
     force_2: exercice.force_2 ?? null,
+    comment: exercice.comment ?? "",
     name: exercice.exercice?.title || exercice.name || "",
     description: exercice.exercice?.description || exercice.description || "",
     video_url: exercice.exercice?.video_url || null,
@@ -141,6 +144,7 @@ export function ExerciceItemCard({
           force_1: editValues.force_1,
           duration_seconds_2: editValues.duration_seconds_2,
           force_2: editValues.force_2,
+          comment: editValues.comment || null,
           name: editValues.name,
           description: editValues.description,
         })
@@ -194,6 +198,7 @@ export function ExerciceItemCard({
       force_1: exercice.force_1 ?? null,
       duration_seconds_2: exercice.duration_seconds_2 ?? null,
       force_2: exercice.force_2 ?? null,
+      comment: exercice.comment ?? "",
       name: exercice.exercice?.title || exercice.name || "",
       description: exercice.exercice?.description || exercice.description || "",
       video_url: exercice.exercice?.video_url || null,
@@ -485,6 +490,16 @@ export function ExerciceItemCard({
                 />
               </div>
             </div>
+            {/* Comment field */}
+            <div>
+              <Label className="text-xs">Commentaire</Label>
+              <Textarea
+                value={editValues.comment}
+                onChange={(e) => setEditValues({ ...editValues, comment: e.target.value })}
+                className="min-h-[60px] text-sm"
+                placeholder="Commentaire optionnel..."
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -545,6 +560,13 @@ export function ExerciceItemCard({
               </div>
             )}
           </div>
+        )}
+
+        {/* Comment display */}
+        {!isEditing && exercice.comment && (
+          <p className="text-xs text-muted-foreground italic bg-muted/50 rounded px-2 py-1">
+            {exercice.comment}
+          </p>
         )}
 
         {/* Separator */}

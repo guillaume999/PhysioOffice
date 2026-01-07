@@ -44,6 +44,7 @@ interface SeanceExercice {
   force_1: number | null;
   duration_seconds_2: number | null;
   force_2: number | null;
+  comment: string | null;
   ordre: number;
   exercice_id: string | null;
   exercice?: {
