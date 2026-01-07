@@ -736,26 +736,24 @@ export function PatientTraitementCard({
 
   return (
     <>
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          {!activeTraitementId && (
-            <div className="flex items-center justify-end">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onSelectTraitement}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter
-              </Button>
-            </div>
-          )}
+      {!activeTraitementId && (
+        <div className="flex items-center justify-end">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onSelectTraitement}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter
+          </Button>
+        </div>
+      )}
 
-          {loading ? (
-            <p className="text-muted-foreground text-sm">Chargement...</p>
-          ) : traitement ? (
-            <Card className="overflow-hidden border-primary/20">
-              <CardContent className="p-4">
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Chargement...</p>
+      ) : traitement ? (
+        <Card className="overflow-hidden border-primary/20">
+          <CardContent className="p-4">
                 {/* Header - Mobile optimized */}
                 <div className="flex flex-col gap-3">
                   {/* Ligne 1: Badge + Actions */}
@@ -1118,10 +1116,6 @@ export function PatientTraitementCard({
               Aucun plan de traitement actif. Importez-en un ou créez-en un nouveau.
             </p>
           )}
-        </CardContent>
-      </Card>
-
-
       {selectedSeanceForAccess && (
         <GenerateAccessCodeDialog
           open={accessCodeDialogOpen}
