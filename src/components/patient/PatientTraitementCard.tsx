@@ -990,7 +990,6 @@ export function PatientTraitementCard({
                                               {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
                                             </Badge>
                                           </div>
-                                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform sm:hidden ${isExpanded ? 'rotate-180' : ''}`} />
                                         </div>
                                         
                                         {/* Date and actions row */}
