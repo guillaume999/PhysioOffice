@@ -170,7 +170,7 @@ export default function PatientTraitementActif() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
+      <div className="container mx-auto px-1 sm:px-4 py-4 md:py-8 max-w-4xl">
         <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${id}`)}>
             <ArrowLeft className="w-5 h-5" />
