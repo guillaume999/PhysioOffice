@@ -829,25 +829,19 @@ export function PatientTraitementCard({
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ClipboardList className="w-5 h-5" />
-            Plan de traitement
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-base font-semibold">Traitement actif</Label>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onSelectTraitement}
-              disabled={!!activeTraitementId}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter
-            </Button>
-          </div>
+        <CardContent className="pt-6 space-y-4">
+          {!activeTraitementId && (
+            <div className="flex items-center justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onSelectTraitement}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter
+              </Button>
+            </div>
+          )}
 
           {loading ? (
             <p className="text-muted-foreground text-sm">Chargement...</p>
