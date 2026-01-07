@@ -127,7 +127,6 @@ export function PatientTraitementCard({
   const navigate = useNavigate();
   const [traitement, setTraitement] = useState<TraitementDetails | null>(null);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [testsExpanded, setTestsExpanded] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
@@ -865,24 +864,6 @@ export function PatientTraitementCard({
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => setExpanded(!expanded)}
-                        className="gap-1 h-8 px-2"
-                      >
-                        {expanded ? (
-                          <>
-                            <ChevronUp className="w-4 h-4" />
-                            <span className="hidden sm:inline">Réduire</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-4 h-4" />
-                            <span className="hidden sm:inline">Détails</span>
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
                         size="icon"
                         onClick={() => setRemoveConfirmDialogOpen(true)}
                         className="text-destructive h-8 w-8"
@@ -906,13 +887,12 @@ export function PatientTraitementCard({
                   </div>
                 </div>
 
-                {/* Expandable content */}
-                {expanded && (
-                  <div className="mt-4 pt-4 border-t space-y-4">
-                    {/* Description */}
-                    {traitement.description && (
-                      <p className="text-sm text-muted-foreground">{traitement.description}</p>
-                    )}
+                {/* Content always visible */}
+                <div className="mt-4 pt-4 border-t space-y-4">
+                  {/* Description */}
+                  {traitement.description && (
+                    <p className="text-sm text-muted-foreground">{traitement.description}</p>
+                  )}
 
                     {/* Tests - Collapsible */}
                     <Collapsible open={testsExpanded} onOpenChange={setTestsExpanded}>
@@ -991,178 +971,198 @@ export function PatientTraitementCard({
                             
                             return (
                               <div key={seance.id}>
-                                {/* Seance card */}
-                                <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
-                                  {/* Seance header */}
-                                  <div className="flex items-center justify-between gap-3 p-3">
-                                    <div 
-                                      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
-                                      onClick={() => toggleSeanceExpand(seance.id)}
-                                    >
-                                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                {/* Seance card with Collapsible */}
+                                <Collapsible 
+                                  open={isExpanded} 
+                                  onOpenChange={() => toggleSeanceExpand(seance.id)}
+                                >
+                                  <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+                                    {/* Seance header - always visible */}
+                                    <div className="p-3">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-sm font-bold text-primary">{i + 1}</span>
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="font-medium text-sm truncate">{getSeanceDisplay(seance)}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <Input
+                                                type="date"
+                                                value={getSeanceDate(i + 1)}
+                                                onChange={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSeanceDateChange(i + 1, e.target.value);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-32 h-7 text-xs"
+                                                title="Date de la séance"
+                                              />
+                                              <Badge variant="secondary" className="text-xs">
+                                                {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
+                                              </Badge>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            title="Modifier (crée une copie)"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditSeance(seance, i);
+                                            }}
+                                          >
+                                            <Edit className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            title="Partager cette séance"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedSeanceForAccess({
+                                                id: seance.seance_type_id,
+                                                name: getSeanceDisplay(seance)
+                                              });
+                                              setAccessCodeDialogOpen(true);
+                                            }}
+                                          >
+                                            <Share2 className="w-4 h-4" />
+                                          </Button>
+                                          <CollapsibleTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8"
+                                            >
+                                              {isExpanded ? (
+                                                <ChevronUp className="w-4 h-4" />
+                                              ) : (
+                                                <ChevronDown className="w-4 h-4" />
+                                              )}
+                                            </Button>
+                                          </CollapsibleTrigger>
+                                        </div>
                                       </div>
-                                      <Input
-                                        type="date"
-                                        value={getSeanceDate(i + 1)}
-                                        onChange={(e) => {
-                                          e.stopPropagation();
-                                          handleSeanceDateChange(i + 1, e.target.value);
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-32 h-7 text-xs"
-                                        title="Date de la séance"
-                                      />
-                                      <span className="text-sm truncate">{getSeanceDisplay(seance)}</span>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
-                                      </Badge>
-                                      {isExpanded ? (
-                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                      ) : (
-                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                      )}
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        title="Modifier (crée une copie)"
-                                        onClick={() => handleEditSeance(seance, i)}
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        title="Partager cette séance"
-                                        onClick={() => {
-                                          setSelectedSeanceForAccess({
-                                            id: seance.seance_type_id,
-                                            name: getSeanceDisplay(seance)
-                                          });
-                                          setAccessCodeDialogOpen(true);
-                                        }}
-                                      >
-                                        <Share2 className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Expanded content */}
-                                  {isExpanded && (
-                                    <div className="px-3 pb-3 space-y-3">
-                                      {/* Exercices list */}
-                                      {exercices.length > 0 ? (
-                                        <div className="space-y-3">
-                                          {exercices.map((ex, j) => {
-                                            const thumbnailUrl = ex.exercice?.thumbnail_url || null;
-                                            const videoUrl = ex.exercice?.video_url || null;
-                                            const exerciceName = ex.exercice?.title || ex.name || `Exercice ${j + 1}`;
-                                            
-                                            return (
-                                              <div 
-                                                key={ex.id}
-                                                className="flex items-start gap-4 p-3 bg-card rounded-xl border border-border shadow-sm"
-                                              >
-                                                {/* Order number */}
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                  <span className="text-sm font-bold text-primary">{j + 1}</span>
-                                                </div>
+                                    
+                                    {/* Collapsed content - Exercises list */}
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3 space-y-3 border-t border-border/50 pt-3">
+                                        {/* Exercices list */}
+                                        {exercices.length > 0 ? (
+                                          <div className="space-y-3">
+                                            {exercices.map((ex, j) => {
+                                              const thumbnailUrl = ex.exercice?.thumbnail_url || null;
+                                              const videoUrl = ex.exercice?.video_url || null;
+                                              const exerciceName = ex.exercice?.title || ex.name || `Exercice ${j + 1}`;
+                                              
+                                              return (
+                                                <div 
+                                                  key={ex.id}
+                                                  className="flex items-start gap-4 p-3 bg-card rounded-xl border border-border shadow-sm"
+                                                >
+                                                  {/* Order number */}
+                                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <span className="text-sm font-bold text-primary">{j + 1}</span>
+                                                  </div>
 
-                                                {/* Thumbnail */}
-                                                <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                                  {thumbnailUrl ? (
-                                                    <img 
-                                                      src={thumbnailUrl} 
-                                                      alt={exerciceName}
-                                                      className="w-full h-full object-cover"
-                                                    />
-                                                  ) : videoUrl ? (
-                                                    <video 
-                                                      src={videoUrl}
-                                                      className="w-full h-full object-cover"
-                                                      muted
-                                                    />
-                                                  ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                      <Play className="w-6 h-6" />
-                                                    </div>
-                                                  )}
-                                                  {videoUrl && (
-                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                                      <Play className="w-5 h-5 text-white fill-white" />
-                                                    </div>
-                                                  )}
-                                                </div>
-                                                
-                                                {/* Exercise info */}
-                                                <div className="flex-1 min-w-0">
-                                                  <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
-                                                  
-                                                  {/* Stats */}
-                                                  <div className="flex items-center gap-3 flex-wrap">
-                                                    <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-lg">
-                                                      <span className="text-base font-bold text-primary">{ex.series || 1}</span>
-                                                      <span className="text-xs text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
-                                                    </div>
-                                                    
-                                                    {ex.repetitions && (
-                                                      <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
-                                                        <span className="text-base font-bold">{ex.repetitions}</span>
-                                                        <span className="text-xs text-muted-foreground">reps</span>
+                                                  {/* Thumbnail */}
+                                                  <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
+                                                    {thumbnailUrl ? (
+                                                      <img 
+                                                        src={thumbnailUrl} 
+                                                        alt={exerciceName}
+                                                        className="w-full h-full object-cover"
+                                                      />
+                                                    ) : videoUrl ? (
+                                                      <video 
+                                                        src={videoUrl}
+                                                        className="w-full h-full object-cover"
+                                                        muted
+                                                      />
+                                                    ) : (
+                                                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                        <Play className="w-6 h-6" />
                                                       </div>
                                                     )}
-                                                    
-                                                    {ex.duration_seconds && (
-                                                      <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
-                                                        <span className="text-base font-bold">{ex.duration_seconds}</span>
-                                                        <span className="text-xs text-muted-foreground">sec</span>
+                                                    {videoUrl && (
+                                                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                                        <Play className="w-5 h-5 text-white fill-white" />
                                                       </div>
                                                     )}
                                                   </div>
+                                                  
+                                                  {/* Exercise info */}
+                                                  <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
+                                                    
+                                                    {/* Stats */}
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                      <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-lg">
+                                                        <span className="text-base font-bold text-primary">{ex.series || 1}</span>
+                                                        <span className="text-xs text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                                      </div>
+                                                      
+                                                      {ex.repetitions && (
+                                                        <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
+                                                          <span className="text-base font-bold">{ex.repetitions}</span>
+                                                          <span className="text-xs text-muted-foreground">reps</span>
+                                                        </div>
+                                                      )}
+                                                      
+                                                      {ex.duration_seconds && (
+                                                        <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
+                                                          <span className="text-base font-bold">{ex.duration_seconds}</span>
+                                                          <span className="text-xs text-muted-foreground">sec</span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : (
-                                        <p className="text-xs text-muted-foreground">Aucun exercice</p>
-                                      )}
-                                      
-                                      {/* Seance actions */}
-                                      <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                                        <div className="flex items-center gap-2">
-                                          <Switch
-                                            id={`seance-visibility-${seance.id}`}
-                                            checked={!seance.seance_types?.is_hidden_from_list}
-                                            onCheckedChange={() => toggleSeanceVisibility(
-                                              seance.seance_type_id, 
-                                              seance.seance_types?.is_hidden_from_list || false
-                                            )}
-                                          />
-                                          <Label 
-                                            htmlFor={`seance-visibility-${seance.id}`} 
-                                            className="text-xs cursor-pointer"
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <p className="text-xs text-muted-foreground">Aucun exercice</p>
+                                        )}
+                                        
+                                        {/* Seance actions */}
+                                        <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                                          <div className="flex items-center gap-2">
+                                            <Switch
+                                              id={`seance-visibility-${seance.id}`}
+                                              checked={!seance.seance_types?.is_hidden_from_list}
+                                              onCheckedChange={() => toggleSeanceVisibility(
+                                                seance.seance_type_id, 
+                                                seance.seance_types?.is_hidden_from_list || false
+                                              )}
+                                            />
+                                            <Label 
+                                              htmlFor={`seance-visibility-${seance.id}`} 
+                                              className="text-xs cursor-pointer"
+                                            >
+                                              Visible dans Séances
+                                            </Label>
+                                          </div>
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="text-xs gap-1"
+                                            onClick={() => handleEditSeanceOriginal(seance)}
                                           >
-                                            Visible dans Séances
-                                          </Label>
+                                            <Edit className="w-3 h-3" />
+                                            Modifier l'originale
+                                          </Button>
                                         </div>
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm" 
-                                          className="text-xs gap-1"
-                                          onClick={() => handleEditSeanceOriginal(seance)}
-                                        >
-                                          <Edit className="w-3 h-3" />
-                                          Modifier l'originale
-                                        </Button>
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
 
                                 {/* Bilan between sessions */}
                                 <div className="ml-3 mt-2 mb-2 pl-3 border-l-2 border-dashed border-primary/30">
@@ -1242,8 +1242,7 @@ export function PatientTraitementCard({
                         </Button>
                       </div>
                     </div>
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           ) : (
