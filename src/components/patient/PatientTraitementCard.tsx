@@ -1279,7 +1279,7 @@ export function PatientTraitementCard({
                       <Button 
                         variant="outline" 
                         className="w-full justify-start gap-2 h-11 sm:h-10"
-                        onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire`)}
+                        onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}`)}
                       >
                         <FileText className="w-4 h-4" />
                         Ajouter un bilan intermédiaire
