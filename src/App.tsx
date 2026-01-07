@@ -15,6 +15,7 @@ import PatientCertificats from "./pages/PatientCertificats";
 import IADiagnostic from "./pages/IADiagnostic";
 import Notes from "./pages/Notes";
 import Profile from "./pages/Profile";
+import Journal from "./pages/Journal";
 import Contact from "./pages/Contact";
 import MentionsLegales from "./pages/MentionsLegales";
 import TraitementType from "./pages/TraitementType";
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/ia-diagnostic" element={<IADiagnostic />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/journal" element={<Journal />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
             <Route path="/traitement-type" element={<TraitementType />} />

@@ -1407,6 +1407,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activity_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          details: string | null
+          id: string
+          resource_id: string | null
+          resource_type: string | null
+          section: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          resource_id?: string | null
+          resource_type?: string | null
+          section: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          resource_id?: string | null
+          resource_type?: string | null
+          section?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_dismissed_popups: {
         Row: {
           dismissed_at: string
