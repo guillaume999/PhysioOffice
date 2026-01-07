@@ -16,6 +16,7 @@ import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCod
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { format } from "date-fns";
 import { ExerciceItemCard } from "@/components/patient/ExerciceItemCard";
+import { AddExerciceToSeanceDialog } from "@/components/patient/AddExerciceToSeanceDialog";
 import { fr } from "date-fns/locale";
 import {
   AlertDialog,
@@ -137,6 +138,8 @@ export function PatientTraitementCard({
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
+  const [addExerciceDialogOpen, setAddExerciceDialogOpen] = useState(false);
+  const [selectedSeanceForAddExercice, setSelectedSeanceForAddExercice] = useState<{id: string; count: number} | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -978,6 +981,23 @@ export function PatientTraitementCard({
                                         ) : (
                                           <p className="text-sm text-muted-foreground text-center py-4">Aucun exercice dans cette séance</p>
                                         )}
+
+                                        {/* Add exercise button */}
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full h-9 text-xs gap-1 border-dashed"
+                                          onClick={() => {
+                                            setSelectedSeanceForAddExercice({
+                                              id: seance.seance_type_id,
+                                              count: exercices.length
+                                            });
+                                            setAddExerciceDialogOpen(true);
+                                          }}
+                                        >
+                                          <Plus className="w-4 h-4" />
+                                          Ajouter un exercice
+                                        </Button>
                                         
                                         {/* Seance actions */}
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">
@@ -1161,6 +1181,19 @@ export function PatientTraitementCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectedSeanceForAddExercice && (
+        <AddExerciceToSeanceDialog
+          open={addExerciceDialogOpen}
+          onOpenChange={(open) => {
+            setAddExerciceDialogOpen(open);
+            if (!open) setSelectedSeanceForAddExercice(null);
+          }}
+          seanceTypeId={selectedSeanceForAddExercice.id}
+          currentExercicesCount={selectedSeanceForAddExercice.count}
+          onSuccess={fetchTraitementDetails}
+        />
+      )}
     </>
   );
 }
