@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil } from "lucide-react";
+import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil, Calendar } from "lucide-react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -46,10 +47,12 @@ interface SeanceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seance?: SeanceFormData | null;
-  onSuccess: () => void;
+  onSuccess: (seanceDate?: string) => void;
+  initialDate?: string;
+  showDateField?: boolean;
 }
 
-export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: SeanceFormDialogProps) {
+export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initialDate, showDateField = false }: SeanceFormDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
@@ -67,6 +70,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
   const [objectifsPrincipaux, setObjectifsPrincipaux] = useState<string[]>([]);
   const [objectifsSecondaires, setObjectifsSecondaires] = useState<string[]>([]);
   const [exercices, setExercices] = useState<SeanceExerciceItem[]>([]);
+  const [seanceDate, setSeanceDate] = useState<string>("");
   
   // New item inputs
   const [newPathologie, setNewPathologie] = useState("");
@@ -84,8 +88,12 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
       } else {
         resetForm();
       }
+      // Set date
+      if (showDateField) {
+        setSeanceDate(initialDate || format(new Date(), 'yyyy-MM-dd'));
+      }
     }
-  }, [open, user, seance]);
+  }, [open, user, seance, initialDate, showDateField]);
 
   const fetchOptions = async () => {
     if (!user) return;
@@ -404,7 +412,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
 
       onOpenChange(false);
       resetForm();
-      onSuccess();
+      onSuccess(showDateField ? seanceDate : undefined);
     } catch (error) {
       console.error("Error saving seance:", error);
       toast.error("Erreur lors de l'enregistrement");
@@ -421,6 +429,22 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess }: Sean
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Date field - only shown when showDateField is true */}
+          {showDateField && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Date de la séance
+              </Label>
+              <Input
+                type="date"
+                value={seanceDate}
+                onChange={(e) => setSeanceDate(e.target.value)}
+                className="w-48"
+              />
+            </div>
+          )}
+
           {/* Pathologies */}
           <div className="space-y-2">
             <Label>Pathologies *</Label>

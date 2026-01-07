@@ -135,7 +135,6 @@ export function PatientTraitementCard({
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
   const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
-  const [newSeanceDate, setNewSeanceDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -301,7 +300,7 @@ export function PatientTraitementCard({
     setSeanceFormDialogOpen(true);
   };
 
-  const handleSeanceFormSuccess = async () => {
+  const handleSeanceFormSuccess = async (seanceDate?: string) => {
     if (!user || !traitement) return;
     
     // If we created a new copy, we need to update the traitement_seances
@@ -358,20 +357,17 @@ export function PatientTraitementCard({
           .eq("id", latestSeance.id);
         
         // Create the date entry for this seance
-        if (newSeanceDate) {
+        if (seanceDate) {
           await supabase
             .from("patient_traitement_seance_dates")
             .insert({
               patient_id: patientId,
               traitement_id: traitement.id,
               seance_ordre: nextOrdre,
-              seance_date: newSeanceDate,
+              seance_date: seanceDate,
               user_id: user.id
             });
         }
-        
-        // Reset the date to today for next time
-        setNewSeanceDate(format(new Date(), 'yyyy-MM-dd'));
       }
     }
     
@@ -1128,29 +1124,19 @@ export function PatientTraitementCard({
                     </div>
 
                     {/* Add buttons section */}
-                    <div className="pt-4 border-t space-y-3">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="date"
-                            value={newSeanceDate}
-                            onChange={(e) => setNewSeanceDate(e.target.value)}
-                            className="w-36 h-9"
-                          />
-                          <Button 
-                            variant="outline" 
-                            className="flex-1 justify-start gap-2"
-                            onClick={() => {
-                              setEditingSeance(null);
-                              setEditingSeanceIndex(null);
-                              setSeanceFormDialogOpen(true);
-                            }}
-                          >
-                            <Plus className="w-4 h-4" />
-                            Ajouter une séance
-                          </Button>
-                        </div>
-                      </div>
+                    <div className="pt-4 border-t space-y-2">
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start gap-2"
+                        onClick={() => {
+                          setEditingSeance(null);
+                          setEditingSeanceIndex(null);
+                          setSeanceFormDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Ajouter une séance
+                      </Button>
                       <Button 
                         variant="outline" 
                         className="w-full justify-start gap-2"
@@ -1205,6 +1191,7 @@ export function PatientTraitementCard({
         onOpenChange={setSeanceFormDialogOpen}
         seance={editingSeance}
         onSuccess={handleSeanceFormSuccess}
+        showDateField={editingSeanceIndex === null}
       />
 
       <AlertDialog open={removeConfirmDialogOpen} onOpenChange={setRemoveConfirmDialogOpen}>
