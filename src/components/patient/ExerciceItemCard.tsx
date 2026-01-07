@@ -28,6 +28,9 @@ interface ExerciceItemCardProps {
     repetitions: number | null;
     duration_seconds: number | null;
     series: number | null;
+    force_1: number | null;
+    duration_seconds_2: number | null;
+    force_2: number | null;
     ordre: number;
     exercice_id: string | null;
     exercice?: {
@@ -56,6 +59,9 @@ export function ExerciceItemCard({
     series: exercice.series ?? null,
     repetitions: exercice.repetitions ?? null,
     duration_seconds: exercice.duration_seconds ?? null,
+    force_1: exercice.force_1 ?? null,
+    duration_seconds_2: exercice.duration_seconds_2 ?? null,
+    force_2: exercice.force_2 ?? null,
     name: exercice.exercice?.title || exercice.name || "",
     description: exercice.exercice?.description || exercice.description || "",
     video_url: exercice.exercice?.video_url || null,
@@ -132,6 +138,9 @@ export function ExerciceItemCard({
           series: editValues.series,
           repetitions: editValues.repetitions,
           duration_seconds: editValues.duration_seconds,
+          force_1: editValues.force_1,
+          duration_seconds_2: editValues.duration_seconds_2,
+          force_2: editValues.force_2,
           name: editValues.name,
           description: editValues.description,
         })
@@ -182,6 +191,9 @@ export function ExerciceItemCard({
       series: exercice.series ?? null,
       repetitions: exercice.repetitions ?? null,
       duration_seconds: exercice.duration_seconds ?? null,
+      force_1: exercice.force_1 ?? null,
+      duration_seconds_2: exercice.duration_seconds_2 ?? null,
+      force_2: exercice.force_2 ?? null,
       name: exercice.exercice?.title || exercice.name || "",
       description: exercice.exercice?.description || exercice.description || "",
       video_url: exercice.exercice?.video_url || null,
@@ -401,7 +413,7 @@ export function ExerciceItemCard({
               />
             </div>
 
-            {/* Metrics */}
+            {/* Metrics - Row 1 */}
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <Label className="text-xs">Séries</Label>
@@ -437,6 +449,42 @@ export function ExerciceItemCard({
                 />
               </div>
             </div>
+            {/* Metrics - Row 2 */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Force</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editValues.force_1 ?? ""}
+                  onChange={(e) => setEditValues({ ...editValues, force_1: e.target.value ? parseInt(e.target.value) : null })}
+                  className="h-9 text-sm"
+                  placeholder="—"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Durée 2 (s)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editValues.duration_seconds_2 ?? ""}
+                  onChange={(e) => setEditValues({ ...editValues, duration_seconds_2: e.target.value ? parseInt(e.target.value) : null })}
+                  className="h-9 text-sm"
+                  placeholder="—"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Force 2</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editValues.force_2 ?? ""}
+                  onChange={(e) => setEditValues({ ...editValues, force_2: e.target.value ? parseInt(e.target.value) : null })}
+                  className="h-9 text-sm"
+                  placeholder="—"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -466,16 +514,34 @@ export function ExerciceItemCard({
                 <span className="text-xs">série{exercice.series > 1 ? "s" : ""}</span>
               </div>
             )}
-            {exercice.repetitions && (
+            {exercice.repetitions != null && (
               <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
                 <span className="text-sm font-bold">{exercice.repetitions}</span>
                 <span className="text-xs">reps</span>
               </div>
             )}
-            {exercice.duration_seconds && (
+            {exercice.duration_seconds != null && (
               <div className="inline-flex items-center gap-1 bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
                 <span className="text-sm font-bold">{exercice.duration_seconds}</span>
                 <span className="text-xs">sec</span>
+              </div>
+            )}
+            {exercice.force_1 != null && (
+              <div className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-bold">{exercice.force_1}</span>
+                <span className="text-xs">force</span>
+              </div>
+            )}
+            {exercice.duration_seconds_2 != null && (
+              <div className="inline-flex items-center gap-1 bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
+                <span className="text-sm font-bold">{exercice.duration_seconds_2}</span>
+                <span className="text-xs">sec</span>
+              </div>
+            )}
+            {exercice.force_2 != null && (
+              <div className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-bold">{exercice.force_2}</span>
+                <span className="text-xs">force</span>
               </div>
             )}
           </div>

@@ -1054,7 +1054,10 @@ export type Database = {
           created_at: string
           description: string | null
           duration_seconds: number | null
+          duration_seconds_2: number | null
           exercice_id: string | null
+          force_1: number | null
+          force_2: number | null
           id: string
           name: string | null
           ordre: number
@@ -1066,7 +1069,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          duration_seconds_2?: number | null
           exercice_id?: string | null
+          force_1?: number | null
+          force_2?: number | null
           id?: string
           name?: string | null
           ordre?: number
@@ -1078,7 +1084,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          duration_seconds_2?: number | null
           exercice_id?: string | null
+          force_1?: number | null
+          force_2?: number | null
           id?: string
           name?: string | null
           ordre?: number

@@ -40,7 +40,10 @@ interface SeanceExercice {
   description: string | null;
   repetitions: number | null;
   duration_seconds: number | null;
-  series: number;
+  series: number | null;
+  force_1: number | null;
+  duration_seconds_2: number | null;
+  force_2: number | null;
   ordre: number;
   exercice_id: string | null;
   exercice?: {
