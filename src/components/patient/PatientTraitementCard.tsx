@@ -81,6 +81,7 @@ interface TraitementSeance {
     objectifs_principaux?: string[];
     objectifs_secondaires?: string[];
     is_hidden_from_list?: boolean;
+    comment?: string | null;
   } | null;
   exercices?: SeanceExercice[];
 }
@@ -144,6 +145,9 @@ export function PatientTraitementCard({
   const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
   const [addExerciceDialogOpen, setAddExerciceDialogOpen] = useState(false);
   const [selectedSeanceForAddExercice, setSelectedSeanceForAddExercice] = useState<{id: string; count: number} | null>(null);
+  const [editingSeanceComment, setEditingSeanceComment] = useState<string | null>(null);
+  const [seanceCommentValues, setSeanceCommentValues] = useState<Record<string, string>>({});
+  const [savingSeanceComment, setSavingSeanceComment] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -173,7 +177,7 @@ export function PatientTraitementCard({
 
         const { data: seancesData } = await supabase
           .from("traitement_seances")
-          .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, is_hidden_from_list)")
+          .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, is_hidden_from_list, comment)")
           .eq("traitement_type_id", activeTraitementId)
           .order("ordre", { ascending: true });
 
@@ -501,6 +505,37 @@ export function PatientTraitementCard({
         b.id === bilanId ? { ...b, bilan_date: date || null } : b
       )
     });
+  };
+
+  const handleSaveSeanceComment = async (seanceTypeId: string, comment: string) => {
+    setSavingSeanceComment(seanceTypeId);
+    try {
+      const { error } = await supabase
+        .from("seance_types")
+        .update({ comment: comment || null })
+        .eq("id", seanceTypeId);
+
+      if (error) throw error;
+
+      // Update local state
+      if (traitement) {
+        setTraitement({
+          ...traitement,
+          seances: traitement.seances.map(s =>
+            s.seance_type_id === seanceTypeId
+              ? { ...s, seance_types: { ...s.seance_types!, comment: comment || null } }
+              : s
+          )
+        });
+      }
+      setEditingSeanceComment(null);
+      toast.success("Commentaire enregistré");
+    } catch (error) {
+      console.error("Error saving seance comment:", error);
+      toast.error("Erreur lors de l'enregistrement");
+    } finally {
+      setSavingSeanceComment(null);
+    }
   };
 
   const handlePrintBilan = (bilan: PatientBilan, seancePosition: number) => {
@@ -1002,6 +1037,66 @@ export function PatientTraitementCard({
                                           <Plus className="w-4 h-4" />
                                           Ajouter un exercice
                                         </Button>
+
+                                        {/* Seance comment */}
+                                        <div className="space-y-2">
+                                          <Label className="text-xs text-muted-foreground">Commentaire de la séance</Label>
+                                          {editingSeanceComment === seance.seance_type_id ? (
+                                            <div className="space-y-2">
+                                              <Textarea
+                                                value={seanceCommentValues[seance.seance_type_id] ?? (seance.seance_types?.comment || "")}
+                                                onChange={(e) => setSeanceCommentValues(prev => ({
+                                                  ...prev,
+                                                  [seance.seance_type_id]: e.target.value
+                                                }))}
+                                                className="min-h-[60px] text-sm"
+                                                placeholder="Commentaire optionnel..."
+                                              />
+                                              <div className="flex items-center gap-2">
+                                                <Button
+                                                  size="sm"
+                                                  className="flex-1 h-8 text-xs"
+                                                  onClick={() => handleSaveSeanceComment(
+                                                    seance.seance_type_id,
+                                                    seanceCommentValues[seance.seance_type_id] ?? (seance.seance_types?.comment || "")
+                                                  )}
+                                                  disabled={savingSeanceComment === seance.seance_type_id}
+                                                >
+                                                  {savingSeanceComment === seance.seance_type_id ? "Enregistrement..." : "Enregistrer"}
+                                                </Button>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-8 text-xs"
+                                                  onClick={() => {
+                                                    setEditingSeanceComment(null);
+                                                    setSeanceCommentValues(prev => {
+                                                      const next = { ...prev };
+                                                      delete next[seance.seance_type_id];
+                                                      return next;
+                                                    });
+                                                  }}
+                                                  disabled={savingSeanceComment === seance.seance_type_id}
+                                                >
+                                                  Annuler
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div
+                                              className="text-sm text-muted-foreground bg-background/50 rounded px-2 py-1.5 min-h-[36px] cursor-pointer hover:bg-background transition-colors border border-transparent hover:border-border"
+                                              onClick={() => {
+                                                setEditingSeanceComment(seance.seance_type_id);
+                                                setSeanceCommentValues(prev => ({
+                                                  ...prev,
+                                                  [seance.seance_type_id]: seance.seance_types?.comment || ""
+                                                }));
+                                              }}
+                                            >
+                                              {seance.seance_types?.comment || <span className="italic text-muted-foreground/60">Cliquez pour ajouter un commentaire...</span>}
+                                            </div>
+                                          )}
+                                        </div>
                                         
                                         {/* Seance actions */}
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">

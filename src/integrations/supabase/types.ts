@@ -1148,6 +1148,7 @@ export type Database = {
         Row: {
           author_name: string | null
           code: string
+          comment: string | null
           created_at: string
           id: string
           is_copy: boolean | null
@@ -1167,6 +1168,7 @@ export type Database = {
         Insert: {
           author_name?: string | null
           code?: string
+          comment?: string | null
           created_at?: string
           id?: string
           is_copy?: boolean | null
@@ -1186,6 +1188,7 @@ export type Database = {
         Update: {
           author_name?: string | null
           code?: string
+          comment?: string | null
           created_at?: string
           id?: string
           is_copy?: boolean | null
