@@ -753,7 +753,7 @@ export function PatientTraitementCard({
         <p className="text-muted-foreground text-sm">Chargement...</p>
       ) : traitement ? (
         <Card className="overflow-hidden border-primary/20">
-          <CardContent className="p-4">
+          <CardContent className="p-2 sm:p-3">
                 {/* Header - Mobile optimized */}
                 <div className="flex flex-col gap-3">
                   {/* Ligne 1: Badge + Actions */}
