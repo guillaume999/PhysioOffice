@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { format } from "date-fns";
 import { ExerciceItemCard } from "@/components/patient/ExerciceItemCard";
 import { AddExerciceToSeanceDialog } from "@/components/patient/AddExerciceToSeanceDialog";
+import { CommentDialog } from "@/components/patient/CommentDialog";
 import { fr } from "date-fns/locale";
 import {
   AlertDialog,
@@ -146,8 +147,9 @@ export function PatientTraitementCard({
   const [addExerciceDialogOpen, setAddExerciceDialogOpen] = useState(false);
   const [selectedSeanceForAddExercice, setSelectedSeanceForAddExercice] = useState<{id: string; count: number} | null>(null);
   const [editingSeanceComment, setEditingSeanceComment] = useState<string | null>(null);
-  const [seanceCommentValues, setSeanceCommentValues] = useState<Record<string, string>>({});
-  const [savingSeanceComment, setSavingSeanceComment] = useState<string | null>(null);
+  const [seanceCommentDialogOpen, setSeanceCommentDialogOpen] = useState(false);
+  const [selectedSeanceForComment, setSelectedSeanceForComment] = useState<{id: string; name: string; comment: string} | null>(null);
+  const [savingSeanceComment, setSavingSeanceComment] = useState(false);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -507,13 +509,15 @@ export function PatientTraitementCard({
     });
   };
 
-  const handleSaveSeanceComment = async (seanceTypeId: string, comment: string) => {
-    setSavingSeanceComment(seanceTypeId);
+  const handleSaveSeanceComment = async (comment: string) => {
+    if (!selectedSeanceForComment) return;
+    
+    setSavingSeanceComment(true);
     try {
       const { error } = await supabase
         .from("seance_types")
         .update({ comment: comment || null })
-        .eq("id", seanceTypeId);
+        .eq("id", selectedSeanceForComment.id);
 
       if (error) throw error;
 
@@ -522,19 +526,20 @@ export function PatientTraitementCard({
         setTraitement({
           ...traitement,
           seances: traitement.seances.map(s =>
-            s.seance_type_id === seanceTypeId
+            s.seance_type_id === selectedSeanceForComment.id
               ? { ...s, seance_types: { ...s.seance_types!, comment: comment || null } }
               : s
           )
         });
       }
-      setEditingSeanceComment(null);
+      setSeanceCommentDialogOpen(false);
+      setSelectedSeanceForComment(null);
       toast.success("Commentaire enregistré");
     } catch (error) {
       console.error("Error saving seance comment:", error);
       toast.error("Erreur lors de l'enregistrement");
     } finally {
-      setSavingSeanceComment(null);
+      setSavingSeanceComment(false);
     }
   };
 
@@ -1038,65 +1043,32 @@ export function PatientTraitementCard({
                                           Ajouter un exercice
                                         </Button>
 
-                                        {/* Seance comment */}
-                                        <div className="space-y-2">
-                                          <Label className="text-xs text-muted-foreground">Commentaire de la séance</Label>
-                                          {editingSeanceComment === seance.seance_type_id ? (
-                                            <div className="space-y-2">
-                                              <Textarea
-                                                value={seanceCommentValues[seance.seance_type_id] ?? (seance.seance_types?.comment || "")}
-                                                onChange={(e) => setSeanceCommentValues(prev => ({
-                                                  ...prev,
-                                                  [seance.seance_type_id]: e.target.value
-                                                }))}
-                                                className="min-h-[60px] text-sm"
-                                                placeholder="Commentaire optionnel..."
-                                              />
-                                              <div className="flex items-center gap-2">
-                                                <Button
-                                                  size="sm"
-                                                  className="flex-1 h-8 text-xs"
-                                                  onClick={() => handleSaveSeanceComment(
-                                                    seance.seance_type_id,
-                                                    seanceCommentValues[seance.seance_type_id] ?? (seance.seance_types?.comment || "")
-                                                  )}
-                                                  disabled={savingSeanceComment === seance.seance_type_id}
-                                                >
-                                                  {savingSeanceComment === seance.seance_type_id ? "Enregistrement..." : "Enregistrer"}
-                                                </Button>
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="h-8 text-xs"
-                                                  onClick={() => {
-                                                    setEditingSeanceComment(null);
-                                                    setSeanceCommentValues(prev => {
-                                                      const next = { ...prev };
-                                                      delete next[seance.seance_type_id];
-                                                      return next;
-                                                    });
-                                                  }}
-                                                  disabled={savingSeanceComment === seance.seance_type_id}
-                                                >
-                                                  Annuler
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div
-                                              className="text-sm text-muted-foreground bg-background/50 rounded px-2 py-1.5 min-h-[36px] cursor-pointer hover:bg-background transition-colors border border-transparent hover:border-border"
-                                              onClick={() => {
-                                                setEditingSeanceComment(seance.seance_type_id);
-                                                setSeanceCommentValues(prev => ({
-                                                  ...prev,
-                                                  [seance.seance_type_id]: seance.seance_types?.comment || ""
-                                                }));
-                                              }}
-                                            >
-                                              {seance.seance_types?.comment || <span className="italic text-muted-foreground/60">Cliquez pour ajouter un commentaire...</span>}
-                                            </div>
-                                          )}
-                                        </div>
+                                        {/* Seance comment - clickable to open modal */}
+                                        <button
+                                          type="button"
+                                          className={`w-full text-left text-sm rounded px-3 py-2 transition-colors ${
+                                            seance.seance_types?.comment 
+                                              ? "text-muted-foreground bg-background/50 hover:bg-background cursor-pointer border border-transparent hover:border-border" 
+                                              : "text-muted-foreground/60 hover:bg-muted/50 border border-dashed border-border cursor-pointer"
+                                          }`}
+                                          onClick={() => {
+                                            setSelectedSeanceForComment({
+                                              id: seance.seance_type_id,
+                                              name: getSeanceDisplay(seance),
+                                              comment: seance.seance_types?.comment || ""
+                                            });
+                                            setSeanceCommentDialogOpen(true);
+                                          }}
+                                        >
+                                          <div className="flex items-start gap-2">
+                                            <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                            {seance.seance_types?.comment ? (
+                                              <span className="line-clamp-2">{seance.seance_types.comment}</span>
+                                            ) : (
+                                              <span className="italic">Ajouter un commentaire de séance...</span>
+                                            )}
+                                          </div>
+                                        </button>
                                         
                                         {/* Seance actions */}
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">
@@ -1291,6 +1263,22 @@ export function PatientTraitementCard({
           seanceTypeId={selectedSeanceForAddExercice.id}
           currentExercicesCount={selectedSeanceForAddExercice.count}
           onSuccess={fetchTraitementDetails}
+        />
+      )}
+
+      {/* Seance Comment Dialog */}
+      {selectedSeanceForComment && (
+        <CommentDialog
+          open={seanceCommentDialogOpen}
+          onOpenChange={(open) => {
+            setSeanceCommentDialogOpen(open);
+            if (!open) setSelectedSeanceForComment(null);
+          }}
+          title="Commentaire de la séance"
+          subtitle={selectedSeanceForComment.name}
+          comment={selectedSeanceForComment.comment}
+          onSave={handleSaveSeanceComment}
+          saving={savingSeanceComment}
         />
       )}
     </>

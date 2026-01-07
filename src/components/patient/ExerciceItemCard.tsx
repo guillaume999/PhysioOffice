@@ -16,10 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { CommentDialog } from "./CommentDialog";
 
 interface ExerciceItemCardProps {
   exercice: {
@@ -78,6 +79,7 @@ export function ExerciceItemCard({
   const [saving, setSaving] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const thumbnailUrl = exercice.exercice?.thumbnail_url || null;
@@ -253,6 +255,28 @@ export function ExerciceItemCard({
       toast.error("Erreur lors de la suppression");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSaveExerciceComment = async (newComment: string) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("seance_exercices")
+        .update({ comment: newComment || null })
+        .eq("id", exercice.id);
+
+      if (error) throw error;
+
+      setEditValues({ ...editValues, comment: newComment });
+      toast.success("Commentaire enregistré");
+      setCommentDialogOpen(false);
+      onUpdate?.();
+    } catch (error) {
+      console.error("Error saving comment:", error);
+      toast.error("Erreur lors de l'enregistrement");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -562,11 +586,26 @@ export function ExerciceItemCard({
           </div>
         )}
 
-        {/* Comment display */}
-        {!isEditing && exercice.comment && (
-          <p className="text-xs text-muted-foreground italic bg-muted/50 rounded px-2 py-1">
-            {exercice.comment}
-          </p>
+        {/* Comment display - clickable to open modal */}
+        {!isEditing && (
+          <button
+            type="button"
+            className={`w-full text-left text-xs rounded px-2 py-1.5 transition-colors ${
+              exercice.comment 
+                ? "text-muted-foreground italic bg-muted/50 hover:bg-muted cursor-pointer" 
+                : "text-muted-foreground/60 hover:bg-muted/50 border border-dashed border-border cursor-pointer"
+            }`}
+            onClick={() => setCommentDialogOpen(true)}
+          >
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-3 h-3 flex-shrink-0" />
+              {exercice.comment ? (
+                <span className="line-clamp-2">{exercice.comment}</span>
+              ) : (
+                <span>Ajouter un commentaire...</span>
+              )}
+            </div>
+          </button>
         )}
 
         {/* Separator */}
@@ -628,6 +667,17 @@ export function ExerciceItemCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Comment Dialog */}
+      <CommentDialog
+        open={commentDialogOpen}
+        onOpenChange={setCommentDialogOpen}
+        title="Commentaire de l'exercice"
+        subtitle={exerciceName}
+        comment={exercice.comment || ""}
+        onSave={handleSaveExerciceComment}
+        saving={saving}
+      />
     </div>
   );
 }
