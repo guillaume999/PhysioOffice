@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video, Palette, RefreshCw } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video, Palette } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -35,7 +35,7 @@ export default function Videos() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] = useState(false);
+  
   const videoInputRef = useRef<HTMLInputElement>(null);
   const editVideoInputRef = useRef<HTMLInputElement>(null);
 
@@ -427,60 +427,6 @@ export default function Videos() {
     setStyleDialogOpen(true);
   };
 
-  const regenerateMissingThumbnails = async () => {
-    const videosWithoutThumbnails = videos.filter(v => !v.thumbnail_url);
-    if (videosWithoutThumbnails.length === 0) {
-      toast.info("Toutes les vidéos ont déjà une vignette");
-      return;
-    }
-
-    setIsRegeneratingThumbnails(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const video of videosWithoutThumbnails) {
-      try {
-        toast.info(`Génération de la vignette pour "${video.title}"...`);
-        
-        const thumbnailDataUrl = await generateThumbnailFromUrl(video.video_url);
-        if (!thumbnailDataUrl) {
-          errorCount++;
-          continue;
-        }
-
-        const thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
-        if (!thumbnailUrl) {
-          errorCount++;
-          continue;
-        }
-
-        const { error } = await supabase
-          .from("videos")
-          .update({ thumbnail_url: thumbnailUrl })
-          .eq("id", video.id);
-
-        if (error) {
-          errorCount++;
-        } else {
-          successCount++;
-        }
-      } catch (error) {
-        console.error(`Error generating thumbnail for ${video.title}:`, error);
-        errorCount++;
-      }
-    }
-
-    setIsRegeneratingThumbnails(false);
-    
-    if (successCount > 0) {
-      toast.success(`${successCount} vignette(s) générée(s) avec succès`);
-      fetchVideos();
-    }
-    if (errorCount > 0) {
-      toast.error(`${errorCount} vignette(s) n'ont pas pu être générées`);
-    }
-  };
-
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -520,102 +466,85 @@ export default function Videos() {
             </p>
           </div>
 
-          <div className="flex gap-2">
-            {videos.some(v => !v.thumbnail_url) && (
-              <Button
-                variant="outline"
-                onClick={regenerateMissingThumbnails}
-                disabled={isRegeneratingThumbnails}
-              >
-                {isRegeneratingThumbnails ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                Générer les vignettes
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter une vidéo
               </Button>
-            )}
-
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) resetForm();
-            }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une vidéo
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Nouvelle vidéo</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="add-title">Titre *</Label>
-                    <Input
-                      id="add-title"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      placeholder="Titre de la vidéo"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Vidéo *</Label>
-                    <div className="mt-2">
-                      <input
-                        ref={videoInputRef}
-                        type="file"
-                        accept="video/*"
-                        onChange={handleVideoSelect}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => videoInputRef.current?.click()}
-                        className="w-full"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {formVideoFile ? formVideoFile.name : "Sélectionner une vidéo"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {isUploading && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Upload en cours... {uploadProgress}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div 
-                          className="bg-primary h-2 rounded-full transition-all duration-300" 
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <Button 
-                    onClick={handleSubmit} 
-                    className="w-full"
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Upload en cours...
-                      </>
-                    ) : (
-                      "Ajouter"
-                    )}
-                  </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nouvelle vidéo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="add-title">Titre *</Label>
+                  <Input
+                    id="add-title"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="Titre de la vidéo"
+                  />
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+
+                <div>
+                  <Label>Vidéo *</Label>
+                  <div className="mt-2">
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => videoInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {formVideoFile ? formVideoFile.name : "Sélectionner une vidéo"}
+                    </Button>
+                  </div>
+                </div>
+
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Upload en cours... {uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleSubmit} 
+                  className="w-full"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Upload en cours...
+                    </>
+                  ) : (
+                    "Ajouter"
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>
