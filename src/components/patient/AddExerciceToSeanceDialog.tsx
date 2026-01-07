@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,10 +12,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Upload, Video, Loader2, X, Pencil } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, Upload, Video, Loader2, X, Pencil, Library, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+
+interface VideoLibraryItem {
+  id: string;
+  title: string;
+  video_url: string;
+  thumbnail_url: string | null;
+}
 
 interface Exercice {
   id: string;
@@ -53,6 +62,7 @@ export function AddExerciceToSeanceDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [series, setSeries] = useState<number | null>(3);
   const [repetitions, setRepetitions] = useState<number | null>(10);
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
@@ -60,6 +70,12 @@ export function AddExerciceToSeanceDialog({
   const [durationSeconds2, setDurationSeconds2] = useState<number | null>(null);
   const [force2, setForce2] = useState<number | null>(null);
   const [comment, setComment] = useState("");
+
+  // Video library state
+  const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
+  const [libraryVideos, setLibraryVideos] = useState<VideoLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
 
   useEffect(() => {
     if (open && user) {
@@ -170,7 +186,46 @@ export function AddExerciceToSeanceDialog({
 
   const removeVideo = () => {
     setVideoUrl(null);
+    setThumbnailUrl(null);
   };
+
+  // Video library functions
+  const fetchLibraryVideos = async () => {
+    if (!user) return;
+    setLibraryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, title, video_url, thumbnail_url")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setLibraryVideos(data || []);
+    } catch (error) {
+      console.error("Error fetching library videos:", error);
+      toast.error("Erreur lors du chargement de la vidéothèque");
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const openLibraryDialog = () => {
+    fetchLibraryVideos();
+    setLibrarySearch("");
+    setLibraryDialogOpen(true);
+  };
+
+  const selectLibraryVideo = (video: VideoLibraryItem) => {
+    setVideoUrl(video.video_url);
+    setThumbnailUrl(video.thumbnail_url);
+    setLibraryDialogOpen(false);
+    toast.success(`Vidéo "${video.title}" sélectionnée`);
+  };
+
+  const filteredLibraryVideos = librarySearch.trim()
+    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    : libraryVideos;
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -237,6 +292,7 @@ export function AddExerciceToSeanceDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -340,7 +396,7 @@ export function AddExerciceToSeanceDialog({
                   />
                 </div>
               ) : (
-                <div>
+                <div className="flex gap-2">
                   <input
                     type="file"
                     accept="video/*"
@@ -362,14 +418,25 @@ export function AddExerciceToSeanceDialog({
                     {uploadingVideo ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Upload en cours...
+                        Upload...
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        Ajouter une vidéo
+                        Uploader
                       </>
                     )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={openLibraryDialog}
+                    disabled={uploadingVideo || !!exerciceId}
+                    className="gap-2"
+                  >
+                    <Library className="w-4 h-4" />
+                    Vidéothèque
                   </Button>
                 </div>
               )}
@@ -496,5 +563,67 @@ export function AddExerciceToSeanceDialog({
         )}
       </DialogContent>
     </Dialog>
+
+      {/* Video Library Dialog */}
+      <Dialog open={libraryDialogOpen} onOpenChange={setLibraryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sélectionner depuis la vidéothèque</DialogTitle>
+            <DialogDescription>
+              Choisissez une vidéo de votre bibliothèque
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher..."
+              value={librarySearch}
+              onChange={(e) => setLibrarySearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <ScrollArea className="h-[300px]">
+            {libraryLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : filteredLibraryVideos.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {librarySearch.trim() ? "Aucune vidéo trouvée" : "Aucune vidéo dans votre bibliothèque"}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 p-1">
+                {filteredLibraryVideos.map((video) => (
+                  <button
+                    key={video.id}
+                    onClick={() => selectLibraryVideo(video)}
+                    className="group relative aspect-video rounded-md overflow-hidden border hover:border-primary transition-colors"
+                  >
+                    {video.thumbnail_url ? (
+                      <img
+                        src={video.thumbnail_url}
+                        alt={video.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <Video className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-white text-xs font-medium px-2 text-center line-clamp-2">
+                        {video.title}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
