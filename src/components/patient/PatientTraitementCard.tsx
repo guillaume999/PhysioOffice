@@ -156,6 +156,8 @@ export function PatientTraitementCard({
   const [deleteBilanDialogOpen, setDeleteBilanDialogOpen] = useState(false);
   const [selectedBilanForDelete, setSelectedBilanForDelete] = useState<{id: string} | null>(null);
   const [deletingBilan, setDeletingBilan] = useState(false);
+  const [visibilityChoiceDialogOpen, setVisibilityChoiceDialogOpen] = useState(false);
+  const [selectedSeanceForVisibility, setSelectedSeanceForVisibility] = useState<TraitementSeance | null>(null);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -396,19 +398,99 @@ export function PatientTraitementCard({
     fetchTraitementDetails();
   };
 
-  const toggleSeanceVisibility = async (seanceTypeId: string, currentlyHidden: boolean) => {
-    const { error } = await supabase
-      .from("seance_types")
-      .update({ is_hidden_from_list: !currentlyHidden })
-      .eq("id", seanceTypeId);
-    
-    if (error) {
-      toast.error("Erreur lors de la mise à jour");
+  const openVisibilityChoiceDialog = (seance: TraitementSeance) => {
+    setSelectedSeanceForVisibility(seance);
+    setVisibilityChoiceDialogOpen(true);
+  };
+
+  const handleVisibilityChoice = async (choice: 'save_as_new' | 'modify_original' | 'cancel') => {
+    if (!selectedSeanceForVisibility || !user) {
+      setVisibilityChoiceDialogOpen(false);
+      setSelectedSeanceForVisibility(null);
       return;
     }
-    
-    toast.success(!currentlyHidden ? "Séance masquée de la liste" : "Séance visible dans la liste");
-    fetchTraitementDetails();
+
+    if (choice === 'cancel') {
+      setVisibilityChoiceDialogOpen(false);
+      setSelectedSeanceForVisibility(null);
+      return;
+    }
+
+    if (choice === 'modify_original') {
+      // Toggle visibility on the original seance
+      const { error } = await supabase
+        .from("seance_types")
+        .update({ is_hidden_from_list: !selectedSeanceForVisibility.seance_types?.is_hidden_from_list })
+        .eq("id", selectedSeanceForVisibility.seance_type_id);
+      
+      if (error) {
+        toast.error("Erreur lors de la mise à jour");
+        setVisibilityChoiceDialogOpen(false);
+        setSelectedSeanceForVisibility(null);
+        return;
+      }
+      
+      toast.success(selectedSeanceForVisibility.seance_types?.is_hidden_from_list ? "Séance visible dans la liste" : "Séance masquée de la liste");
+      fetchTraitementDetails();
+    } else if (choice === 'save_as_new') {
+      // Create a new seance with the same data, but visible in list
+      try {
+        const seance = selectedSeanceForVisibility;
+        const seanceTypes = seance.seance_types;
+        if (!seanceTypes) throw new Error("No seance type data");
+
+        // Create new seance_type
+        const { data: newSeance, error: createError } = await supabase
+          .from("seance_types")
+          .insert({
+            user_id: user.id,
+            pathologie: seanceTypes.pathologie,
+            objectif_principal: seanceTypes.objectif_principal,
+            pathologies: seanceTypes.pathologies,
+            objectifs_principaux: seanceTypes.objectifs_principaux,
+            objectifs_secondaires: seanceTypes.objectifs_secondaires,
+            comment: seanceTypes.comment,
+            is_hidden_from_list: false, // New seance is visible
+            is_shared: false
+          })
+          .select("id")
+          .single();
+
+        if (createError) throw createError;
+
+        // Copy exercises to new seance
+        if (seance.exercices && seance.exercices.length > 0) {
+          const exercisesToInsert = seance.exercices.map(ex => ({
+            seance_type_id: newSeance.id,
+            exercice_id: ex.exercice_id,
+            name: ex.name,
+            description: ex.description,
+            repetitions: ex.repetitions,
+            duration_seconds: ex.duration_seconds,
+            series: ex.series,
+            force_1: ex.force_1,
+            duration_seconds_2: ex.duration_seconds_2,
+            force_2: ex.force_2,
+            comment: ex.comment,
+            ordre: ex.ordre
+          }));
+
+          const { error: exercicesError } = await supabase
+            .from("seance_exercices")
+            .insert(exercisesToInsert);
+
+          if (exercicesError) throw exercicesError;
+        }
+
+        toast.success("Nouvelle séance créée et visible dans la liste");
+      } catch (error) {
+        console.error("Error creating new seance:", error);
+        toast.error("Erreur lors de la création de la séance");
+      }
+    }
+
+    setVisibilityChoiceDialogOpen(false);
+    setSelectedSeanceForVisibility(null);
   };
 
 
@@ -1235,32 +1317,18 @@ export function PatientTraitementCard({
                                           </button>
                                           
                                           {/* Seance actions */}
-                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">
-                                            <div className="flex items-center gap-2">
-                                              <Switch
-                                                id={`seance-visibility-${seance.id}`}
-                                                checked={!seance.seance_types?.is_hidden_from_list}
-                                                onCheckedChange={() => toggleSeanceVisibility(
-                                                  seance.seance_type_id, 
-                                                  seance.seance_types?.is_hidden_from_list || false
-                                                )}
-                                              />
-                                              <Label 
-                                                htmlFor={`seance-visibility-${seance.id}`} 
-                                                className="text-xs cursor-pointer"
-                                              >
-                                                Visible dans Séances
-                                              </Label>
-                                            </div>
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm" 
-                                              className="text-xs gap-1 h-8 w-full sm:w-auto"
-                                              onClick={() => handleEditSeanceOriginal(seance)}
+                                          <div className="flex items-center gap-2 pt-2 border-t border-border/30">
+                                            <Switch
+                                              id={`seance-visibility-${seance.id}`}
+                                              checked={!seance.seance_types?.is_hidden_from_list}
+                                              onCheckedChange={() => openVisibilityChoiceDialog(seance)}
+                                            />
+                                            <Label 
+                                              htmlFor={`seance-visibility-${seance.id}`} 
+                                              className="text-xs cursor-pointer"
                                             >
-                                              <Edit className="w-3 h-3" />
-                                              Modifier l'originale
-                                            </Button>
+                                              Visible dans Séances
+                                            </Label>
                                           </div>
                                         </div>
                                       </CollapsibleContent>
@@ -1498,6 +1566,41 @@ export function PatientTraitementCard({
             >
               {deletingBilan ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Visibility Choice Dialog */}
+      <AlertDialog open={visibilityChoiceDialogOpen} onOpenChange={setVisibilityChoiceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Modifier la visibilité</AlertDialogTitle>
+            <AlertDialogDescription>
+              Comment souhaitez-vous modifier cette séance ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-2 py-4">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => handleVisibilityChoice('save_as_new')}
+            >
+              <Plus className="w-4 h-4" />
+              Sauvegarder comme nouvelle séance
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => handleVisibilityChoice('modify_original')}
+            >
+              <Edit className="w-4 h-4" />
+              Modifier l'original
+            </Button>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => handleVisibilityChoice('cancel')}>
+              Annuler
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
