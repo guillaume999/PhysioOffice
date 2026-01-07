@@ -5,7 +5,17 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -58,6 +68,8 @@ export function ExerciceItemCard({
   const [isVisible, setIsVisible] = useState(isSharedOrPlatform);
   const [saving, setSaving] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const thumbnailUrl = exercice.exercice?.thumbnail_url || null;
   const videoUrl = editValues.video_url || exercice.exercice?.video_url || null;
@@ -206,6 +218,27 @@ export function ExerciceItemCard({
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("seance_exercices")
+        .delete()
+        .eq("id", exercice.id);
+
+      if (error) throw error;
+
+      toast.success("Exercice supprimé");
+      setDeleteDialogOpen(false);
+      onUpdate?.();
+    } catch (error) {
+      console.error("Error deleting exercise:", error);
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Thumbnail with video - full width */}
@@ -257,14 +290,24 @@ export function ExerciceItemCard({
                 </p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 flex-shrink-0"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              <Edit className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         )}
 
@@ -475,6 +518,28 @@ export function ExerciceItemCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cet exercice ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              L'exercice "{exerciceName}" sera retiré de cette séance. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
