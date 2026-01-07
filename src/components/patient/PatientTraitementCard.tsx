@@ -882,8 +882,11 @@ export function PatientTraitementCard({
                                     {/* Seance header - always visible */}
                                     <div className="p-3">
                                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                        {/* Seance info */}
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        {/* Seance info - clickable to expand */}
+                                        <div 
+                                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={() => toggleSeanceExpand(seance.id)}
+                                        >
                                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                                             <span className="text-sm font-bold text-primary">{i + 1}</span>
                                           </div>
@@ -893,6 +896,7 @@ export function PatientTraitementCard({
                                               {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
                                             </Badge>
                                           </div>
+                                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform sm:hidden ${isExpanded ? 'rotate-180' : ''}`} />
                                         </div>
                                         
                                         {/* Date and actions row */}
