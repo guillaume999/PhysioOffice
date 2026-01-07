@@ -965,218 +965,222 @@ export function PatientTraitementCard({
                             const exercices = seance.exercices || [];
                             const bilanAfterSeance = traitement.bilans?.find(b => b.position_after_seance === i + 1);
                             
-                            return (
-                              <div key={seance.id}>
-                                {/* Seance card with Collapsible */}
-                                <Collapsible 
-                                  open={isExpanded} 
-                                  onOpenChange={() => toggleSeanceExpand(seance.id)}
-                                >
-                                  <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-lg border border-emerald-300 dark:border-emerald-700/50 overflow-hidden">
-                                    {/* Seance header - always visible */}
-                                    <div className="p-3">
-                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                        {/* Seance info - clickable to expand */}
-                                        <div 
-                                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                          onClick={() => toggleSeanceExpand(seance.id)}
-                                        >
-                                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-sm font-bold text-primary">{i + 1}</span>
+                              return (
+                                <div key={seance.id} className="space-y-3">
+                                  {/* Seance card with Collapsible */}
+                                  <Collapsible 
+                                    open={isExpanded} 
+                                    onOpenChange={() => toggleSeanceExpand(seance.id)}
+                                  >
+                                    <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-lg border border-emerald-300 dark:border-emerald-700/50 overflow-hidden">
+                                      {/* Seance header - always visible */}
+                                      <div className="p-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                          {/* Seance info - clickable to expand */}
+                                          <div 
+                                            className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                            onClick={() => toggleSeanceExpand(seance.id)}
+                                          >
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                              <span className="text-sm font-bold text-primary">{i + 1}</span>
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <p className="font-medium text-sm">{getSeanceDisplay(seance)}</p>
+                                              <Badge variant="secondary" className="text-xs mt-1">
+                                                {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
+                                              </Badge>
+                                            </div>
                                           </div>
-                                          <div className="min-w-0 flex-1">
-                                            <p className="font-medium text-sm">{getSeanceDisplay(seance)}</p>
-                                            <Badge variant="secondary" className="text-xs mt-1">
-                                              {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Date and actions row */}
-                                        <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
-                                          <Input
-                                            type="date"
-                                            value={getSeanceDate(i + 1)}
-                                            onChange={(e) => {
-                                              e.stopPropagation();
-                                              handleSeanceDateChange(i + 1, e.target.value);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
-                                            title="Date de la séance"
-                                          />
-                                          <div className="flex items-center gap-1 flex-shrink-0">
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-9 w-9 sm:h-8 sm:w-8"
-                                              title="Modifier (crée une copie)"
-                                              onClick={(e) => {
+                                          
+                                          {/* Date and actions row */}
+                                          <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
+                                            <Input
+                                              type="date"
+                                              value={getSeanceDate(i + 1)}
+                                              onChange={(e) => {
                                                 e.stopPropagation();
-                                                handleEditSeance(seance, i);
+                                                handleSeanceDateChange(i + 1, e.target.value);
                                               }}
-                                            >
-                                              <Edit className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-9 w-9 sm:h-8 sm:w-8"
-                                              title="Partager cette séance"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedSeanceForAccess({
-                                                  id: seance.seance_type_id,
-                                                  name: getSeanceDisplay(seance)
-                                                });
-                                                setAccessCodeDialogOpen(true);
-                                              }}
-                                            >
-                                              <Share2 className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-9 w-9 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
-                                              title="Supprimer cette séance"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedSeanceForDelete({
-                                                  id: seance.seance_type_id,
-                                                  traitementSeanceId: seance.id,
-                                                  name: getSeanceDisplay(seance),
-                                                  exercicesCount: exercices.length
-                                                });
-                                                setDeleteSeanceDialogOpen(true);
-                                              }}
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                            <CollapsibleTrigger asChild>
+                                              onClick={(e) => e.stopPropagation()}
+                                              className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
+                                              title="Date de la séance"
+                                            />
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                               <Button
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-9 w-9 sm:h-8 sm:w-8"
+                                                title="Modifier (crée une copie)"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleEditSeance(seance, i);
+                                                }}
                                               >
-                                                {isExpanded ? (
-                                                  <ChevronUp className="w-4 h-4" />
-                                                ) : (
-                                                  <ChevronDown className="w-4 h-4" />
-                                                )}
+                                                <Edit className="w-4 h-4" />
                                               </Button>
-                                            </CollapsibleTrigger>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 sm:h-8 sm:w-8"
+                                                title="Partager cette séance"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedSeanceForAccess({
+                                                    id: seance.seance_type_id,
+                                                    name: getSeanceDisplay(seance)
+                                                  });
+                                                  setAccessCodeDialogOpen(true);
+                                                }}
+                                              >
+                                                <Share2 className="w-4 h-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                                                title="Supprimer cette séance"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedSeanceForDelete({
+                                                    id: seance.seance_type_id,
+                                                    traitementSeanceId: seance.id,
+                                                    name: getSeanceDisplay(seance),
+                                                    exercicesCount: exercices.length
+                                                  });
+                                                  setDeleteSeanceDialogOpen(true);
+                                                }}
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </Button>
+                                              <CollapsibleTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-9 w-9 sm:h-8 sm:w-8"
+                                                >
+                                                  {isExpanded ? (
+                                                    <ChevronUp className="w-4 h-4" />
+                                                  ) : (
+                                                    <ChevronDown className="w-4 h-4" />
+                                                  )}
+                                                </Button>
+                                              </CollapsibleTrigger>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                    
-                                    {/* Collapsed content - Exercises list */}
-                                    <CollapsibleContent>
-                                      <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
-                                        {/* Exercices list - grid for better space usage */}
-                                        {exercices.length > 0 ? (
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                            {exercices.map((ex, j) => (
-                                              <ExerciceItemCard
-                                                key={ex.id}
-                                                exercice={ex}
-                                                index={j}
-                                                seanceTypeId={seance.seance_type_id}
-                                                onUpdate={fetchTraitementDetails}
-                                              />
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <p className="text-sm text-muted-foreground text-center py-4">Aucun exercice dans cette séance</p>
-                                        )}
+                                      
+                                      {/* Collapsed content - Exercises list */}
+                                      <CollapsibleContent>
+                                        <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
+                                          {/* Exercices list - grid for better space usage */}
+                                          {exercices.length > 0 ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                              {exercices.map((ex, j) => (
+                                                <ExerciceItemCard
+                                                  key={ex.id}
+                                                  exercice={ex}
+                                                  index={j}
+                                                  seanceTypeId={seance.seance_type_id}
+                                                  onUpdate={fetchTraitementDetails}
+                                                />
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <p className="text-sm text-muted-foreground text-center py-4">Aucun exercice dans cette séance</p>
+                                          )}
 
-                                        {/* Add exercise button */}
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="w-full h-9 text-xs gap-1 border-dashed"
-                                          onClick={() => {
-                                            setSelectedSeanceForAddExercice({
-                                              id: seance.seance_type_id,
-                                              count: exercices.length
-                                            });
-                                            setAddExerciceDialogOpen(true);
-                                          }}
-                                        >
-                                          <Plus className="w-4 h-4" />
-                                          Ajouter un exercice
-                                        </Button>
-
-                                        {/* Seance comment - clickable to open modal */}
-                                        <button
-                                          type="button"
-                                          className={`w-full text-left text-sm rounded px-3 py-2 transition-colors ${
-                                            seance.seance_types?.comment 
-                                              ? "text-muted-foreground bg-background/50 hover:bg-background cursor-pointer border border-transparent hover:border-border" 
-                                              : "text-muted-foreground/60 hover:bg-muted/50 border border-dashed border-border cursor-pointer"
-                                          }`}
-                                          onClick={() => {
-                                            setSelectedSeanceForComment({
-                                              id: seance.seance_type_id,
-                                              name: getSeanceDisplay(seance),
-                                              comment: seance.seance_types?.comment || ""
-                                            });
-                                            setSeanceCommentDialogOpen(true);
-                                          }}
-                                        >
-                                          <div className="flex items-start gap-2">
-                                            <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                            {seance.seance_types?.comment ? (
-                                              <span className="line-clamp-2">{seance.seance_types.comment}</span>
-                                            ) : (
-                                              <span className="italic">Ajouter un commentaire de séance...</span>
-                                            )}
-                                          </div>
-                                        </button>
-                                        
-                                        {/* Seance actions */}
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">
-                                          <div className="flex items-center gap-2">
-                                            <Switch
-                                              id={`seance-visibility-${seance.id}`}
-                                              checked={!seance.seance_types?.is_hidden_from_list}
-                                              onCheckedChange={() => toggleSeanceVisibility(
-                                                seance.seance_type_id, 
-                                                seance.seance_types?.is_hidden_from_list || false
-                                              )}
-                                            />
-                                            <Label 
-                                              htmlFor={`seance-visibility-${seance.id}`} 
-                                              className="text-xs cursor-pointer"
-                                            >
-                                              Visible dans Séances
-                                            </Label>
-                                          </div>
-                                          <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            className="text-xs gap-1 h-8 w-full sm:w-auto"
-                                            onClick={() => handleEditSeanceOriginal(seance)}
+                                          {/* Add exercise button */}
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full h-9 text-xs gap-1 border-dashed"
+                                            onClick={() => {
+                                              setSelectedSeanceForAddExercice({
+                                                id: seance.seance_type_id,
+                                                count: exercices.length
+                                              });
+                                              setAddExerciceDialogOpen(true);
+                                            }}
                                           >
-                                            <Edit className="w-3 h-3" />
-                                            Modifier l'originale
+                                            <Plus className="w-4 h-4" />
+                                            Ajouter un exercice
                                           </Button>
-                                        </div>
-                                      </div>
-                                    </CollapsibleContent>
-                                  </div>
-                                </Collapsible>
 
-                                {/* Bilan between sessions */}
-                                <div className="ml-3 mt-2 mb-2 pl-3 border-l-2 border-dashed border-primary/30">
-                                  {bilanAfterSeance ? (
-                                    <div className="bg-primary/5 rounded-md p-3 space-y-2">
-                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-primary flex-1 min-w-0">
-                                          <ClipboardCheck className="w-4 h-4 flex-shrink-0" />
-                                          <span className="truncate">Bilan après séance {i + 1}</span>
+                                          {/* Seance comment - clickable to open modal */}
+                                          <button
+                                            type="button"
+                                            className={`w-full text-left text-sm rounded px-3 py-2 transition-colors ${
+                                              seance.seance_types?.comment 
+                                                ? "text-muted-foreground bg-background/50 hover:bg-background cursor-pointer border border-transparent hover:border-border" 
+                                                : "text-muted-foreground/60 hover:bg-muted/50 border border-dashed border-border cursor-pointer"
+                                            }`}
+                                            onClick={() => {
+                                              setSelectedSeanceForComment({
+                                                id: seance.seance_type_id,
+                                                name: getSeanceDisplay(seance),
+                                                comment: seance.seance_types?.comment || ""
+                                              });
+                                              setSeanceCommentDialogOpen(true);
+                                            }}
+                                          >
+                                            <div className="flex items-start gap-2">
+                                              <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                              {seance.seance_types?.comment ? (
+                                                <span className="line-clamp-2">{seance.seance_types.comment}</span>
+                                              ) : (
+                                                <span className="italic">Ajouter un commentaire de séance...</span>
+                                              )}
+                                            </div>
+                                          </button>
+                                          
+                                          {/* Seance actions */}
+                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/30">
+                                            <div className="flex items-center gap-2">
+                                              <Switch
+                                                id={`seance-visibility-${seance.id}`}
+                                                checked={!seance.seance_types?.is_hidden_from_list}
+                                                onCheckedChange={() => toggleSeanceVisibility(
+                                                  seance.seance_type_id, 
+                                                  seance.seance_types?.is_hidden_from_list || false
+                                                )}
+                                              />
+                                              <Label 
+                                                htmlFor={`seance-visibility-${seance.id}`} 
+                                                className="text-xs cursor-pointer"
+                                              >
+                                                Visible dans Séances
+                                              </Label>
+                                            </div>
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm" 
+                                              className="text-xs gap-1 h-8 w-full sm:w-auto"
+                                              onClick={() => handleEditSeanceOriginal(seance)}
+                                            >
+                                              <Edit className="w-3 h-3" />
+                                              Modifier l'originale
+                                            </Button>
+                                          </div>
                                         </div>
-                                        <div className="flex items-center gap-2 pl-6 sm:pl-0">
+                                      </CollapsibleContent>
+                                    </div>
+                                  </Collapsible>
+
+                                  {/* Bilan after this session - same level as seance */}
+                                  {bilanAfterSeance ? (
+                                    <div className="bg-primary/5 rounded-lg border border-primary/20 p-3">
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                            <ClipboardCheck className="w-4 h-4 text-primary" />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
+                                            <span className="text-xs text-muted-foreground">Après séance {i + 1}</span>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 pl-11 sm:pl-0">
                                           <Input
                                             type="date"
                                             value={bilanAfterSeance.bilan_date || ""}
@@ -1186,21 +1190,21 @@ export function PatientTraitementCard({
                                           />
                                           <Button
                                             variant="ghost"
-                                            size="sm"
-                                            className="h-9 sm:h-7 w-9 sm:w-auto px-2"
+                                            size="icon"
+                                            className="h-9 w-9 sm:h-8 sm:w-8"
                                             onClick={() => handlePrintBilan(bilanAfterSeance, i + 1)}
                                             title="Imprimer le bilan"
                                           >
-                                            <Printer className="w-4 h-4 sm:w-3 sm:h-3" />
+                                            <Printer className="w-4 h-4" />
                                           </Button>
                                           <Button
                                             variant="ghost"
-                                            size="sm"
-                                            className="h-9 sm:h-7 px-2 text-sm sm:text-xs"
+                                            size="icon"
+                                            className="h-9 w-9 sm:h-8 sm:w-8"
                                             onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
+                                            title="Modifier le bilan"
                                           >
-                                            <Edit className="w-4 h-4 sm:w-3 sm:h-3 sm:mr-1" />
-                                            <span className="hidden sm:inline">Modifier</span>
+                                            <Edit className="w-4 h-4" />
                                           </Button>
                                         </div>
                                       </div>
@@ -1209,17 +1213,16 @@ export function PatientTraitementCard({
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="text-xs text-muted-foreground hover:text-primary h-9 sm:h-8"
+                                      className="w-full text-xs text-muted-foreground hover:text-primary h-9 justify-start gap-2 border border-dashed border-border/50"
                                       onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}`)}
                                     >
-                                      <Plus className="w-3 h-3 mr-1" />
+                                      <Plus className="w-3 h-3" />
                                       Ajouter un bilan après cette séance
                                     </Button>
                                   )}
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">Aucune séance</p>
