@@ -375,6 +375,17 @@ export function AddExerciceToSeanceDialog({
 
       if (error) throw error;
 
+      // Log activity
+      await supabase.from("user_activity_logs").insert({
+        user_id: user.id,
+        section: "seances",
+        action_type: "edit",
+        title: `Exercice "${name.trim()}" ajouté`,
+        details: `Ajout de l'exercice à la séance`,
+        resource_id: seanceTypeId,
+        resource_type: "seance_type",
+      });
+
       toast.success("Exercice ajouté");
       onSuccess();
       onOpenChange(false);
