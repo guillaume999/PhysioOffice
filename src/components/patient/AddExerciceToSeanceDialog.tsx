@@ -131,7 +131,7 @@ export function AddExerciceToSeanceDialog({
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("videos")
+        .from("exercice-videos")
         .upload(fileName, file, {
           cacheControl: "3600",
           upsert: false,
@@ -141,7 +141,7 @@ export function AddExerciceToSeanceDialog({
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from("videos").getPublicUrl(fileName);
+      } = supabase.storage.from("exercice-videos").getPublicUrl(fileName);
 
       setVideoUrl(publicUrl);
       toast.success("Vidéo uploadée avec succès");
