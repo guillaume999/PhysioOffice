@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -56,6 +57,7 @@ export function ExerciceItemCard({
   const isSharedOrPlatform = exercice.exercice?.status === "shared" || exercice.exercice?.status === "pending";
   const [isVisible, setIsVisible] = useState(isSharedOrPlatform);
   const [saving, setSaving] = useState(false);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
 
   const thumbnailUrl = exercice.exercice?.thumbnail_url || null;
   const videoUrl = editValues.video_url || exercice.exercice?.video_url || null;
@@ -222,7 +224,10 @@ export function ExerciceItemCard({
               muted
             />
           ) : null}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors cursor-pointer">
+          <div 
+            className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors cursor-pointer"
+            onClick={() => videoUrl && setVideoModalOpen(true)}
+          >
             <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
               <Play className="w-6 h-6 text-primary fill-primary ml-0.5" />
             </div>
@@ -454,6 +459,22 @@ export function ExerciceItemCard({
           </div>
         )}
       </div>
+
+      {/* Video Modal */}
+      <Dialog open={videoModalOpen} onOpenChange={setVideoModalOpen}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black">
+          <div className="relative w-full aspect-video">
+            {videoUrl && (
+              <video
+                src={videoUrl}
+                className="w-full h-full"
+                controls
+                autoPlay
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
