@@ -11,7 +11,7 @@ import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, Chevron
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+
 import { GenerateAccessCodeDialog } from "@/components/patient/GenerateAccessCodeDialog";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { format } from "date-fns";
@@ -128,16 +128,12 @@ export function PatientTraitementCard({
   const [traitement, setTraitement] = useState<TraitementDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [testsExpanded, setTestsExpanded] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingTraitement, setEditingTraitement] = useState<any>(null);
   const [accessCodeDialogOpen, setAccessCodeDialogOpen] = useState(false);
   const [selectedSeanceForAccess, setSelectedSeanceForAccess] = useState<{id: string; name: string} | null>(null);
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [seanceFormDialogOpen, setSeanceFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [editingSeanceIndex, setEditingSeanceIndex] = useState<number | null>(null);
-  const [editConfirmDialogOpen, setEditConfirmDialogOpen] = useState(false);
-  const [canReplaceTraitement, setCanReplaceTraitement] = useState(true);
   const [removeConfirmDialogOpen, setRemoveConfirmDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -352,138 +348,6 @@ export function PatientTraitementCard({
     fetchTraitementDetails();
   };
 
-  const handleEdit = () => {
-    if (!traitement) return;
-    
-    // Always open the form dialog directly (create new version)
-    setEditingTraitement({
-      // Never pass id - always create a new treatment
-      pathologie: traitement.pathologie,
-      description: traitement.description,
-      tests: (traitement.tests || []).map(t => ({
-        id: t.id,
-        exercice_id: t.exercice_id || t.exercices?.id || '',
-        exercice: t.exercices ? {
-          id: t.exercices.id,
-          title: t.exercices.title,
-          description: t.exercices.description,
-          thumbnail_url: t.exercices.thumbnail_url
-        } : null,
-        ordre: t.ordre
-      })),
-      seances: (traitement.seances || []).map(s => ({
-        id: s.id,
-        seance_type_id: s.seance_type_id,
-        ordre: s.ordre,
-        seance: s.seance_types ? {
-          id: s.seance_types.id,
-          pathologie: s.seance_types.pathologie,
-          pathologies: s.seance_types.pathologies || [],
-          objectif_principal: s.seance_types.objectif_principal,
-          objectifs_principaux: s.seance_types.objectifs_principaux || []
-        } : null
-      })),
-      author_name: traitement.author_name
-    });
-    setEditDialogOpen(true);
-  };
-
-  const handleEditSuccess = async () => {
-    if (!user || !traitement) return;
-    
-    // If the original treatment was visible, ask user what to do
-    if (!traitement.is_hidden_from_list) {
-      // Check if multiple patients use this treatment
-      const { count } = await supabase
-        .from("patient_care_plans")
-        .select("id", { count: "exact", head: true })
-        .eq("active_traitement_id", traitement.id);
-      
-      setCanReplaceTraitement((count || 0) <= 1);
-      setEditConfirmDialogOpen(true);
-      return;
-    }
-    
-    // If original was already hidden, just activate the new one
-    await finalizeEdit('new');
-  };
-
-  const finalizeEdit = async (mode: 'replace' | 'new') => {
-    if (!user) return;
-    
-    const oldTraitementId = activeTraitementId;
-    
-    // Fetch the latest traitement created by this user
-    const { data: latestTraitement } = await supabase
-      .from("traitement_types")
-      .select("id")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (!latestTraitement) return;
-    
-    if (mode === 'replace') {
-      // Transfer bilans and dates from old to new treatment before deleting
-      if (oldTraitementId && oldTraitementId !== latestTraitement.id) {
-        // Transfer bilans to new treatment
-        await supabase
-          .from("patient_bilans")
-          .update({ traitement_id: latestTraitement.id })
-          .eq("patient_id", patientId)
-          .eq("traitement_id", oldTraitementId);
-        
-        // Transfer seance dates to new treatment
-        await supabase
-          .from("patient_traitement_seance_dates")
-          .update({ traitement_id: latestTraitement.id })
-          .eq("patient_id", patientId)
-          .eq("traitement_id", oldTraitementId);
-        
-        // Now delete the old treatment structure (tests, seances)
-        await supabase.from("traitement_tests").delete().eq("traitement_type_id", oldTraitementId);
-        await supabase.from("traitement_seances").delete().eq("traitement_type_id", oldTraitementId);
-        // Delete the treatment itself
-        await supabase.from("traitement_types").delete().eq("id", oldTraitementId);
-      }
-      
-      // Make the new treatment visible
-      await supabase
-        .from("traitement_types")
-        .update({ is_hidden_from_list: false })
-        .eq("id", latestTraitement.id);
-      
-      toast.success("Traitement remplacé avec succès");
-    } else {
-      // Keep new as hidden, transfer bilans and dates
-      if (oldTraitementId && oldTraitementId !== latestTraitement.id) {
-        // Transfer bilans to new treatment
-        await supabase
-          .from("patient_bilans")
-          .update({ traitement_id: latestTraitement.id })
-          .eq("patient_id", patientId)
-          .eq("traitement_id", oldTraitementId);
-        
-        // Transfer seance dates to new treatment
-        await supabase
-          .from("patient_traitement_seance_dates")
-          .update({ traitement_id: latestTraitement.id })
-          .eq("patient_id", patientId)
-          .eq("traitement_id", oldTraitementId);
-      }
-      
-      toast.success("Nouvelle version du traitement créée");
-    }
-    
-    // Activate the new treatment
-    if (onTraitementChanged) {
-      onTraitementChanged(latestTraitement.id);
-    }
-    
-    setEditConfirmDialogOpen(false);
-    fetchTraitementDetails();
-  };
 
   const toggleVisibility = async () => {
     if (!traitement) return;
@@ -1230,10 +1094,6 @@ export function PatientTraitementCard({
                             Visible dans la page Traitements
                           </Label>
                         </div>
-                        <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
-                          <Edit className="w-4 h-4" />
-                          Modifier et sauvegarder
-                        </Button>
                       </div>
                     </div>
                 </div>
@@ -1247,43 +1107,6 @@ export function PatientTraitementCard({
         </CardContent>
       </Card>
 
-      <AlertDialog open={editConfirmDialogOpen} onOpenChange={setEditConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Modifications enregistrées
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {canReplaceTraitement 
-                ? "L'ancien traitement est visible dans votre liste de traitements. Comment souhaitez-vous procéder ?"
-                : "Ce traitement est utilisé par plusieurs patients. Une nouvelle version sera créée pour éviter d'affecter les autres patients."
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel onClick={() => finalizeEdit('new')}>
-              {canReplaceTraitement ? "Garder les deux versions" : "Créer nouvelle version"}
-            </AlertDialogCancel>
-            {canReplaceTraitement && (
-              <Button 
-                variant="default" 
-                onClick={() => finalizeEdit('replace')}
-              >
-                Remplacer l'ancien
-              </Button>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <TraitementFormDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        traitement={editingTraitement}
-        onSuccess={handleEditSuccess}
-        isHiddenFromList={true}
-      />
 
       {selectedSeanceForAccess && (
         <GenerateAccessCodeDialog
