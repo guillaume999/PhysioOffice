@@ -153,6 +153,9 @@ export function PatientTraitementCard({
   const [deleteSeanceDialogOpen, setDeleteSeanceDialogOpen] = useState(false);
   const [selectedSeanceForDelete, setSelectedSeanceForDelete] = useState<{id: string; traitementSeanceId: string; name: string; exercicesCount: number} | null>(null);
   const [deletingSeance, setDeletingSeance] = useState(false);
+  const [deleteBilanDialogOpen, setDeleteBilanDialogOpen] = useState(false);
+  const [selectedBilanForDelete, setSelectedBilanForDelete] = useState<{id: string} | null>(null);
+  const [deletingBilan, setDeletingBilan] = useState(false);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -587,6 +590,30 @@ export function PatientTraitementCard({
       toast.error("Erreur lors de la suppression");
     } finally {
       setDeletingSeance(false);
+    }
+  };
+
+  const handleDeleteBilan = async () => {
+    if (!selectedBilanForDelete) return;
+    setDeletingBilan(true);
+    
+    try {
+      const { error } = await supabase
+        .from("patient_bilans")
+        .delete()
+        .eq("id", selectedBilanForDelete.id);
+
+      if (error) throw error;
+
+      toast.success("Bilan supprimé");
+      setDeleteBilanDialogOpen(false);
+      setSelectedBilanForDelete(null);
+      fetchTraitementDetails();
+    } catch (error) {
+      console.error("Error deleting bilan:", error);
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeletingBilan(false);
     }
   };
 
@@ -1245,10 +1272,22 @@ export function PatientTraitementCard({
                                           variant="ghost"
                                           size="icon"
                                           className="h-9 w-9 sm:h-8 sm:w-8"
-                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${bilan.position_after_seance}&bilan=${bilan.id}`)}
+                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&bilan=${bilan.id}`)}
                                           title="Modifier le bilan"
                                         >
                                           <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-9 w-9 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                                          onClick={() => {
+                                            setSelectedBilanForDelete({ id: bilan.id });
+                                            setDeleteBilanDialogOpen(true);
+                                          }}
+                                          title="Supprimer le bilan"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
                                         </Button>
                                       </div>
                                     </div>
@@ -1406,6 +1445,28 @@ export function PatientTraitementCard({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deletingSeance ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Bilan Confirmation Dialog */}
+      <AlertDialog open={deleteBilanDialogOpen} onOpenChange={setDeleteBilanDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce bilan intermédiaire ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ce bilan intermédiaire sera définitivement supprimé. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingBilan}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBilan}
+              disabled={deletingBilan}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingBilan ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
