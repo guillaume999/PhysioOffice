@@ -964,72 +964,93 @@ export function PatientTraitementCard({
                                       <div className="px-3 pb-3 space-y-3 border-t border-border/50 pt-3">
                                         {/* Exercices list */}
                                         {exercices.length > 0 ? (
-                                          <div className="space-y-3">
+                                          <div className="space-y-2">
                                             {exercices.map((ex, j) => {
                                               const thumbnailUrl = ex.exercice?.thumbnail_url || null;
                                               const videoUrl = ex.exercice?.video_url || null;
                                               const exerciceName = ex.exercice?.title || ex.name || `Exercice ${j + 1}`;
+                                              const hasVideo = thumbnailUrl || videoUrl;
                                               
                                               return (
                                                 <div 
                                                   key={ex.id}
-                                                  className="flex items-start gap-4 p-3 bg-card rounded-xl border border-border shadow-sm"
+                                                  className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
                                                 >
-                                                  {/* Order number */}
-                                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                    <span className="text-sm font-bold text-primary">{j + 1}</span>
-                                                  </div>
-
-                                                  {/* Thumbnail */}
-                                                  <div className="w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-                                                    {thumbnailUrl ? (
-                                                      <img 
-                                                        src={thumbnailUrl} 
-                                                        alt={exerciceName}
-                                                        className="w-full h-full object-cover"
-                                                      />
-                                                    ) : videoUrl ? (
-                                                      <video 
-                                                        src={videoUrl}
-                                                        className="w-full h-full object-cover"
-                                                        muted
-                                                      />
-                                                    ) : (
-                                                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                        <Play className="w-6 h-6" />
+                                                  {/* Mobile: Stack layout, Desktop: Horizontal */}
+                                                  <div className="flex flex-col sm:flex-row">
+                                                    {/* Thumbnail - Full width on mobile, fixed on desktop */}
+                                                    {hasVideo && (
+                                                      <div className="relative w-full sm:w-28 h-24 sm:h-20 flex-shrink-0 bg-muted">
+                                                        {thumbnailUrl ? (
+                                                          <img 
+                                                            src={thumbnailUrl} 
+                                                            alt={exerciceName}
+                                                            className="w-full h-full object-cover"
+                                                          />
+                                                        ) : videoUrl ? (
+                                                          <video 
+                                                            src={videoUrl}
+                                                            className="w-full h-full object-cover"
+                                                            muted
+                                                          />
+                                                        ) : null}
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors cursor-pointer">
+                                                          <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
+                                                            <Play className="w-5 h-5 text-primary fill-primary ml-0.5" />
+                                                          </div>
+                                                        </div>
+                                                        {/* Order badge on thumbnail */}
+                                                        <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-md">
+                                                          {j + 1}
+                                                        </div>
                                                       </div>
                                                     )}
-                                                    {videoUrl && (
-                                                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                                        <Play className="w-5 h-5 text-white fill-white" />
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                  
-                                                  {/* Exercise info */}
-                                                  <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
                                                     
-                                                    {/* Stats */}
-                                                    <div className="flex items-center gap-3 flex-wrap">
-                                                      <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-lg">
-                                                        <span className="text-base font-bold text-primary">{ex.series || 1}</span>
-                                                        <span className="text-xs text-muted-foreground">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                                    {/* Content */}
+                                                    <div className="flex-1 p-3">
+                                                      <div className="flex items-start gap-3">
+                                                        {/* Order number - only show if no thumbnail */}
+                                                        {!hasVideo && (
+                                                          <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                            {j + 1}
+                                                          </div>
+                                                        )}
+                                                        
+                                                        <div className="flex-1 min-w-0">
+                                                          {/* Exercise name */}
+                                                          <p className="font-semibold text-sm sm:text-base leading-tight mb-2">{exerciceName}</p>
+                                                          
+                                                          {/* Stats row */}
+                                                          <div className="flex items-center gap-2 flex-wrap">
+                                                            {/* Series */}
+                                                            <div className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                              <span className="text-sm font-bold">{ex.series || 1}</span>
+                                                              <span className="text-xs">série{(ex.series || 1) > 1 ? "s" : ""}</span>
+                                                            </div>
+                                                            
+                                                            {/* Repetitions */}
+                                                            {ex.repetitions && (
+                                                              <div className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
+                                                                <span className="text-sm font-bold">{ex.repetitions}</span>
+                                                                <span className="text-xs">reps</span>
+                                                              </div>
+                                                            )}
+                                                            
+                                                            {/* Duration */}
+                                                            {ex.duration_seconds && (
+                                                              <div className="inline-flex items-center gap-1 bg-accent text-accent-foreground px-2 py-0.5 rounded-full">
+                                                                <span className="text-sm font-bold">{ex.duration_seconds}</span>
+                                                                <span className="text-xs">sec</span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                          
+                                                          {/* Description if exists */}
+                                                          {ex.description && (
+                                                            <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{ex.description}</p>
+                                                          )}
+                                                        </div>
                                                       </div>
-                                                      
-                                                      {ex.repetitions && (
-                                                        <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
-                                                          <span className="text-base font-bold">{ex.repetitions}</span>
-                                                          <span className="text-xs text-muted-foreground">reps</span>
-                                                        </div>
-                                                      )}
-                                                      
-                                                      {ex.duration_seconds && (
-                                                        <div className="flex items-center gap-1.5 bg-secondary/50 px-2.5 py-1 rounded-lg">
-                                                          <span className="text-base font-bold">{ex.duration_seconds}</span>
-                                                          <span className="text-xs text-muted-foreground">sec</span>
-                                                        </div>
-                                                      )}
                                                     </div>
                                                   </div>
                                                 </div>
@@ -1037,7 +1058,7 @@ export function PatientTraitementCard({
                                             })}
                                           </div>
                                         ) : (
-                                          <p className="text-xs text-muted-foreground">Aucun exercice</p>
+                                          <p className="text-sm text-muted-foreground text-center py-4">Aucun exercice dans cette séance</p>
                                         )}
                                         
                                         {/* Seance actions */}
