@@ -885,7 +885,7 @@ export function PatientTraitementCard({
                                   open={isExpanded} 
                                   onOpenChange={() => toggleSeanceExpand(seance.id)}
                                 >
-                                  <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800/50 overflow-hidden">
+                                  <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-lg border border-emerald-300 dark:border-emerald-700/50 overflow-hidden">
                                     {/* Seance header - always visible */}
                                     <div className="p-3">
                                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
