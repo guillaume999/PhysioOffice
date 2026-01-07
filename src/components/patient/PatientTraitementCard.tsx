@@ -774,16 +774,18 @@ export function PatientTraitementCard({
                     </div>
                   </div>
                   {/* Ligne 2: Date + infos */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
                     <Input
                       type="date"
                       value={traitement.traitement_start_date || ""}
                       onChange={(e) => handleTraitementDateChange(e.target.value)}
-                      className="w-32 h-7 text-xs"
+                      className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
                       title="Date de début du traitement"
                     />
-                    <span className="truncate">par {traitement.author_name || "Anonyme"}</span>
-                    <span>• {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate">par {traitement.author_name || "Anonyme"}</span>
+                      <span>• {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances</span>
+                    </div>
                   </div>
                 </div>
 
@@ -879,73 +881,76 @@ export function PatientTraitementCard({
                                   <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
                                     {/* Seance header - always visible */}
                                     <div className="p-3">
-                                      <div className="flex items-center justify-between gap-2">
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        {/* Seance info */}
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                                             <span className="text-sm font-bold text-primary">{i + 1}</span>
                                           </div>
                                           <div className="min-w-0 flex-1">
-                                            <p className="font-medium text-sm truncate">{getSeanceDisplay(seance)}</p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                              <Input
-                                                type="date"
-                                                value={getSeanceDate(i + 1)}
-                                                onChange={(e) => {
-                                                  e.stopPropagation();
-                                                  handleSeanceDateChange(i + 1, e.target.value);
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="w-32 h-7 text-xs"
-                                                title="Date de la séance"
-                                              />
-                                              <Badge variant="secondary" className="text-xs">
-                                                {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
-                                              </Badge>
-                                            </div>
+                                            <p className="font-medium text-sm">{getSeanceDisplay(seance)}</p>
+                                            <Badge variant="secondary" className="text-xs mt-1">
+                                              {exercices.length} exercice{exercices.length > 1 ? 's' : ''}
+                                            </Badge>
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            title="Modifier (crée une copie)"
-                                            onClick={(e) => {
+                                        
+                                        {/* Date and actions row */}
+                                        <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
+                                          <Input
+                                            type="date"
+                                            value={getSeanceDate(i + 1)}
+                                            onChange={(e) => {
                                               e.stopPropagation();
-                                              handleEditSeance(seance, i);
+                                              handleSeanceDateChange(i + 1, e.target.value);
                                             }}
-                                          >
-                                            <Edit className="w-4 h-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            title="Partager cette séance"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedSeanceForAccess({
-                                                id: seance.seance_type_id,
-                                                name: getSeanceDisplay(seance)
-                                              });
-                                              setAccessCodeDialogOpen(true);
-                                            }}
-                                          >
-                                            <Share2 className="w-4 h-4" />
-                                          </Button>
-                                          <CollapsibleTrigger asChild>
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
+                                            title="Date de la séance"
+                                          />
+                                          <div className="flex items-center gap-1 flex-shrink-0">
                                             <Button
                                               variant="ghost"
                                               size="icon"
-                                              className="h-8 w-8"
+                                              className="h-9 w-9 sm:h-8 sm:w-8"
+                                              title="Modifier (crée une copie)"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEditSeance(seance, i);
+                                              }}
                                             >
-                                              {isExpanded ? (
-                                                <ChevronUp className="w-4 h-4" />
-                                              ) : (
-                                                <ChevronDown className="w-4 h-4" />
-                                              )}
+                                              <Edit className="w-4 h-4" />
                                             </Button>
-                                          </CollapsibleTrigger>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-9 w-9 sm:h-8 sm:w-8"
+                                              title="Partager cette séance"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedSeanceForAccess({
+                                                  id: seance.seance_type_id,
+                                                  name: getSeanceDisplay(seance)
+                                                });
+                                                setAccessCodeDialogOpen(true);
+                                              }}
+                                            >
+                                              <Share2 className="w-4 h-4" />
+                                            </Button>
+                                            <CollapsibleTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 sm:h-8 sm:w-8"
+                                              >
+                                                {isExpanded ? (
+                                                  <ChevronUp className="w-4 h-4" />
+                                                ) : (
+                                                  <ChevronDown className="w-4 h-4" />
+                                                )}
+                                              </Button>
+                                            </CollapsibleTrigger>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -1032,7 +1037,7 @@ export function PatientTraitementCard({
                                         )}
                                         
                                         {/* Seance actions */}
-                                        <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/30">
                                           <div className="flex items-center gap-2">
                                             <Switch
                                               id={`seance-visibility-${seance.id}`}
@@ -1052,7 +1057,7 @@ export function PatientTraitementCard({
                                           <Button 
                                             variant="outline" 
                                             size="sm" 
-                                            className="text-xs gap-1"
+                                            className="text-xs gap-1 h-9 sm:h-8 w-full sm:w-auto"
                                             onClick={() => handleEditSeanceOriginal(seance)}
                                           >
                                             <Edit className="w-3 h-3" />
@@ -1068,36 +1073,36 @@ export function PatientTraitementCard({
                                 <div className="ml-3 mt-2 mb-2 pl-3 border-l-2 border-dashed border-primary/30">
                                   {bilanAfterSeance ? (
                                     <div className="bg-primary/5 rounded-md p-3 space-y-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                                          <ClipboardCheck className="w-4 h-4" />
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-primary flex-1 min-w-0">
+                                          <ClipboardCheck className="w-4 h-4 flex-shrink-0" />
+                                          <span className="truncate">Bilan après séance {i + 1}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 pl-6 sm:pl-0">
                                           <Input
                                             type="date"
                                             value={bilanAfterSeance.bilan_date || ""}
                                             onChange={(e) => handleBilanDateChange(bilanAfterSeance.id, e.target.value)}
-                                            className="w-32 h-7 text-xs"
+                                            className="flex-1 sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
                                             title="Date du bilan"
                                           />
-                                          <span>Bilan après séance {i + 1}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 text-xs"
+                                            className="h-9 sm:h-7 w-9 sm:w-auto px-2"
                                             onClick={() => handlePrintBilan(bilanAfterSeance, i + 1)}
                                             title="Imprimer le bilan"
                                           >
-                                            <Printer className="w-3 h-3" />
+                                            <Printer className="w-4 h-4 sm:w-3 sm:h-3" />
                                           </Button>
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 text-xs"
+                                            className="h-9 sm:h-7 px-2 text-sm sm:text-xs"
                                             onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
                                           >
-                                            <Edit className="w-3 h-3 mr-1" />
-                                            Modifier
+                                            <Edit className="w-4 h-4 sm:w-3 sm:h-3 sm:mr-1" />
+                                            <span className="hidden sm:inline">Modifier</span>
                                           </Button>
                                         </div>
                                       </div>
@@ -1106,7 +1111,7 @@ export function PatientTraitementCard({
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="text-xs text-muted-foreground hover:text-primary h-8"
+                                      className="text-xs text-muted-foreground hover:text-primary h-9 sm:h-8"
                                       onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}`)}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
@@ -1124,10 +1129,10 @@ export function PatientTraitementCard({
                     </div>
 
                     {/* Add buttons section */}
-                    <div className="pt-4 border-t space-y-2">
+                    <div className="pt-4 border-t space-y-3">
                       <Button 
                         variant="outline" 
-                        className="w-full justify-start gap-2"
+                        className="w-full justify-start gap-2 h-11 sm:h-10"
                         onClick={() => {
                           setEditingSeance(null);
                           setEditingSeanceIndex(null);
@@ -1139,7 +1144,7 @@ export function PatientTraitementCard({
                       </Button>
                       <Button 
                         variant="outline" 
-                        className="w-full justify-start gap-2"
+                        className="w-full justify-start gap-2 h-11 sm:h-10"
                         onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire`)}
                       >
                         <FileText className="w-4 h-4" />
