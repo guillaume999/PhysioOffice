@@ -955,20 +955,63 @@ export function PatientTraitementCard({
                       </CollapsibleContent>
                     </Collapsible>
 
-                    {/* Séances with Bilans */}
+                    {/* Séances and Bilans sorted by date */}
                     <div className="space-y-3">
-                      <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
-                      {traitement.seances && traitement.seances.length > 0 ? (
-                        <div className="space-y-3">
-                          {traitement.seances.map((seance, i) => {
-                            const isExpanded = expandedSeances.has(seance.id);
-                            const exercices = seance.exercices || [];
-                            const bilanAfterSeance = traitement.bilans?.find(b => b.position_after_seance === i + 1);
-                            
-                              return (
-                                <div key={seance.id} className="space-y-3">
-                                  {/* Seance card with Collapsible */}
+                      <p className="text-sm font-semibold">Séances et bilans ({(traitement.seances?.length || 0) + (traitement.bilans?.length || 0)})</p>
+                      {(() => {
+                        // Build combined list of seances and bilans with their dates
+                        type CombinedItem = 
+                          | { type: 'seance'; data: TraitementSeance; index: number; date: string | null }
+                          | { type: 'bilan'; data: PatientBilan; date: string | null };
+                        
+                        const items: CombinedItem[] = [];
+                        
+                        // Add seances
+                        traitement.seances?.forEach((seance, i) => {
+                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === i + 1);
+                          items.push({
+                            type: 'seance',
+                            data: seance,
+                            index: i,
+                            date: seanceDate?.seance_date || null
+                          });
+                        });
+                        
+                        // Add bilans
+                        traitement.bilans?.forEach((bilan) => {
+                          items.push({
+                            type: 'bilan',
+                            data: bilan,
+                            date: bilan.bilan_date || null
+                          });
+                        });
+                        
+                        // Sort: items with dates first (chronologically), then items without dates
+                        items.sort((a, b) => {
+                          if (a.date && b.date) {
+                            return a.date.localeCompare(b.date);
+                          }
+                          if (a.date && !b.date) return -1;
+                          if (!a.date && b.date) return 1;
+                          return 0;
+                        });
+                        
+                        if (items.length === 0) {
+                          return <p className="text-xs text-muted-foreground">Aucune séance</p>;
+                        }
+                        
+                        return (
+                          <div className="space-y-3">
+                            {items.map((item) => {
+                              if (item.type === 'seance') {
+                                const seance = item.data;
+                                const i = item.index;
+                                const isExpanded = expandedSeances.has(seance.id);
+                                const exercices = seance.exercices || [];
+                                
+                                return (
                                   <Collapsible 
+                                    key={seance.id}
                                     open={isExpanded} 
                                     onOpenChange={() => toggleSeanceExpand(seance.id)}
                                   >
@@ -1166,57 +1209,57 @@ export function PatientTraitementCard({
                                       </CollapsibleContent>
                                     </div>
                                   </Collapsible>
-
-                                  {/* Bilan after this session - same level as seance */}
-                                  {bilanAfterSeance && (
-                                    <div className="bg-primary/5 rounded-lg border border-primary/20 p-3">
-                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                            <ClipboardCheck className="w-4 h-4 text-primary" />
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
-                                            <span className="text-xs text-muted-foreground">Après séance {i + 1}</span>
-                                          </div>
+                                );
+                              } else {
+                                // Bilan
+                                const bilan = item.data;
+                                return (
+                                  <div key={bilan.id} className="bg-primary/5 rounded-lg border border-primary/20 p-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                          <ClipboardCheck className="w-4 h-4 text-primary" />
                                         </div>
-                                        <div className="flex items-center gap-2 pl-11 sm:pl-0">
-                                          <Input
-                                            type="date"
-                                            value={bilanAfterSeance.bilan_date || ""}
-                                            onChange={(e) => handleBilanDateChange(bilanAfterSeance.id, e.target.value)}
-                                            className="flex-1 sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
-                                            title="Date du bilan"
-                                          />
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-9 w-9 sm:h-8 sm:w-8"
-                                            onClick={() => handlePrintBilan(bilanAfterSeance, i + 1)}
-                                            title="Imprimer le bilan"
-                                          >
-                                            <Printer className="w-4 h-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-9 w-9 sm:h-8 sm:w-8"
-                                            onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${i + 1}&bilan=${bilanAfterSeance.id}`)}
-                                            title="Modifier le bilan"
-                                          >
-                                            <Edit className="w-4 h-4" />
-                                          </Button>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
+                                          <span className="text-xs text-muted-foreground">Après séance {bilan.position_after_seance}</span>
                                         </div>
                                       </div>
+                                      <div className="flex items-center gap-2 pl-11 sm:pl-0">
+                                        <Input
+                                          type="date"
+                                          value={bilan.bilan_date || ""}
+                                          onChange={(e) => handleBilanDateChange(bilan.id, e.target.value)}
+                                          className="flex-1 sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
+                                          title="Date du bilan"
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-9 w-9 sm:h-8 sm:w-8"
+                                          onClick={() => handlePrintBilan(bilan, bilan.position_after_seance)}
+                                          title="Imprimer le bilan"
+                                        >
+                                          <Printer className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-9 w-9 sm:h-8 sm:w-8"
+                                          onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?traitement=${traitement.id}&position=${bilan.position_after_seance}&bilan=${bilan.id}`)}
+                                          title="Modifier le bilan"
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </Button>
+                                      </div>
                                     </div>
-                                  )}
-                                </div>
-                              );
+                                  </div>
+                                );
+                              }
                             })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Aucune séance</p>
-                      )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Add buttons section */}
