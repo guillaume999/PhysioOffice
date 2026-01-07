@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer, MessageSquare } from "lucide-react";
+import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer, MessageSquare, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -150,6 +150,9 @@ export function PatientTraitementCard({
   const [seanceCommentDialogOpen, setSeanceCommentDialogOpen] = useState(false);
   const [selectedSeanceForComment, setSelectedSeanceForComment] = useState<{id: string; name: string; comment: string} | null>(null);
   const [savingSeanceComment, setSavingSeanceComment] = useState(false);
+  const [deleteSeanceDialogOpen, setDeleteSeanceDialogOpen] = useState(false);
+  const [selectedSeanceForDelete, setSelectedSeanceForDelete] = useState<{id: string; traitementSeanceId: string; name: string; exercicesCount: number} | null>(null);
+  const [deletingSeance, setDeletingSeance] = useState(false);
 
   useEffect(() => {
     if (activeTraitementId) {
@@ -540,6 +543,50 @@ export function PatientTraitementCard({
       toast.error("Erreur lors de l'enregistrement");
     } finally {
       setSavingSeanceComment(false);
+    }
+  };
+
+  const handleDeleteSeance = async () => {
+    if (!selectedSeanceForDelete || !traitement) return;
+    
+    setDeletingSeance(true);
+    try {
+      // 1. Delete all exercises from the seance
+      const { error: exercicesError } = await supabase
+        .from("seance_exercices")
+        .delete()
+        .eq("seance_type_id", selectedSeanceForDelete.id);
+      
+      if (exercicesError) throw exercicesError;
+
+      // 2. Delete the traitement_seance entry
+      const { error: traitementSeanceError } = await supabase
+        .from("traitement_seances")
+        .delete()
+        .eq("id", selectedSeanceForDelete.traitementSeanceId);
+      
+      if (traitementSeanceError) throw traitementSeanceError;
+
+      // 3. Delete the seance_type itself (since it's hidden from list and specific to this treatment)
+      const { error: seanceTypeError } = await supabase
+        .from("seance_types")
+        .delete()
+        .eq("id", selectedSeanceForDelete.id);
+      
+      if (seanceTypeError) {
+        console.error("Error deleting seance_type:", seanceTypeError);
+        // Don't throw - the seance_type might be used elsewhere
+      }
+
+      toast.success("Séance supprimée");
+      setDeleteSeanceDialogOpen(false);
+      setSelectedSeanceForDelete(null);
+      fetchTraitementDetails();
+    } catch (error) {
+      console.error("Error deleting seance:", error);
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeletingSeance(false);
     }
   };
 
@@ -988,6 +1035,24 @@ export function PatientTraitementCard({
                                             >
                                               <Share2 className="w-4 h-4" />
                                             </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-9 w-9 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                                              title="Supprimer cette séance"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedSeanceForDelete({
+                                                  id: seance.seance_type_id,
+                                                  traitementSeanceId: seance.id,
+                                                  name: getSeanceDisplay(seance),
+                                                  exercicesCount: exercices.length
+                                                });
+                                                setDeleteSeanceDialogOpen(true);
+                                              }}
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
                                             <CollapsibleTrigger asChild>
                                               <Button
                                                 variant="ghost"
@@ -1281,6 +1346,36 @@ export function PatientTraitementCard({
           saving={savingSeanceComment}
         />
       )}
+
+      {/* Delete Seance Confirmation Dialog */}
+      <AlertDialog open={deleteSeanceDialogOpen} onOpenChange={setDeleteSeanceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette séance ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedSeanceForDelete && (
+                <>
+                  La séance "{selectedSeanceForDelete.name}" sera supprimée
+                  {selectedSeanceForDelete.exercicesCount > 0 && (
+                    <> ainsi que ses <strong>{selectedSeanceForDelete.exercicesCount} exercice{selectedSeanceForDelete.exercicesCount > 1 ? 's' : ''}</strong></>
+                  )}
+                  . Cette action est irréversible.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingSeance}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSeance}
+              disabled={deletingSeance}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingSeance ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
