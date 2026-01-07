@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video, Palette } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ThumbnailStyleDialog } from "@/components/video/ThumbnailStyleDialog";
 
 interface VideoItem {
   id: string;
@@ -29,6 +30,7 @@ export default function Videos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [styleDialogOpen, setStyleDialogOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -420,6 +422,11 @@ export default function Videos() {
     setVideoDialogOpen(true);
   };
 
+  const openStyleDialog = (video: VideoItem) => {
+    setSelectedVideo(video);
+    setStyleDialogOpen(true);
+  };
+
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -610,6 +617,14 @@ export default function Videos() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => openStyleDialog(video)}
+                              title="Modifier le style de la vignette"
+                            >
+                              <Palette className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => openEditDialog(video)}
                             >
                               <Edit className="h-4 w-4" />
@@ -731,6 +746,18 @@ export default function Videos() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Thumbnail Style Dialog */}
+        {selectedVideo && (
+          <ThumbnailStyleDialog
+            open={styleDialogOpen}
+            onOpenChange={setStyleDialogOpen}
+            videoId={selectedVideo.id}
+            videoUrl={selectedVideo.video_url}
+            currentThumbnailUrl={selectedVideo.thumbnail_url}
+            onSuccess={fetchVideos}
+          />
+        )}
       </div>
     </Layout>
   );
