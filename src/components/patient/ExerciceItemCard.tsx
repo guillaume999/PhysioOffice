@@ -107,7 +107,7 @@ export function ExerciceItemCard({
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("videos")
+        .from("exercice-videos")
         .upload(fileName, file, {
           cacheControl: "3600",
           upsert: false,
@@ -117,7 +117,24 @@ export function ExerciceItemCard({
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from("videos").getPublicUrl(fileName);
+      } = supabase.storage.from("exercice-videos").getPublicUrl(fileName);
+
+      // Also add to video library for sync
+      const { data: videoData, error: videoError } = await supabase
+        .from("videos")
+        .insert({
+          user_id: user.id,
+          title: editValues.name || file.name,
+          video_url: publicUrl,
+          name: file.name,
+          thumbnail_url: null
+        })
+        .select()
+        .single();
+
+      if (videoError) {
+        console.error("Error adding to video library:", videoError);
+      }
 
       setEditValues({ ...editValues, video_url: publicUrl });
       toast.success("Vidéo uploadée avec succès");
