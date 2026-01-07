@@ -253,16 +253,6 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (pathologies.length === 0) {
-      toast.error("Au moins une pathologie est requise");
-      return;
-    }
-
-    if (objectifsPrincipaux.length === 0) {
-      toast.error("Au moins un objectif principal est requis");
-      return;
-    }
-
     setLoading(true);
     try {
       // Save new pathologies
@@ -447,7 +437,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
           {/* Pathologies */}
           <div className="space-y-2">
-            <Label>Pathologies *</Label>
+            <Label>Pathologies</Label>
             <div className="flex flex-wrap gap-2 mb-2">
               {pathologies.map((p, i) => (
                 <Badge key={i} variant="secondary" className="gap-1">
@@ -482,7 +472,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
           {/* Objectifs Principaux */}
           <div className="space-y-2">
-            <Label>Objectifs principaux *</Label>
+            <Label>Objectifs principaux</Label>
             <div className="flex flex-wrap gap-2 mb-2">
               {objectifsPrincipaux.map((o, i) => (
                 <Badge key={i} variant="default" className="gap-1">
