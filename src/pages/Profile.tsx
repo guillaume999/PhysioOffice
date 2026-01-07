@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, User, Mail, Lock, Save } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, FileText } from "lucide-react";
 import { z } from "zod";
 import { PagePopup } from "@/components/popup/PagePopup";
 
@@ -205,9 +205,19 @@ export default function Profile() {
     <Layout>
       <PagePopup pageKey="profile" />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-foreground">Mon Profil</h1>
-          <p className="text-muted-foreground mt-2">Gérez vos informations personnelles et votre mot de passe</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-foreground">Mon Profil</h1>
+            <p className="text-muted-foreground mt-2">Gérez vos informations personnelles et votre mot de passe</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/journal")}
+            className="gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Journal d'activité
+          </Button>
         </div>
 
         <div className="space-y-6">
