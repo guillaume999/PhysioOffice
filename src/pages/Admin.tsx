@@ -43,7 +43,6 @@ import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
 import { PopupsManagement } from "@/components/admin/PopupsManagement";
 
 interface UserProfile {
-  id: string;
   user_id: string;
   email: string | null;
   first_name: string | null;
@@ -56,8 +55,7 @@ interface UserProfile {
   created_at: string;
   subscription_tier: "free" | "basic" | "premium";
   subscription_end_date: string | null;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
+  has_stripe_account: boolean | null;
 }
 
 interface SeanceType {
@@ -222,10 +220,11 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch users
+      // Fetch users - explicitly select only non-sensitive fields
+      // SECURITY: Never select stripe_customer_id or stripe_subscription_id
       const { data: usersData, error: usersError } = await supabase
         .from("profiles")
-        .select("*")
+        .select("user_id, email, first_name, last_name, pseudo, trial_end_date, is_premium, is_banned, can_share, created_at, subscription_tier, subscription_end_date, has_stripe_account")
         .order("created_at", { ascending: false });
 
       if (usersError) throw usersError;
@@ -1066,7 +1065,7 @@ export default function Admin() {
                         const isUserAdmin = adminUserIds.has(u.user_id);
 
                         return (
-                          <tr key={u.id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""} ${isUserAdmin ? "bg-primary/5" : ""}`}>
+                          <tr key={u.user_id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""} ${isUserAdmin ? "bg-primary/5" : ""}`}>
                             <td className="py-3 px-2">
                               <div className="flex flex-col">
                                 <span>{u.first_name} {u.last_name}</span>
@@ -1076,7 +1075,7 @@ export default function Admin() {
                             <td className="py-3 px-2 text-sm text-muted-foreground">
                               <div className="flex items-center gap-2">
                                 {u.email}
-                                {u.stripe_customer_id && (
+                                {u.has_stripe_account && (
                                   <Badge variant="outline" className="text-xs">
                                     <CreditCard className="w-3 h-3 mr-1" />
                                     Stripe
