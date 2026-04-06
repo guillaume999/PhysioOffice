@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, MapPin, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, MapPin, Save, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { FRENCH_REGIONS } from "@/lib/french-regions";
@@ -14,7 +15,8 @@ interface DirectorySettingsCardProps {
   userId: string;
 }
 
-interface DirectoryData {
+interface DirectoryEntry {
+  id: string | null;
   is_visible: boolean;
   city: string;
   region: string;
@@ -28,7 +30,8 @@ interface DirectoryData {
   photo_url_2: string;
 }
 
-const emptyData: DirectoryData = {
+const emptyEntry = (): DirectoryEntry => ({
+  id: null,
   is_visible: false,
   city: "",
   region: "",
@@ -40,102 +43,238 @@ const emptyData: DirectoryData = {
   website_url: "",
   photo_url: "",
   photo_url_2: "",
-};
+});
+
+function DirectoryEntryForm({
+  entry,
+  onChange,
+  onSave,
+  onDelete,
+  saving,
+}: {
+  entry: DirectoryEntry;
+  onChange: (field: keyof DirectoryEntry, value: string | boolean) => void;
+  onSave: (e: React.FormEvent) => void;
+  onDelete?: () => void;
+  saving: boolean;
+}) {
+  const departements = entry.region
+    ? FRENCH_REGIONS.find((r) => r.name === entry.region)?.departements.map((d) => d.name) || []
+    : [];
+
+  return (
+    <form onSubmit={onSave} className="space-y-4">
+      <div className="flex items-center justify-between rounded-lg border p-4">
+        <div className="space-y-0.5">
+          <Label className="text-base">Visible dans l'annuaire</Label>
+          <p className="text-sm text-muted-foreground">Activez pour apparaître dans l'annuaire public</p>
+        </div>
+        <Switch checked={entry.is_visible} onCheckedChange={(v) => onChange("is_visible", v)} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Région</Label>
+          <Select value={entry.region} onValueChange={(v) => { onChange("region", v); onChange("departement", ""); }}>
+            <SelectTrigger><SelectValue placeholder="Sélectionner une région" /></SelectTrigger>
+            <SelectContent>
+              {FRENCH_REGIONS.map((r) => (
+                <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {departements.length > 0 && (
+          <div className="space-y-2">
+            <Label>Département</Label>
+            <Select value={entry.departement} onValueChange={(v) => onChange("departement", v)}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner un département" /></SelectTrigger>
+              <SelectContent>
+                {departements.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Ville</Label>
+        <Input value={entry.city} onChange={(e) => onChange("city", e.target.value)} placeholder="Paris, Lyon..." />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Lien Google Maps</Label>
+        <Input value={entry.google_maps_link} onChange={(e) => onChange("google_maps_link", e.target.value)} placeholder="https://maps.google.com/..." />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Facebook</Label>
+          <Input value={entry.facebook_url} onChange={(e) => onChange("facebook_url", e.target.value)} placeholder="https://facebook.com/..." />
+        </div>
+        <div className="space-y-2">
+          <Label>Instagram</Label>
+          <Input value={entry.instagram_url} onChange={(e) => onChange("instagram_url", e.target.value)} placeholder="https://instagram.com/..." />
+        </div>
+        <div className="space-y-2">
+          <Label>LinkedIn</Label>
+          <Input value={entry.linkedin_url} onChange={(e) => onChange("linkedin_url", e.target.value)} placeholder="https://linkedin.com/in/..." />
+        </div>
+        <div className="space-y-2">
+          <Label>Site web</Label>
+          <Input value={entry.website_url} onChange={(e) => onChange("website_url", e.target.value)} placeholder="https://monsite.fr" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>URL photo 1</Label>
+          <Input value={entry.photo_url} onChange={(e) => onChange("photo_url", e.target.value)} placeholder="https://..." />
+        </div>
+        <div className="space-y-2">
+          <Label>URL photo 2 (optionnel)</Label>
+          <Input value={entry.photo_url_2} onChange={(e) => onChange("photo_url_2", e.target.value)} placeholder="https://..." />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={saving} className="gradient-primary text-primary-foreground">
+          {saving ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enregistrement...</>
+          ) : (
+            <><Save className="w-4 h-4 mr-2" />Enregistrer la fiche</>
+          )}
+        </Button>
+        {onDelete && (
+          <Button type="button" variant="destructive" size="sm" onClick={onDelete} disabled={saving}>
+            <Trash2 className="w-4 h-4 mr-1" />Supprimer
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+}
 
 export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [data, setData] = useState<DirectoryData>(emptyData);
-  const [exists, setExists] = useState(false);
-
-  const departements = data.region
-    ? FRENCH_REGIONS.find((r) => r.name === data.region)?.departements.map((d) => d.name) || []
-    : [];
+  const [entries, setEntries] = useState<DirectoryEntry[]>([]);
+  const [activeTab, setActiveTab] = useState("0");
 
   useEffect(() => {
-    fetchDirectory();
+    fetchEntries();
   }, [userId]);
 
-  const fetchDirectory = async () => {
+  const fetchEntries = async () => {
     try {
-      const { data: entry, error } = await supabase
+      const { data, error } = await supabase
         .from("practitioner_directory")
         .select("*")
         .eq("user_id", userId)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("Error fetching directory:", error);
         return;
       }
 
-      if (entry) {
-        setExists(true);
-        setData({
-          is_visible: entry.is_visible,
-          city: entry.city || "",
-          region: entry.region || "",
-          departement: entry.departement || "",
-          google_maps_link: entry.google_maps_link || "",
-          facebook_url: entry.facebook_url || "",
-          instagram_url: entry.instagram_url || "",
-          linkedin_url: entry.linkedin_url || "",
-          website_url: entry.website_url || "",
-          photo_url: entry.photo_url || "",
-          photo_url_2: entry.photo_url_2 || "",
-        });
+      if (data && data.length > 0) {
+        setEntries(data.map((e) => ({
+          id: e.id,
+          is_visible: e.is_visible,
+          city: e.city || "",
+          region: e.region || "",
+          departement: e.departement || "",
+          google_maps_link: e.google_maps_link || "",
+          facebook_url: e.facebook_url || "",
+          instagram_url: e.instagram_url || "",
+          linkedin_url: e.linkedin_url || "",
+          website_url: e.website_url || "",
+          photo_url: e.photo_url || "",
+          photo_url_2: e.photo_url_2 || "",
+        })));
+      } else {
+        setEntries([emptyEntry()]);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleChange = (index: number, field: keyof DirectoryEntry, value: string | boolean) => {
+    setEntries((prev) => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+  };
+
+  const handleSave = async (index: number, e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const entry = entries[index];
 
     try {
       const payload = {
         user_id: userId,
-        is_visible: data.is_visible,
-        city: data.city || null,
-        region: data.region || null,
-        departement: data.departement || null,
-        google_maps_link: data.google_maps_link || null,
-        facebook_url: data.facebook_url || null,
-        instagram_url: data.instagram_url || null,
-        linkedin_url: data.linkedin_url || null,
-        website_url: data.website_url || null,
-        photo_url: data.photo_url || null,
-        photo_url_2: data.photo_url_2 || null,
+        is_visible: entry.is_visible,
+        city: entry.city || null,
+        region: entry.region || null,
+        departement: entry.departement || null,
+        google_maps_link: entry.google_maps_link || null,
+        facebook_url: entry.facebook_url || null,
+        instagram_url: entry.instagram_url || null,
+        linkedin_url: entry.linkedin_url || null,
+        website_url: entry.website_url || null,
+        photo_url: entry.photo_url || null,
+        photo_url_2: entry.photo_url_2 || null,
       };
 
       let error;
-      if (exists) {
-        ({ error } = await supabase
-          .from("practitioner_directory")
-          .update(payload)
-          .eq("user_id", userId));
+      if (entry.id) {
+        ({ error } = await supabase.from("practitioner_directory").update(payload).eq("id", entry.id));
       } else {
-        ({ error } = await supabase
+        const { data: inserted, error: insertError } = await supabase
           .from("practitioner_directory")
-          .insert(payload));
-        if (!error) setExists(true);
+          .insert(payload)
+          .select("id")
+          .single();
+        error = insertError;
+        if (!error && inserted) {
+          setEntries((prev) => prev.map((e, i) => i === index ? { ...e, id: inserted.id } : e));
+        }
       }
 
       if (error) {
         toast({ title: "Erreur", description: "Impossible de sauvegarder la fiche", variant: "destructive" });
       } else {
-        toast({ title: "Fiche annuaire enregistrée", description: data.is_visible ? "Votre fiche est visible dans l'annuaire" : "Votre fiche est masquée" });
+        toast({ title: "Fiche enregistrée", description: entry.is_visible ? "Votre fiche est visible dans l'annuaire" : "Votre fiche est masquée" });
       }
     } finally {
       setSaving(false);
     }
   };
 
-  const update = (field: keyof DirectoryData, value: string | boolean) => {
-    setData((prev) => ({ ...prev, [field]: value }));
+  const handleAddEntry = () => {
+    setEntries((prev) => [...prev, emptyEntry()]);
+    setActiveTab(String(entries.length));
+  };
+
+  const handleDelete = async (index: number) => {
+    const entry = entries[index];
+    if (entry.id) {
+      setSaving(true);
+      const { error } = await supabase.from("practitioner_directory").delete().eq("id", entry.id);
+      setSaving(false);
+      if (error) {
+        toast({ title: "Erreur", description: "Impossible de supprimer la fiche", variant: "destructive" });
+        return;
+      }
+    }
+    const newEntries = entries.filter((_, i) => i !== index);
+    if (newEntries.length === 0) newEntries.push(emptyEntry());
+    setEntries(newEntries);
+    setActiveTab("0");
+    toast({ title: "Fiche supprimée" });
   };
 
   if (loading) {
@@ -151,118 +290,53 @@ export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
   return (
     <Card id="annuaire">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="w-5 h-5" />
-          Ma fiche annuaire
-        </CardTitle>
-        <CardDescription>
-          Configurez votre visibilité dans l'annuaire public des kinésithérapeutes
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Mes fiches annuaire
+            </CardTitle>
+            <CardDescription>
+              Configurez vos fiches dans l'annuaire public (ex : plusieurs cabinets)
+            </CardDescription>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddEntry} className="gap-1">
+            <Plus className="w-4 h-4" />
+            Ajouter
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSave} className="space-y-4">
-          {/* Visibility toggle */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div className="space-y-0.5">
-              <Label className="text-base">Visible dans l'annuaire</Label>
-              <p className="text-sm text-muted-foreground">
-                Activez pour apparaître dans l'annuaire public
-              </p>
-            </div>
-            <Switch
-              checked={data.is_visible}
-              onCheckedChange={(v) => update("is_visible", v)}
-            />
-          </div>
-
-          {/* Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Région</Label>
-              <Select value={data.region} onValueChange={(v) => { update("region", v); update("departement", ""); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une région" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FRENCH_REGIONS.map((r) => (
-                    <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {departements.length > 0 && (
-              <div className="space-y-2">
-                <Label>Département</Label>
-                <Select value={data.departement} onValueChange={(v) => update("departement", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un département" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departements.map((d) => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Ville</Label>
-            <Input value={data.city} onChange={(e) => update("city", e.target.value)} placeholder="Paris, Lyon..." />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Lien Google Maps</Label>
-            <Input value={data.google_maps_link} onChange={(e) => update("google_maps_link", e.target.value)} placeholder="https://maps.google.com/..." />
-          </div>
-
-          {/* Social links */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Facebook</Label>
-              <Input value={data.facebook_url} onChange={(e) => update("facebook_url", e.target.value)} placeholder="https://facebook.com/..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Instagram</Label>
-              <Input value={data.instagram_url} onChange={(e) => update("instagram_url", e.target.value)} placeholder="https://instagram.com/..." />
-            </div>
-            <div className="space-y-2">
-              <Label>LinkedIn</Label>
-              <Input value={data.linkedin_url} onChange={(e) => update("linkedin_url", e.target.value)} placeholder="https://linkedin.com/in/..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Site web</Label>
-              <Input value={data.website_url} onChange={(e) => update("website_url", e.target.value)} placeholder="https://monsite.fr" />
-            </div>
-          </div>
-
-          {/* Photos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>URL photo 1</Label>
-              <Input value={data.photo_url} onChange={(e) => update("photo_url", e.target.value)} placeholder="https://..." />
-            </div>
-            <div className="space-y-2">
-              <Label>URL photo 2 (optionnel)</Label>
-              <Input value={data.photo_url_2} onChange={(e) => update("photo_url_2", e.target.value)} placeholder="https://..." />
-            </div>
-          </div>
-
-          <Button type="submit" disabled={saving} className="gradient-primary text-primary-foreground">
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Enregistrer la fiche
-              </>
-            )}
-          </Button>
-        </form>
+        {entries.length === 1 ? (
+          <DirectoryEntryForm
+            entry={entries[0]}
+            onChange={(f, v) => handleChange(0, f, v)}
+            onSave={(e) => handleSave(0, e)}
+            onDelete={entries[0].id ? () => handleDelete(0) : undefined}
+            saving={saving}
+          />
+        ) : (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              {entries.map((entry, i) => (
+                <TabsTrigger key={i} value={String(i)}>
+                  {entry.city || `Fiche ${i + 1}`}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {entries.map((entry, i) => (
+              <TabsContent key={i} value={String(i)}>
+                <DirectoryEntryForm
+                  entry={entry}
+                  onChange={(f, v) => handleChange(i, f, v)}
+                  onSave={(e) => handleSave(i, e)}
+                  onDelete={() => handleDelete(i)}
+                  saving={saving}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
       </CardContent>
     </Card>
   );
