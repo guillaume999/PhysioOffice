@@ -38,6 +38,7 @@ const features = [
     href: "/seances",
     color: "from-indigo-500 to-blue-500",
     bgColor: "bg-indigo-500/10",
+  },
   {
     title: "Exercices",
     description: "Bibliothèque d'exercices de rééducation",
