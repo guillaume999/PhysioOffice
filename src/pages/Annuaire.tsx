@@ -91,6 +91,14 @@ export default function Annuaire() {
           <p className="text-muted-foreground">
             Trouvez un kinésithérapeute près de chez vous
           </p>
+          {user && (
+            <Button asChild variant="outline" className="mt-3 gap-2">
+              <Link to="/profile#annuaire">
+                <Settings className="w-4 h-4" />
+                Configurer ma fiche
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
