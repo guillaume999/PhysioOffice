@@ -8,9 +8,12 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, User, Mail, Lock, Save, FileText } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, FileText, MapPin, Globe, Facebook, Instagram, Linkedin, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { Switch } from "@/components/ui/switch";
+import { FRENCH_REGIONS } from "@/lib/french-regions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
 
