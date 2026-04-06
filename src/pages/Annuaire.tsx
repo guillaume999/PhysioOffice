@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { frenchRegions, getDepartementsByRegion } from "@/lib/french-regions";
+import { FRENCH_REGIONS } from "@/lib/french-regions";
 
 interface DirectoryEntry {
   id: string;
