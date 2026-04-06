@@ -82,6 +82,30 @@ export default function Annuaire() {
     return matchesSearch && matchesRegion && matchesDept;
   });
 
+  // Group filtered entries by user_id
+  const grouped = useMemo(() => {
+    const map = new Map<string, DirectoryEntry[]>();
+    for (const entry of filtered) {
+      const list = map.get(entry.user_id) || [];
+      list.push(entry);
+      map.set(entry.user_id, list);
+    }
+    return Array.from(map.values());
+  }, [filtered]);
+
+  // Collect unique social links from all entries of a user
+  const collectLinks = (entries: DirectoryEntry[]) => {
+    const links: { type: string; url: string; icon: React.ReactNode; title: string }[] = [];
+    const seen = new Set<string>();
+    for (const e of entries) {
+      if (e.facebook_url && !seen.has(e.facebook_url)) { seen.add(e.facebook_url); links.push({ type: "fb", url: e.facebook_url, icon: <Facebook className="w-4 h-4" />, title: "Facebook" }); }
+      if (e.instagram_url && !seen.has(e.instagram_url)) { seen.add(e.instagram_url); links.push({ type: "ig", url: e.instagram_url, icon: <Instagram className="w-4 h-4" />, title: "Instagram" }); }
+      if (e.linkedin_url && !seen.has(e.linkedin_url)) { seen.add(e.linkedin_url); links.push({ type: "li", url: e.linkedin_url, icon: <Linkedin className="w-4 h-4" />, title: "LinkedIn" }); }
+      if (e.website_url && !seen.has(e.website_url)) { seen.add(e.website_url); links.push({ type: "web", url: e.website_url, icon: <Globe className="w-4 h-4" />, title: "Site web" }); }
+    }
+    return links;
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 md:py-12">
@@ -142,83 +166,107 @@ export default function Annuaire() {
         {/* Results */}
         {isLoading ? (
           <p className="text-center text-muted-foreground">Chargement...</p>
-        ) : filtered.length === 0 ? (
+        ) : grouped.length === 0 ? (
           <p className="text-center text-muted-foreground">Aucun kinésithérapeute trouvé.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
-            {filtered.map((entry) => (
-              <Card key={entry.id} className="overflow-hidden hover:shadow-soft transition-shadow">
-                <CardContent className="p-0">
-                  {/* Photos */}
-                  {(entry.photo_url || entry.profile?.avatar_url) && (
-                    <div className="h-48 overflow-hidden bg-muted flex">
-                      <img
-                        src={entry.photo_url || entry.profile?.avatar_url || ""}
-                        alt={`${entry.profile?.first_name || ""} ${entry.profile?.last_name || ""}`}
-                        className={`object-cover ${entry.photo_url_2 ? "w-1/2" : "w-full"} h-full`}
-                      />
-                      {entry.photo_url_2 && (
-                        <img
-                          src={entry.photo_url_2}
-                          alt="Photo 2"
-                          className="w-1/2 h-full object-cover"
-                        />
-                      )}
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <h3 className="font-display font-semibold text-lg">
-                      {entry.profile?.first_name} {entry.profile?.last_name}
-                    </h3>
-                    {entry.profile?.pseudo && (
-                      <p className="text-sm text-muted-foreground">@{entry.profile.pseudo}</p>
-                    )}
-                    {entry.profile?.specialty && (
-                      <Badge variant="secondary" className="mt-1">{entry.profile.specialty}</Badge>
-                    )}
+            {grouped.map((userEntries) => {
+              const first = userEntries[0];
+              const profile = first.profile;
+              const allLinks = collectLinks(userEntries);
+              const hasMultiple = userEntries.length > 1;
 
-                    {/* Location */}
-                    {(entry.city || entry.departement) && (
-                      <div className="flex items-center gap-1 mt-3 text-sm text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>
-                          {[entry.city, entry.departement, entry.region].filter(Boolean).join(", ")}
-                        </span>
+              // Collect all unique photos
+              const photos: string[] = [];
+              for (const e of userEntries) {
+                if (e.photo_url && !photos.includes(e.photo_url)) photos.push(e.photo_url);
+                if (e.photo_url_2 && !photos.includes(e.photo_url_2)) photos.push(e.photo_url_2);
+              }
+              if (photos.length === 0 && profile?.avatar_url) photos.push(profile.avatar_url);
+
+              return (
+                <Card key={first.user_id} className="overflow-hidden hover:shadow-soft transition-shadow">
+                  <CardContent className="p-0">
+                    {/* Photos */}
+                    {photos.length > 0 && (
+                      <div className="h-48 overflow-hidden bg-muted flex">
+                        {photos.slice(0, 2).map((url, i) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt={`${profile?.first_name || ""} ${profile?.last_name || ""}`}
+                            className={`object-cover h-full ${photos.length > 1 ? "w-1/2" : "w-full"}`}
+                          />
+                        ))}
                       </div>
                     )}
+                    <div className="p-4">
+                      <h3 className="font-display font-semibold text-lg">
+                        {profile?.first_name} {profile?.last_name}
+                      </h3>
+                      {profile?.pseudo && (
+                        <p className="text-sm text-muted-foreground">@{profile.pseudo}</p>
+                      )}
+                      {profile?.specialty && (
+                        <Badge variant="secondary" className="mt-1">{profile.specialty}</Badge>
+                      )}
 
-                    {/* Links */}
-                    <div className="flex items-center gap-2 mt-3">
-                      {entry.google_maps_link && (
-                        <a href={entry.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Google Maps">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                      {/* Locations - tabs if multiple */}
+                      {hasMultiple ? (
+                        <Tabs defaultValue="0" className="mt-3">
+                          <TabsList className="h-auto flex-wrap">
+                            {userEntries.map((e, i) => (
+                              <TabsTrigger key={e.id} value={String(i)} className="text-xs px-2 py-1">
+                                <MapPin className="w-3 h-3 mr-1" />
+                                {e.city || `Cabinet ${i + 1}`}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                          {userEntries.map((e, i) => (
+                            <TabsContent key={e.id} value={String(i)} className="mt-2">
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                <span>{[e.city, e.departement, e.region].filter(Boolean).join(", ")}</span>
+                              </div>
+                              {e.google_maps_link && (
+                                <a href={e.google_maps_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mt-1">
+                                  <ExternalLink className="w-3 h-3" /> Voir sur Google Maps
+                                </a>
+                              )}
+                            </TabsContent>
+                          ))}
+                        </Tabs>
+                      ) : (
+                        <>
+                          {(first.city || first.departement) && (
+                            <div className="flex items-center gap-1 mt-3 text-sm text-muted-foreground">
+                              <MapPin className="w-3.5 h-3.5" />
+                              <span>{[first.city, first.departement, first.region].filter(Boolean).join(", ")}</span>
+                            </div>
+                          )}
+                          {first.google_maps_link && (
+                            <a href={first.google_maps_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mt-1">
+                              <ExternalLink className="w-3 h-3" /> Voir sur Google Maps
+                            </a>
+                          )}
+                        </>
                       )}
-                      {entry.facebook_url && (
-                        <a href={entry.facebook_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Facebook">
-                          <Facebook className="w-4 h-4" />
-                        </a>
-                      )}
-                      {entry.instagram_url && (
-                        <a href={entry.instagram_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Instagram">
-                          <Instagram className="w-4 h-4" />
-                        </a>
-                      )}
-                      {entry.linkedin_url && (
-                        <a href={entry.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="LinkedIn">
-                          <Linkedin className="w-4 h-4" />
-                        </a>
-                      )}
-                      {entry.website_url && (
-                        <a href={entry.website_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Site web">
-                          <Globe className="w-4 h-4" />
-                        </a>
+
+                      {/* Social Links */}
+                      {allLinks.length > 0 && (
+                        <div className="flex items-center gap-2 mt-3">
+                          {allLinks.map((link, i) => (
+                            <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title={link.title}>
+                              {link.icon}
+                            </a>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
