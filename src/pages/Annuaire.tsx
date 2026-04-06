@@ -4,10 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe } from "lucide-react";
+import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FRENCH_REGIONS } from "@/lib/french-regions";
+import { useAuth } from "@/lib/auth";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 interface DirectoryEntry {
   id: string;
