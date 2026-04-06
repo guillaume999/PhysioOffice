@@ -383,6 +383,7 @@ export default function Profile() {
           {/* Directory Settings */}
           {user && <DirectorySettingsCard userId={user.id} />}
         </div>
+      </div>
     </Layout>
   );
 }
