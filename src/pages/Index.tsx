@@ -48,6 +48,14 @@ const features = [
     bgColor: "bg-violet-500/10",
   },
   {
+    title: "Traitements",
+    description: "Protocoles de traitement personnalisés",
+    icon: ClipboardList,
+    href: "/traitements",
+    color: "from-cyan-500 to-blue-500",
+    bgColor: "bg-cyan-500/10",
+  },
+  {
     title: "Planning",
     description: "Organisez vos rendez-vous et votre emploi du temps",
     icon: Calendar,
