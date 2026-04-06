@@ -4,10 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe } from "lucide-react";
+import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FRENCH_REGIONS } from "@/lib/french-regions";
+import { useAuth } from "@/lib/auth";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 interface DirectoryEntry {
   id: string;
@@ -32,6 +35,7 @@ interface DirectoryEntry {
 }
 
 export default function Annuaire() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
@@ -87,6 +91,14 @@ export default function Annuaire() {
           <p className="text-muted-foreground">
             Trouvez un kinésithérapeute près de chez vous
           </p>
+          {user && (
+            <Button asChild variant="outline" className="mt-3 gap-2">
+              <Link to="/profile#annuaire">
+                <Settings className="w-4 h-4" />
+                Configurer ma fiche
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Filters */}

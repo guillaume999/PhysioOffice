@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, User, Mail, Lock, Save, FileText } from "lucide-react";
 import { z } from "zod";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { DirectorySettingsCard } from "@/components/profile/DirectorySettingsCard";
 
 const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
 
@@ -379,6 +380,8 @@ export default function Profile() {
               </form>
             </CardContent>
           </Card>
+          {/* Directory Settings */}
+          {user && <DirectorySettingsCard userId={user.id} />}
         </div>
       </div>
     </Layout>
