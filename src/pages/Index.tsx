@@ -147,7 +147,7 @@ export default function Index() {
             {features.map((feature, index) => (
               <Link
                 key={feature.title}
-                to={user ? feature.href : "/auth"}
+                to={user || (feature as any).public ? feature.href : "/auth"}
                 className="group animate-fade-up"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
