@@ -1,0 +1,1 @@
+ALTER TABLE public.practitioner_directory DROP CONSTRAINT IF EXISTS practitioner_directory_user_id_key;
