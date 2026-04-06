@@ -159,6 +159,10 @@ function DirectoryEntryForm({
           <Input value={entry.photo_url_2} onChange={(e) => onChange("photo_url_2", e.target.value)} placeholder="https://..." />
         </div>
       </div>
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={saving} className="gradient-primary text-primary-foreground">
+          {saving ? (
             <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enregistrement...</>
           ) : (
             <><Save className="w-4 h-4 mr-2" />Enregistrer la fiche</>
