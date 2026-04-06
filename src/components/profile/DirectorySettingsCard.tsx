@@ -28,6 +28,9 @@ interface DirectoryEntry {
   website_url: string;
   photo_url: string;
   photo_url_2: string;
+  phone: string;
+  email: string;
+  doctolib_url: string;
 }
 
 const emptyEntry = (): DirectoryEntry => ({
@@ -43,6 +46,9 @@ const emptyEntry = (): DirectoryEntry => ({
   website_url: "",
   photo_url: "",
   photo_url_2: "",
+  phone: "",
+  email: "",
+  doctolib_url: "",
 });
 
 function DirectoryEntryForm({
