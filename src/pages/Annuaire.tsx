@@ -39,29 +39,28 @@ export default function Annuaire() {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["annuaire"],
     queryFn: async () => {
-      // Fetch visible directory entries
-      const { data: dirData, error } = await supabase
-        .from("practitioner_directory")
-        .select("*")
-        .eq("is_visible", true);
-
+      const { data, error } = await supabase.rpc("get_public_directory");
       if (error) throw error;
-      if (!dirData || dirData.length === 0) return [];
-
-      // Fetch associated profile info (only public fields)
-      const userIds = dirData.map((d: any) => d.user_id);
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, pseudo, specialty, avatar_url")
-        .in("user_id", userIds);
-
-      const profileMap = new Map(
-        (profiles || []).map((p: any) => [p.user_id, p])
-      );
-
-      return dirData.map((d: any) => ({
-        ...d,
-        profile: profileMap.get(d.user_id) || null,
+      return (data || []).map((d: any) => ({
+        id: d.id,
+        user_id: d.user_id,
+        city: d.city,
+        region: d.region,
+        departement: d.departement,
+        google_maps_link: d.google_maps_link,
+        facebook_url: d.facebook_url,
+        instagram_url: d.instagram_url,
+        linkedin_url: d.linkedin_url,
+        website_url: d.website_url,
+        photo_url: d.photo_url,
+        photo_url_2: d.photo_url_2,
+        profile: {
+          first_name: d.first_name,
+          last_name: d.last_name,
+          pseudo: d.pseudo,
+          specialty: d.specialty,
+          avatar_url: d.avatar_url,
+        },
       })) as DirectoryEntry[];
     },
   });

@@ -1593,6 +1593,28 @@ export type Database = {
         Returns: boolean
       }
       generate_unique_code: { Args: { table_name: string }; Returns: string }
+      get_public_directory: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          city: string
+          departement: string
+          facebook_url: string
+          first_name: string
+          google_maps_link: string
+          id: string
+          instagram_url: string
+          last_name: string
+          linkedin_url: string
+          photo_url: string
+          photo_url_2: string
+          pseudo: string
+          region: string
+          specialty: string
+          user_id: string
+          website_url: string
+        }[]
+      }
       get_user_subscription_tier: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]
