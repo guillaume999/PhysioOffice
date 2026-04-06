@@ -67,7 +67,7 @@ export default function Annuaire() {
   });
 
   const departements = regionFilter && regionFilter !== "all"
-    ? getDepartementsByRegion(regionFilter)
+    ? (FRENCH_REGIONS.find(r => r.name === regionFilter)?.departements.map(d => d.name) || [])
     : [];
 
   const filtered = entries.filter((entry) => {
