@@ -247,6 +247,9 @@ export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
         website_url: entry.website_url || null,
         photo_url: entry.photo_url || null,
         photo_url_2: entry.photo_url_2 || null,
+        phone: entry.phone || null,
+        email: entry.email || null,
+        doctolib_url: entry.doctolib_url || null,
       };
 
       let error;
