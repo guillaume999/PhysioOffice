@@ -22,6 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { CommentDialog } from "./CommentDialog";
+import { SearchableExerciceTitleInput, ExerciceOption } from "./SearchableExerciceTitleInput";
+import { PathologySearchInput } from "./PathologySearchInput";
 
 interface VideoLibraryItem {
   id: string;
@@ -93,6 +95,46 @@ export function ExerciceItemCard({
   const [libraryVideos, setLibraryVideos] = useState<VideoLibraryItem[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
+
+  // Search state for existing exercises and pathologies
+  const [availableExercices, setAvailableExercices] = useState<ExerciceOption[]>([]);
+  const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
+  const [pathologieTags, setPathologieTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isEditing || !user) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: exData }, { data: pathoData }] = await Promise.all([
+        supabase
+          .from("exercices")
+          .select("id, code, title, description, video_url, thumbnail_url, pathologie_tags")
+          .eq("user_id", user.id)
+          .order("title"),
+        supabase
+          .from("pathologies")
+          .select("name")
+          .eq("user_id", user.id),
+      ]);
+      if (cancelled) return;
+      setAvailableExercices((exData as ExerciceOption[]) || []);
+      setAvailablePathologies([
+        ...new Set((pathoData?.map((p: { name: string }) => p.name) || [])),
+      ]);
+      // Pre-load existing pathology tags from the linked exercise
+      if (exercice.exercice_id) {
+        const linked = (exData as Array<{ id: string; pathologie_tags?: string[] | null }> | null)?.find(
+          (e) => e.id === exercice.exercice_id
+        );
+        setPathologieTags(linked?.pathologie_tags || []);
+      } else {
+        setPathologieTags([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, user, exercice.exercice_id]);
   
   // Check if exercise is shared/platform (visible in exercise list)
   const isSharedOrPlatform = exercice.exercice?.status === "shared" || exercice.exercice?.status === "pending";
