@@ -17,6 +17,8 @@ import { Plus, Upload, Video, Loader2, X, Pencil, Library, Search } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { SearchableExerciceTitleInput } from "./SearchableExerciceTitleInput";
+import { PathologySearchInput } from "./PathologySearchInput";
 
 interface VideoLibraryItem {
   id: string;
@@ -53,6 +55,7 @@ export function AddExerciceToSeanceDialog({
 }: AddExerciceToSeanceDialogProps) {
   const { user } = useAuth();
   const [availableExercices, setAvailableExercices] = useState<Exercice[]>([]);
+  const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -72,6 +75,7 @@ export function AddExerciceToSeanceDialog({
   const [durationSeconds2, setDurationSeconds2] = useState<number | null>(null);
   const [force2, setForce2] = useState<number | null>(null);
   const [comment, setComment] = useState("");
+  const [pathologieTags, setPathologieTags] = useState<string[]>([]);
 
   // Video library state
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
@@ -106,6 +110,13 @@ export function AddExerciceToSeanceDialog({
       .order("title");
     setAvailableExercices(exData || []);
 
+    // Fetch pathologies for search
+    const { data: pathoData } = await supabase
+      .from("pathologies")
+      .select("name")
+      .eq("user_id", user.id);
+    setAvailablePathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
+
     setLoading(false);
   };
 
@@ -121,6 +132,7 @@ export function AddExerciceToSeanceDialog({
     setDurationSeconds2(null);
     setForce2(null);
     setComment("");
+    setPathologieTags([]);
   };
 
   const handleExerciceSelect = (value: string) => {
@@ -414,39 +426,48 @@ export function AddExerciceToSeanceDialog({
           </div>
         ) : (
           <div className="space-y-4 py-2">
-            {/* Select existing or custom */}
+            {/* Name with searchable existing exercises */}
             <div>
-              <Label className="text-xs">Exercice existant</Label>
-              <Select
-                value={exerciceId || "custom"}
-                onValueChange={handleExerciceSelect}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner ou créer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="custom">Personnalisé</SelectItem>
-                  {availableExercices.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      <span className="font-mono text-xs uppercase text-muted-foreground mr-2">
-                        {e.code}
-                      </span>
-                      {e.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Name */}
-            <div>
-              <Label className="text-xs">Nom</Label>
-              <Input
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Nom</Label>
+                {exerciceId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      setExerciceId(null);
+                      setName("");
+                      setDescription("");
+                      setVideoUrl(null);
+                      setThumbnailUrl(null);
+                    }}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Délier
+                  </Button>
+                )}
+              </div>
+              <SearchableExerciceTitleInput
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nom de l'exercice"
+                onChange={(v) => {
+                  setName(v);
+                  if (exerciceId) setExerciceId(null);
+                }}
+                onSelectExercice={(ex) => {
+                  setExerciceId(ex.id);
+                  setName(ex.title);
+                  setDescription(ex.description || "");
+                  setVideoUrl(ex.video_url || null);
+                  setThumbnailUrl(ex.thumbnail_url || null);
+                }}
+                options={availableExercices}
                 disabled={!!exerciceId}
               />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Tapez librement ou utilisez la loupe pour rechercher dans vos exercices.
+              </p>
             </div>
 
             {/* Description */}
@@ -458,6 +479,18 @@ export function AddExerciceToSeanceDialog({
                 placeholder="Description optionnelle"
               />
             </div>
+
+            {/* Pathologies */}
+            {!exerciceId && (
+              <div>
+                <Label className="text-xs">Pathologies</Label>
+                <PathologySearchInput
+                  selected={pathologieTags}
+                  onChange={setPathologieTags}
+                  options={availablePathologies}
+                />
+              </div>
+            )}
 
             {/* Video section */}
             <div className="space-y-2">
