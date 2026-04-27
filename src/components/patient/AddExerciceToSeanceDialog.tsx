@@ -349,6 +349,15 @@ export function AddExerciceToSeanceDialog({
 
       // If it's a custom exercice (no exercice_id), create it in the exercices table
       if (!finalExerciceId && name.trim()) {
+        // Persist any new pathologies to the user's library
+        for (const patho of pathologieTags) {
+          if (!availablePathologies.includes(patho)) {
+            await supabase
+              .from("pathologies")
+              .insert({ user_id: user.id, name: patho });
+          }
+        }
+
         const { data: newExercice, error: exerciceError } = await supabase
           .from("exercices")
           .insert({
@@ -356,7 +365,7 @@ export function AddExerciceToSeanceDialog({
             title: name.trim(),
             description: description.trim() || null,
             status: "draft",
-            pathologie_tags: [],
+            pathologie_tags: pathologieTags,
             video_url: videoUrl || null,
             thumbnail_url: thumbnailUrl || null,
             author_name: userPseudo,
