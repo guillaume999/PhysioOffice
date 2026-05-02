@@ -245,11 +245,14 @@ export default function PatientCertificats() {
   const handlePrint = () => {
     if (!printingCertificat) return;
     
+    const escapeHtml = (str: string) =>
+      str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
     const patientSection = includePatientName 
-      ? `<div class="patient-info">Patient : ${patientName}</div>` 
+      ? `<div class="patient-info">Patient : ${escapeHtml(patientName || "")}</div>` 
       : "";
     const dateSection = includeDate 
       ? `<div class="date">Date : ${new Date(printingCertificat.created_at).toLocaleDateString("fr-FR")}</div>` 
@@ -295,9 +298,9 @@ export default function PatientCertificats() {
           </style>
         </head>
         <body>
-          <h1>${printingCertificat.title}</h1>
+          <h1>${escapeHtml(printingCertificat.title)}</h1>
           ${patientSection}
-          <div class="content">${printingCertificat.content}</div>
+          <div class="content">${escapeHtml(printingCertificat.content)}</div>
           ${dateSection}
           <div class="signature">Signature :</div>
         </body>

@@ -40,6 +40,38 @@ serve(async (req) => {
 
     console.log("Authenticated user:", user.id);
 
+    // Validate messages input
+    const { messages } = await req.json();
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: "Messages invalides" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (messages.length > 50) {
+      return new Response(JSON.stringify({ error: "Trop de messages. Limite : 50." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    for (const msg of messages) {
+      if (!msg.role || !msg.content || typeof msg.content !== "string") {
+        return new Response(JSON.stringify({ error: "Format de message invalide" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (msg.content.length > 10000) {
+        return new Response(JSON.stringify({ error: "Message trop long. Limite : 10 000 caractères." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Check if user can use AI (subscription tier)
     const { data: profile } = await supabaseClient
       .from("profiles")
@@ -61,7 +93,6 @@ serve(async (req) => {
       });
     }
 
-    const { messages } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -133,8 +164,9 @@ Tu peux:
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
-    console.error("AI chat error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erreur inconnue" }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("AI chat error:", errorMessage);
+    return new Response(JSON.stringify({ error: "Une erreur interne est survenue. Veuillez réessayer." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
