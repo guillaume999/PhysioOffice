@@ -129,10 +129,9 @@ export function Navbar() {
               <div className="flex items-center gap-4">
                 <Link
                   to="/profile"
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors p-2 rounded-lg hover:bg-muted"
                 >
                   <User className="w-4 h-4" />
-                  <span>{user.email}</span>
                 </Link>
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   <LogOut className="w-4 h-4 mr-2" />
