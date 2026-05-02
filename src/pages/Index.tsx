@@ -77,8 +77,9 @@ export default function Index() {
       </section>
 
       {/* Features Grid */}
-      <section className="py-12 md:py-20 bg-muted/30">
-        <div className="container mx-auto px-4" style={{ border: '3px solid red' }}>
+      <section className="py-12 md:py-20" style={{ background: 'pink' }}>
+        <p style={{ fontSize: '30px', color: 'black' }}>DEBUG TEST</p>
+        <div className="container mx-auto px-4">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-4xl font-display font-bold mb-4">
               Tout ce dont vous avez besoin
