@@ -19,8 +19,8 @@ const featureGroups = [
     label: "Rééducation",
     items: [
       { title: "Exercices", description: "Bibliothèque d'exercices de rééducation", icon: Dumbbell, href: "/exercices", color: "from-violet-500 to-purple-500", bgColor: "bg-violet-500/10" },
-      { title: "Traitements", description: "Protocoles de traitement personnalisés", icon: ClipboardList, href: "/traitements", color: "from-cyan-500 to-blue-500", bgColor: "bg-cyan-500/10" },
-      { title: "Séances", description: "Créez et gérez vos séances de rééducation", icon: ClipboardList, href: "/seances", color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-500/10" },
+      { title: "Traitements", description: "Protocoles de traitement personnalisés", icon: ClipboardList, href: "/traitement-type", color: "from-cyan-500 to-blue-500", bgColor: "bg-cyan-500/10" },
+      { title: "Séances", description: "Créez et gérez vos séances de rééducation", icon: ClipboardList, href: "/seance-type", color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-500/10" },
       { title: "Vidéos", description: "Votre vidéothèque de techniques et exercices", icon: Video, href: "/videos", color: "from-red-500 to-orange-500", bgColor: "bg-red-500/10" },
     ],
   },
