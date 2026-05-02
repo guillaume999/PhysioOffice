@@ -5,104 +5,33 @@ import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, 
 import { useAuth } from "@/lib/auth";
 import { PagePopup } from "@/components/popup/PagePopup";
 
-// Features that require authentication
-const features = [
+const featureGroups = [
   {
-    title: "Patients",
-    description: "Gérez vos patients avec leurs informations complètes",
-    icon: Users,
-    href: "/patients",
-    color: "from-blue-500 to-cyan-500",
-    bgColor: "bg-blue-500/10",
+    label: "Cabinet",
+    items: [
+      { title: "Patients", description: "Gérez vos patients avec leurs informations complètes", icon: Users, href: "/patients", color: "from-blue-500 to-cyan-500", bgColor: "bg-blue-500/10" },
+      { title: "Notes", description: "Créez et organisez vos notes médicales", icon: FileText, href: "/notes", color: "from-orange-500 to-amber-500", bgColor: "bg-orange-500/10" },
+      { title: "Planning", description: "Organisez vos rendez-vous et votre emploi du temps", icon: Calendar, href: "/planning", color: "from-pink-500 to-rose-500", bgColor: "bg-pink-500/10" },
+      { title: "IA Diagnostic", description: "Assistant IA pour l'analyse des symptômes", icon: Brain, href: "/ia-diagnostic", color: "from-emerald-500 to-teal-500", bgColor: "bg-emerald-500/10" },
+    ],
   },
   {
-    title: "Notes",
-    description: "Créez et organisez vos notes médicales",
-    icon: FileText,
-    href: "/notes",
-    color: "from-orange-500 to-amber-500",
-    bgColor: "bg-orange-500/10",
+    label: "Rééducation",
+    items: [
+      { title: "Exercices", description: "Bibliothèque d'exercices de rééducation", icon: Dumbbell, href: "/exercices", color: "from-violet-500 to-purple-500", bgColor: "bg-violet-500/10" },
+      { title: "Traitements", description: "Protocoles de traitement personnalisés", icon: ClipboardList, href: "/traitements", color: "from-cyan-500 to-blue-500", bgColor: "bg-cyan-500/10" },
+      { title: "Séances", description: "Créez et gérez vos séances de rééducation", icon: ClipboardList, href: "/seances", color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-500/10" },
+      { title: "Vidéos", description: "Votre vidéothèque de techniques et exercices", icon: Video, href: "/videos", color: "from-red-500 to-orange-500", bgColor: "bg-red-500/10" },
+    ],
   },
   {
-    title: "IA Diagnostic",
-    description: "Assistant IA pour l'analyse des symptômes",
-    icon: Brain,
-    href: "/ia-diagnostic",
-    color: "from-emerald-500 to-teal-500",
-    bgColor: "bg-emerald-500/10",
-  },
-  {
-    title: "Séances",
-    description: "Créez et gérez vos séances de rééducation",
-    icon: ClipboardList,
-    href: "/seances",
-    color: "from-indigo-500 to-blue-500",
-    bgColor: "bg-indigo-500/10",
-  },
-  {
-    title: "Exercices",
-    description: "Bibliothèque d'exercices de rééducation",
-    icon: Dumbbell,
-    href: "/exercices",
-    color: "from-violet-500 to-purple-500",
-    bgColor: "bg-violet-500/10",
-  },
-  {
-    title: "Traitements",
-    description: "Protocoles de traitement personnalisés",
-    icon: ClipboardList,
-    href: "/traitements",
-    color: "from-cyan-500 to-blue-500",
-    bgColor: "bg-cyan-500/10",
-  },
-  {
-    title: "Planning",
-    description: "Organisez vos rendez-vous et votre emploi du temps",
-    icon: Calendar,
-    href: "/planning",
-    color: "from-pink-500 to-rose-500",
-    bgColor: "bg-pink-500/10",
-  },
-  {
-    title: "Vidéos",
-    description: "Votre vidéothèque de techniques et exercices",
-    icon: Video,
-    href: "/videos",
-    color: "from-red-500 to-orange-500",
-    bgColor: "bg-red-500/10",
-  },
-  {
-    title: "Actualités",
-    description: "Suivez les dernières nouvelles de la plateforme",
-    icon: Newspaper,
-    href: "/news",
-    color: "from-rose-500 to-red-500",
-    bgColor: "bg-rose-500/10",
-  },
-  {
-    title: "Formation",
-    description: "Développez vos compétences avec nos formations",
-    icon: GraduationCap,
-    href: "/formation",
-    color: "from-purple-500 to-violet-500",
-    bgColor: "bg-purple-500/10",
-  },
-  {
-    title: "Annonces",
-    description: "Offres d'emploi et remplacements entre kinés",
-    icon: Megaphone,
-    href: "/annonces",
-    color: "from-yellow-500 to-orange-500",
-    bgColor: "bg-yellow-500/10",
-  },
-  {
-    title: "Annuaire",
-    description: "Trouvez un kinésithérapeute près de chez vous",
-    icon: BookOpen,
-    href: "/annuaire",
-    color: "from-teal-500 to-cyan-500",
-    bgColor: "bg-teal-500/10",
-    public: true,
+    label: "Communauté",
+    items: [
+      { title: "Actualités", description: "Suivez les dernières nouvelles de la plateforme", icon: Newspaper, href: "/news", color: "from-rose-500 to-red-500", bgColor: "bg-rose-500/10" },
+      { title: "Annonces", description: "Offres d'emploi et remplacements entre kinés", icon: Megaphone, href: "/annonces", color: "from-yellow-500 to-orange-500", bgColor: "bg-yellow-500/10" },
+      { title: "Formation", description: "Développez vos compétences avec nos formations", icon: GraduationCap, href: "/formation", color: "from-purple-500 to-violet-500", bgColor: "bg-purple-500/10" },
+      { title: "Annuaire", description: "Trouvez un kinésithérapeute près de chez vous", icon: BookOpen, href: "/annuaire", color: "from-teal-500 to-cyan-500", bgColor: "bg-teal-500/10", public: true },
+    ],
   },
 ];
 
@@ -159,35 +88,42 @@ export default function Index() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-6 max-w-4xl mx-auto">
-            {features.map((feature, index) => (
-              <Link
-                key={feature.title}
-                to={user || (feature as any).public ? feature.href : "/auth"}
-                className="group animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
-                  <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
-                    <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
-                      <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
-                        <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-sm md:text-xl font-display group-hover:text-primary transition-colors leading-tight">
-                        {feature.title}
-                      </CardTitle>
-                      <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm line-clamp-2">
-                        {feature.description}
-                      </CardDescription>
-                    </div>
-                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all hidden md:block" />
-                  </CardHeader>
-                </Card>
-              </Link>
+          <div className="flex flex-col gap-6 md:gap-8 max-w-4xl mx-auto">
+            {featureGroups.map((group, groupIndex) => (
+              <div key={group.label} className="rounded-2xl border-2 border-border bg-card/50 p-4 md:p-6 animate-fade-up" style={{ animationDelay: `${groupIndex * 0.15}s` }}>
+                <h3 className="text-lg md:text-xl font-display font-semibold mb-4 text-foreground">{group.label}</h3>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  {group.items.map((feature, index) => (
+                    <Link
+                      key={feature.title}
+                      to={user || (feature as any).public ? feature.href : "/auth"}
+                      className="group"
+                    >
+                      <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
+                        <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
+                          <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
+                            <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
+                              <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-sm md:text-xl font-display group-hover:text-primary transition-colors leading-tight">
+                              {feature.title}
+                            </CardTitle>
+                            <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm line-clamp-2">
+                              {feature.description}
+                            </CardDescription>
+                          </div>
+                          <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all hidden md:block" />
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+                      </div>
 
           {!user && (
             <div className="text-center mt-8 md:mt-12">
