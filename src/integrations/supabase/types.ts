@@ -1627,6 +1627,15 @@ export type Database = {
           website_url: string
         }[]
       }
+      get_session_by_access_code: {
+        Args: { _code: string }
+        Returns: {
+          expires_at: string
+          id: string
+          patient_id: string
+          seance_type_id: string
+        }[]
+      }
       get_user_subscription_tier: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]
@@ -1646,6 +1655,10 @@ export type Database = {
           _resource_type: string
           _user_id: string
         }
+        Returns: boolean
+      }
+      has_valid_access_code_for_seance: {
+        Args: { _seance_type_id: string }
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
