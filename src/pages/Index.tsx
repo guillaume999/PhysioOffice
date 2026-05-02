@@ -123,7 +123,6 @@ export default function Index() {
               </div>
             ))}
           </div>
-                      </div>
 
           {!user && (
             <div className="text-center mt-8 md:mt-12">
