@@ -2,51 +2,32 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
-import { LogOut, User, Shield, Briefcase, Activity, Users2, ChevronRight } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { LogOut, User, Shield } from "lucide-react";
 
-interface SectionConfig {
-  label: string;
-  icon: LucideIcon;
-  routes: { label: string; href: string }[];
-}
-
-const sections: Record<string, SectionConfig> = {
-  cabinet: {
-    label: "Cabinet",
-    icon: Briefcase,
-    routes: [
+const sections: Record<string, { label: string; href: string }[]> = {
+  cabinet: [
       { label: "Patients", href: "/patients" },
       { label: "Notes", href: "/notes" },
       { label: "Planning", href: "/planning" },
       { label: "IA Diagnostic", href: "/ia-diagnostic" },
-    ],
-  },
-  reeducation: {
-    label: "Rééducation",
-    icon: Activity,
-    routes: [
+  ],
+  reeducation: [
       { label: "Exercices", href: "/exercices" },
       { label: "Traitements", href: "/traitement-type" },
       { label: "Séances", href: "/seance-type" },
       { label: "Vidéos", href: "/videos" },
-    ],
-  },
-  communaute: {
-    label: "Communauté",
-    icon: Users2,
-    routes: [
+  ],
+  communaute: [
       { label: "Actualités", href: "/news" },
       { label: "Annonces", href: "/annonces" },
       { label: "Formation", href: "/formation" },
       { label: "Annuaire", href: "/annuaire" },
-    ],
-  },
+  ],
 };
 
 function getCurrentSection(pathname: string): string | null {
-  for (const [key, section] of Object.entries(sections)) {
-    if (section.routes.some((r) => pathname === r.href || pathname.startsWith(r.href + "/"))) {
+  for (const [key, routes] of Object.entries(sections)) {
+    if (routes.some((r) => pathname === r.href || pathname.startsWith(r.href + "/"))) {
       return key;
     }
   }
@@ -71,7 +52,7 @@ export function Navbar() {
   const isActive = (path: string) => location.pathname === path;
 
   const currentSection = getCurrentSection(location.pathname);
-  const currentSectionConfig = currentSection ? sections[currentSection] : null;
+  const sectionLinks = currentSection ? sections[currentSection] : [];
 
   return (
     <nav className="sticky top-0 z-50 glass border-b">
@@ -86,30 +67,19 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
-            {currentSectionConfig ? (
-              <>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-semibold mr-2">
-                  <currentSectionConfig.icon className="w-4 h-4" />
-                  {currentSectionConfig.label}
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 mr-1" />
-                <div className="flex items-center gap-1">
-                  {currentSectionConfig.routes.map((link) => (
-                    <Link
-                      key={link.href}
-                      to={link.href}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        isActive(link.href)
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            ) : null}
+            {sectionLinks.map((link) => (
+              <Link
+                key={link.href}
+                to={link.href}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive(link.href)
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
             {user && isAdmin && (
               <Link
                 to="/admin"
