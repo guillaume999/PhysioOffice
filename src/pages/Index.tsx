@@ -27,9 +27,9 @@ const featureGroups = [
   {
     label: "Communauté",
     items: [
-      { title: "Actualités", description: "Suivez les dernières nouvelles de la plateforme", icon: Newspaper, href: "/news", color: "from-rose-500 to-red-500", bgColor: "bg-rose-500/10" },
-      { title: "Annonces", description: "Offres d'emploi et remplacements entre kinés", icon: Megaphone, href: "/annonces", color: "from-yellow-500 to-orange-500", bgColor: "bg-yellow-500/10" },
-      { title: "Formation", description: "Développez vos compétences avec nos formations", icon: GraduationCap, href: "/formation", color: "from-purple-500 to-violet-500", bgColor: "bg-purple-500/10" },
+      { title: "Actualités", description: "Suivez les dernières nouvelles de la plateforme", icon: Newspaper, href: "/news", color: "from-rose-500 to-red-500", bgColor: "bg-rose-500/10", public: true },
+      { title: "Annonces", description: "Offres d'emploi et remplacements entre kinés", icon: Megaphone, href: "/annonces", color: "from-yellow-500 to-orange-500", bgColor: "bg-yellow-500/10", public: true },
+      { title: "Formation", description: "Développez vos compétences avec nos formations", icon: GraduationCap, href: "/formation", color: "from-purple-500 to-violet-500", bgColor: "bg-purple-500/10", public: true },
       { title: "Annuaire", description: "Trouvez un kinésithérapeute près de chez vous", icon: BookOpen, href: "/annuaire", color: "from-teal-500 to-cyan-500", bgColor: "bg-teal-500/10", public: true },
     ],
   },
