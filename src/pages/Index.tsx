@@ -54,7 +54,7 @@ export default function Index() {
             </div>
             
             <h1 className="text-3xl md:text-5xl lg:text-7xl font-display font-bold mb-4 md:mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-              Votre cabinet médical
+              Votre cabinet kiné
               <span className="text-gradient block mt-2">simplifié</span>
             </h1>
             
