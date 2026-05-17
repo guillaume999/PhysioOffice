@@ -83,6 +83,7 @@ export default function PatientBilanIntermediaire() {
               const parsed = JSON.parse(bilanData.content);
               if (typeof parsed === "object") {
                 setBilan({
+                  objectif_intermediaire: parsed.objectif_intermediaire || "",
                   douleur_localisation: parsed.douleur_localisation || "",
                   douleur_intensite: parsed.douleur_intensite || "",
                   douleur_type: parsed.douleur_type || "",
