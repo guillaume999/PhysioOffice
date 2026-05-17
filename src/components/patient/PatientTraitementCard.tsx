@@ -19,6 +19,7 @@ import { ExerciceItemCard } from "@/components/patient/ExerciceItemCard";
 import { AddExerciceToSeanceDialog } from "@/components/patient/AddExerciceToSeanceDialog";
 import { CommentDialog } from "@/components/patient/CommentDialog";
 import { fr } from "date-fns/locale";
+import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -988,13 +989,12 @@ export function PatientTraitementCard({
                   </div>
                   {/* Ligne 2: Date + infos */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
-                    <Input
-                      type="date"
-                      value={traitement.traitement_start_date || ""}
-                      onChange={(e) => handleTraitementDateChange(e.target.value)}
-                      className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
-                      title="Date de début du traitement"
-                    />
+                     <DatePickerInline
+                       value={traitement.traitement_start_date || ""}
+                       onChange={(v) => handleTraitementDateChange(v)}
+                       className="w-full sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
+                       title="Date de début du traitement"
+                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate">par {traitement.author_name || "Anonyme"}</span>
                       <span>• {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances</span>
@@ -1153,17 +1153,12 @@ export function PatientTraitementCard({
                                           
                                           {/* Date and actions row */}
                                           <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
-                                            <Input
-                                              type="date"
-                                              value={getSeanceDate(i + 1)}
-                                              onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleSeanceDateChange(i + 1, e.target.value);
-                                              }}
-                                              onClick={(e) => e.stopPropagation()}
-                                              className="w-full sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
-                                              title="Date de la séance"
-                                            />
+                                             <DatePickerInline
+                                               value={getSeanceDate(i + 1)}
+                                               onChange={(v) => handleSeanceDateChange(i + 1, v)}
+                                               className="w-full sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
+                                               title="Date de la séance"
+                                             />
                                             <div className="flex items-center gap-1 flex-shrink-0">
                                               <Button
                                                 variant="ghost"
@@ -1330,11 +1325,10 @@ export function PatientTraitementCard({
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-2 pl-11 sm:pl-0">
-                                        <Input
-                                          type="date"
+                                        <DatePickerInline
                                           value={bilan.bilan_date || ""}
-                                          onChange={(e) => handleBilanDateChange(bilan.id, e.target.value)}
-                                          className="flex-1 sm:w-32 h-9 sm:h-7 text-sm sm:text-xs"
+                                          onChange={(v) => handleBilanDateChange(bilan.id, v)}
+                                          className="flex-1 sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
                                           title="Date du bilan"
                                         />
                                         <Button
