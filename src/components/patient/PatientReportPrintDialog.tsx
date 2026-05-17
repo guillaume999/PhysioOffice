@@ -271,7 +271,9 @@ export function PatientReportPrintDialog({
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">N°</th>`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Type</th>`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs principaux</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs secondaires</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Pathologies</th>`);
         sections.push(`</tr></thead><tbody>`);
         
         // Create combined list of seances and bilans sorted by date (chronological)
