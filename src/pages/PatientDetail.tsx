@@ -192,6 +192,7 @@ export default function PatientDetail() {
             seance_type_id,
             seance_types (
               objectifs_principaux,
+              objectifs_secondaires,
               pathologies
             )
           `)
