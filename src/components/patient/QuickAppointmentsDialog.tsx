@@ -198,17 +198,27 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       ordre: currentMaxOrdre + i + 1,
     }));
 
-    const { error: errSeances } = await supabase.from("traitement_seances").insert(seancesRows);
+    const { data: insertedSeances, error: errSeances } = await supabase
+      .from("traitement_seances")
+      .insert(seancesRows)
+      .select("id, seance_type_id, ordre");
     if (errSeances) {
       setSaving(false);
       toast({ title: "Erreur", description: errSeances.message, variant: "destructive" });
       return;
     }
 
-    // 4) Insert patient_traitement_seance_dates entries
+    // Map clone id -> inserted traitement_seances id
+    const seanceIdByClone = new Map<string, string>();
+    (insertedSeances || []).forEach((r) => {
+      seanceIdByClone.set(r.seance_type_id, r.id);
+    });
+
+    // 4) Insert patient_traitement_seance_dates entries, each bound to its own seance
     const dateRows = dates.map((d, i) => ({
       patient_id: patientId,
       traitement_id: traitementId,
+      seance_id: seanceIdByClone.get(newSeanceTypeIds[i]) ?? null,
       seance_ordre: currentMaxOrdre + i + 1,
       seance_date: format(d, "yyyy-MM-dd"),
       user_id: user.id,
