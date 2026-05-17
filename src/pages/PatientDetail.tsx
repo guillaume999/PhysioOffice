@@ -88,6 +88,7 @@ export default function PatientDetail() {
     ordre: number;
     seance_date: string | null;
     objectifs_principaux: string[];
+    objectifs_secondaires: string[];
     pathologies: string[];
   }[]>([]);
   const [bilanInitialData, setBilanInitialData] = useState<Record<string, any> | null>(null);
