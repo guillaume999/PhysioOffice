@@ -1085,9 +1085,10 @@ export function PatientTraitementCard({
                         
                         const items: CombinedItem[] = [];
                         
-                        // Add seances
+                        // Add seances — match dates by the seance's actual `ordre`,
+                        // not by array index, since ordres can have gaps or duplicates.
                         traitement.seances?.forEach((seance, i) => {
-                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === i + 1);
+                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === seance.ordre);
                           items.push({
                             type: 'seance',
                             data: seance,
@@ -1153,9 +1154,9 @@ export function PatientTraitementCard({
                                           
                                           {/* Date and actions row */}
                                           <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
-                                             <DatePickerInline
-                                               value={getSeanceDate(i + 1)}
-                                               onChange={(v) => handleSeanceDateChange(i + 1, v)}
+                                              <DatePickerInline
+                                                value={getSeanceDate(seance.ordre)}
+                                                onChange={(v) => handleSeanceDateChange(seance.ordre, v)}
                                                className="w-full sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
                                                title="Date de la séance"
                                              />
