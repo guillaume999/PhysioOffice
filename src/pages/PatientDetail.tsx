@@ -216,6 +216,7 @@ export default function PatientDetail() {
             ordre: ts.ordre,
             seance_date: datesMap.get(ts.ordre) || null,
             objectifs_principaux: ts.seance_types?.objectifs_principaux || [],
+            objectifs_secondaires: ts.seance_types?.objectifs_secondaires || [],
             pathologies: ts.seance_types?.pathologies || [],
           }));
           setTraitementSeances(seances);
