@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
 interface BilanData {
+  objectif_intermediaire: string;
   douleur_localisation: string;
   douleur_intensite: string;
   douleur_type: string;
@@ -37,6 +38,7 @@ export default function PatientBilanIntermediaire() {
   const [existingBilanId, setExistingBilanId] = useState<string | null>(bilanId);
 
   const [bilan, setBilan] = useState<BilanData>({
+    objectif_intermediaire: "",
     douleur_localisation: "",
     douleur_intensite: "",
     douleur_type: "",
@@ -81,6 +83,7 @@ export default function PatientBilanIntermediaire() {
               const parsed = JSON.parse(bilanData.content);
               if (typeof parsed === "object") {
                 setBilan({
+                  objectif_intermediaire: parsed.objectif_intermediaire || "",
                   douleur_localisation: parsed.douleur_localisation || "",
                   douleur_intensite: parsed.douleur_intensite || "",
                   douleur_type: parsed.douleur_type || "",
@@ -191,6 +194,21 @@ export default function PatientBilanIntermediaire() {
         </div>
 
         <div className="space-y-6">
+          {/* Objectif intermédiaire */}
+          <Card className="border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-700 dark:text-amber-400">Objectif intermédiaire</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Objectif à atteindre pour ce bilan intermédiaire..."
+                value={bilan.objectif_intermediaire}
+                onChange={(e) => handleChange("objectif_intermediaire", e.target.value)}
+                className="min-h-[100px]"
+              />
+            </CardContent>
+          </Card>
+
           {/* Évaluation de la douleur */}
           <Card>
             <CardHeader>
