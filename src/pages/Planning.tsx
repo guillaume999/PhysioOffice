@@ -475,6 +475,15 @@ export default function Planning() {
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
+                                      className="h-5 w-5 p-0 bg-primary/20 hover:bg-primary/40"
+                                      onClick={() => handleEditAppointment(apt)}
+                                      title="Modifier le rendez-vous"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
                                       className="h-5 w-5 p-0 bg-destructive/20 hover:bg-destructive/40 text-destructive"
                                       onClick={() => handleDeleteAppointment(apt.id)}
                                       title="Supprimer le rendez-vous"
@@ -506,7 +515,7 @@ export default function Planning() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nouveau rendez-vous</DialogTitle>
+            <DialogTitle>{editingAppointmentId ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}</DialogTitle>
           </DialogHeader>
           {selectedSlot && (
             <div className="space-y-4">
@@ -561,7 +570,7 @@ export default function Planning() {
               </div>
 
               <Button onClick={handleCreateAppointment} className="w-full gradient-primary text-primary-foreground">
-                Créer le rendez-vous
+                {editingAppointmentId ? "Enregistrer" : "Créer le rendez-vous"}
               </Button>
             </div>
           )}
