@@ -125,10 +125,63 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       return;
     }
 
-    // 2) Insert one traitement_seances row per date (reusing the same seance_type)
+    // Fetch the template seance_type data + its exercices so we can clone an independent copy per date
+    const { data: templateSeance, error: errTemplate } = await supabase
+      .from("seance_types")
+      .select("pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, comment")
+      .eq("id", templateSeanceTypeId)
+      .maybeSingle();
+
+    if (errTemplate || !templateSeance) {
+      setSaving(false);
+      toast({ title: "Erreur", description: errTemplate?.message || "Modèle introuvable", variant: "destructive" });
+      return;
+    }
+
+    const { data: templateExercices } = await supabase
+      .from("seance_exercices")
+      .select("exercice_id, name, description, repetitions, duration_seconds, series, force_1, duration_seconds_2, force_2, comment, ordre")
+      .eq("seance_type_id", templateSeanceTypeId)
+      .order("ordre", { ascending: true });
+
+    // 2) For each date, create an INDEPENDENT clone of the seance_type so editing one
+    //    does not affect the others.
+    const newSeanceTypeIds: string[] = [];
+    for (let i = 0; i < dates.length; i++) {
+      const { data: cloned, error: errClone } = await supabase
+        .from("seance_types")
+        .insert({
+          user_id: user.id,
+          pathologie: templateSeance.pathologie,
+          objectif_principal: templateSeance.objectif_principal,
+          pathologies: templateSeance.pathologies,
+          objectifs_principaux: templateSeance.objectifs_principaux,
+          objectifs_secondaires: templateSeance.objectifs_secondaires,
+          comment: templateSeance.comment,
+          is_hidden_from_list: true,
+          is_shared: false,
+        })
+        .select("id")
+        .single();
+
+      if (errClone || !cloned) {
+        setSaving(false);
+        toast({ title: "Erreur", description: errClone?.message || "Clonage échoué", variant: "destructive" });
+        return;
+      }
+
+      newSeanceTypeIds.push(cloned.id);
+
+      if (templateExercices && templateExercices.length > 0) {
+        const exRows = templateExercices.map((ex) => ({ ...ex, seance_type_id: cloned.id }));
+        await supabase.from("seance_exercices").insert(exRows);
+      }
+    }
+
+    // 3) Insert one traitement_seances row per date, each pointing to its own clone
     const seancesRows = dates.map((_, i) => ({
       traitement_type_id: traitementId,
-      seance_type_id: templateSeanceTypeId,
+      seance_type_id: newSeanceTypeIds[i],
       ordre: currentMaxOrdre + i + 1,
     }));
 
@@ -139,7 +192,7 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       return;
     }
 
-    // 3) Insert patient_traitement_seance_dates entries
+    // 4) Insert patient_traitement_seance_dates entries
     const dateRows = dates.map((d, i) => ({
       patient_id: patientId,
       traitement_id: traitementId,
