@@ -23,6 +23,7 @@ interface TraitementSeance {
   ordre: number;
   seance_date: string | null;
   objectifs_principaux: string[];
+  objectifs_secondaires: string[];
   pathologies: string[];
 }
 
@@ -270,7 +271,9 @@ export function PatientReportPrintDialog({
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">N°</th>`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Type</th>`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs principaux</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs secondaires</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Pathologies</th>`);
         sections.push(`</tr></thead><tbody>`);
         
         // Create combined list of seances and bilans sorted by date (chronological)
@@ -302,15 +305,23 @@ export function PatientReportPrintDialog({
             const dateStr = seance.seance_date 
               ? new Date(seance.seance_date).toLocaleDateString("fr-FR") 
               : "____/____/________";
-            const objectifs = seance.objectifs_principaux.length > 0 
+            const objectifsPrincipaux = seance.objectifs_principaux.length > 0 
               ? escapeHtml(seance.objectifs_principaux.join(", ")) 
-              : escapeHtml(seance.pathologies.join(", ")) || "-";
+              : "-";
+            const objectifsSecondaires = seance.objectifs_secondaires.length > 0 
+              ? escapeHtml(seance.objectifs_secondaires.join(", ")) 
+              : "-";
+            const pathologies = seance.pathologies.length > 0 
+              ? escapeHtml(seance.pathologies.join(", ")) 
+              : "-";
             
             sections.push(`<tr>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${seance.ordre}</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">Séance</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${dateStr}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifs}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsPrincipaux}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsSecondaires}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${pathologies}</td>`);
             sections.push(`</tr>`);
           } else {
             const bilan = item.data;
@@ -334,6 +345,8 @@ export function PatientReportPrintDialog({
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">Bilan intermédiaire</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${dateStr}</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${objectifInter}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
             sections.push(`</tr>`);
           }
         });

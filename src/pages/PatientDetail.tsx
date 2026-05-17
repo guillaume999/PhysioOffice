@@ -88,6 +88,7 @@ export default function PatientDetail() {
     ordre: number;
     seance_date: string | null;
     objectifs_principaux: string[];
+    objectifs_secondaires: string[];
     pathologies: string[];
   }[]>([]);
   const [bilanInitialData, setBilanInitialData] = useState<Record<string, any> | null>(null);
@@ -191,6 +192,7 @@ export default function PatientDetail() {
             seance_type_id,
             seance_types (
               objectifs_principaux,
+              objectifs_secondaires,
               pathologies
             )
           `)
@@ -214,6 +216,7 @@ export default function PatientDetail() {
             ordre: ts.ordre,
             seance_date: datesMap.get(ts.ordre) || null,
             objectifs_principaux: ts.seance_types?.objectifs_principaux || [],
+            objectifs_secondaires: ts.seance_types?.objectifs_secondaires || [],
             pathologies: ts.seance_types?.pathologies || [],
           }));
           setTraitementSeances(seances);
