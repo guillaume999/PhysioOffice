@@ -1154,9 +1154,9 @@ export function PatientTraitementCard({
                                           
                                           {/* Date and actions row */}
                                           <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
-                                             <DatePickerInline
-                                               value={getSeanceDate(i + 1)}
-                                               onChange={(v) => handleSeanceDateChange(i + 1, v)}
+                                              <DatePickerInline
+                                                value={getSeanceDate(seance.ordre)}
+                                                onChange={(v) => handleSeanceDateChange(seance.ordre, v)}
                                                className="w-full sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
                                                title="Date de la séance"
                                              />
