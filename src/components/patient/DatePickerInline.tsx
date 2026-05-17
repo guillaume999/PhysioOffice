@@ -4,6 +4,7 @@ import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface DatePickerInlineProps {
@@ -21,11 +22,12 @@ export function DatePickerInline({
   title,
   placeholder = "Date",
 }: DatePickerInlineProps) {
+  const [open, setOpen] = useState(false);
   const parsed = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
   const date = parsed && isValid(parsed) ? parsed : undefined;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -56,6 +58,7 @@ export function DatePickerInline({
           onSelect={(d) => {
             if (d) onChange(format(d, "yyyy-MM-dd"));
             else onChange("");
+            setOpen(false);
           }}
           initialFocus
           locale={fr}
