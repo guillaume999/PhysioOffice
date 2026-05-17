@@ -26,6 +26,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   patientId: string;
   patientName?: string;
+  traitementId: string | null;
   onCreated?: () => void;
 }
 
@@ -39,7 +40,7 @@ const WEEKDAYS = [
   { value: 0, label: "Dim" },
 ];
 
-export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patientName, onCreated }: Props) {
+export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patientName, traitementId, onCreated }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<"dates" | "repeat">("dates");
@@ -47,43 +48,32 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
 
   // Mode 1: multi-dates
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [timeDates, setTimeDates] = useState("09:00");
-  const [durationDates, setDurationDates] = useState(30);
 
   // Mode 2: repeat weekly
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [days, setDays] = useState<number[]>([1, 3, 5]);
-  const [timeRepeat, setTimeRepeat] = useState("09:00");
-  const [durationRepeat, setDurationRepeat] = useState(30);
 
   const toggleDay = (d: number) => {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
-  const buildAppointment = (date: Date, time: string, duration: number) => {
-    const [h, m] = time.split(":").map(Number);
-    const start = new Date(date);
-    start.setHours(h, m, 0, 0);
-    const end = new Date(start.getTime() + duration * 60000);
-    return {
-      user_id: user?.id,
-      patient_id: patientId,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-    };
-  };
-
   const handleSave = async () => {
     if (!user) return;
-    let rows: any[] = [];
+    if (!traitementId) {
+      toast({ title: "Aucun traitement actif", variant: "destructive" });
+      return;
+    }
+
+    // Collect target dates
+    let dates: Date[] = [];
 
     if (mode === "dates") {
       if (selectedDates.length === 0) {
         toast({ title: "Sélectionnez au moins une date", variant: "destructive" });
         return;
       }
-      rows = selectedDates.map((d) => buildAppointment(d, timeDates, durationDates));
+      dates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
     } else {
       if (!startDate || !endDate) {
         toast({ title: "Choisissez une date de début et de fin", variant: "destructive" });
@@ -103,25 +93,73 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       end.setHours(0, 0, 0, 0);
       while (cur <= end) {
         if (days.includes(cur.getDay())) {
-          rows.push(buildAppointment(new Date(cur), timeRepeat, durationRepeat));
+          dates.push(new Date(cur));
         }
         cur.setDate(cur.getDate() + 1);
       }
-      if (rows.length === 0) {
+      if (dates.length === 0) {
         toast({ title: "Aucun rendez-vous généré", variant: "destructive" });
         return;
       }
     }
 
     setSaving(true);
-    const { error } = await supabase.from("appointments").insert(rows);
-    setSaving(false);
 
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    // 1) Find a template seance_type from existing traitement_seances
+    const { data: existing } = await supabase
+      .from("traitement_seances")
+      .select("seance_type_id, ordre")
+      .eq("traitement_type_id", traitementId)
+      .order("ordre", { ascending: false });
+
+    const templateSeanceTypeId = existing && existing.length > 0 ? existing[0].seance_type_id : null;
+    const currentMaxOrdre = existing && existing.length > 0 ? existing[0].ordre : 0;
+
+    if (!templateSeanceTypeId) {
+      setSaving(false);
+      toast({
+        title: "Ajoutez d'abord une séance",
+        description: "Créez au moins une séance dans ce traitement pour pouvoir en dupliquer rapidement.",
+        variant: "destructive",
+      });
       return;
     }
-    toast({ title: `${rows.length} rendez-vous créé${rows.length > 1 ? "s" : ""}` });
+
+    // 2) Insert one traitement_seances row per date (reusing the same seance_type)
+    const seancesRows = dates.map((_, i) => ({
+      traitement_type_id: traitementId,
+      seance_type_id: templateSeanceTypeId,
+      ordre: currentMaxOrdre + i + 1,
+    }));
+
+    const { error: errSeances } = await supabase.from("traitement_seances").insert(seancesRows);
+    if (errSeances) {
+      setSaving(false);
+      toast({ title: "Erreur", description: errSeances.message, variant: "destructive" });
+      return;
+    }
+
+    // 3) Insert patient_traitement_seance_dates entries
+    const dateRows = dates.map((d, i) => ({
+      patient_id: patientId,
+      traitement_id: traitementId,
+      seance_ordre: currentMaxOrdre + i + 1,
+      seance_date: format(d, "yyyy-MM-dd"),
+      user_id: user.id,
+    }));
+
+    const { error: errDates } = await supabase
+      .from("patient_traitement_seance_dates")
+      .insert(dateRows);
+
+    setSaving(false);
+
+    if (errDates) {
+      toast({ title: "Erreur", description: errDates.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: `${dates.length} séance${dates.length > 1 ? "s" : ""} ajoutée${dates.length > 1 ? "s" : ""}` });
     setSelectedDates([]);
     onOpenChange(false);
     onCreated?.();
@@ -132,10 +170,10 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CalendarPlus className="w-5 h-5" /> Ajout rapide de rendez-vous
+            <CalendarPlus className="w-5 h-5" /> Ajout rapide de séances
           </DialogTitle>
           <DialogDescription>
-            {patientName ? `Pour ${patientName}` : "Créer plusieurs rendez-vous en quelques clics"}
+            Crée des séances datées dans le traitement actif{patientName ? ` de ${patientName}` : ""}. La dernière séance du traitement est utilisée comme modèle.
           </DialogDescription>
         </DialogHeader>
 
@@ -154,22 +192,6 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
                 locale={fr}
                 className={cn("p-3 pointer-events-auto rounded-md border")}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Heure</Label>
-                <Input type="time" value={timeDates} onChange={(e) => setTimeDates(e.target.value)} />
-              </div>
-              <div>
-                <Label>Durée (min)</Label>
-                <Input
-                  type="number"
-                  min={5}
-                  step={5}
-                  value={durationDates}
-                  onChange={(e) => setDurationDates(Number(e.target.value))}
-                />
-              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {selectedDates.length} date{selectedDates.length > 1 ? "s" : ""} sélectionnée{selectedDates.length > 1 ? "s" : ""}
@@ -216,22 +238,6 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Heure</Label>
-                <Input type="time" value={timeRepeat} onChange={(e) => setTimeRepeat(e.target.value)} />
-              </div>
-              <div>
-                <Label>Durée (min)</Label>
-                <Input
-                  type="number"
-                  min={5}
-                  step={5}
-                  value={durationRepeat}
-                  onChange={(e) => setDurationRepeat(Number(e.target.value))}
-                />
-              </div>
-            </div>
           </TabsContent>
         </Tabs>
 
@@ -239,7 +245,7 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Créer les rendez-vous
+            Ajouter les séances
           </Button>
         </DialogFooter>
       </DialogContent>
