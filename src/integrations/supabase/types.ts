@@ -819,6 +819,7 @@ export type Database = {
           id: string
           patient_id: string
           seance_date: string | null
+          seance_id: string | null
           seance_ordre: number
           traitement_id: string
           updated_at: string
@@ -829,6 +830,7 @@ export type Database = {
           id?: string
           patient_id: string
           seance_date?: string | null
+          seance_id?: string | null
           seance_ordre: number
           traitement_id: string
           updated_at?: string
@@ -839,6 +841,7 @@ export type Database = {
           id?: string
           patient_id?: string
           seance_date?: string | null
+          seance_id?: string | null
           seance_ordre?: number
           traitement_id?: string
           updated_at?: string
@@ -850,6 +853,13 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_traitement_seance_dates_seance_id_fkey"
+            columns: ["seance_id"]
+            isOneToOne: false
+            referencedRelation: "traitement_seances"
             referencedColumns: ["id"]
           },
           {

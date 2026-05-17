@@ -97,6 +97,7 @@ interface PatientBilan {
 
 interface SeanceDate {
   id: string;
+  seance_id: string | null;
   seance_ordre: number;
   seance_date: string | null;
 }
@@ -203,7 +204,7 @@ export function PatientTraitementCard({
         // Fetch seance dates for this patient and traitement
         const { data: seanceDatesData } = await supabase
           .from("patient_traitement_seance_dates")
-          .select("id, seance_ordre, seance_date")
+          .select("id, seance_id, seance_ordre, seance_date")
           .eq("patient_id", patientId)
           .eq("traitement_id", activeTraitementId)
           .order("seance_ordre", { ascending: true });
@@ -365,11 +366,21 @@ export function PatientTraitementCard({
         
         // Create the date entry for this seance
         if (seanceDate) {
+          // Get the just-inserted traitement_seances row id so the date is bound to it
+          const { data: insertedTs } = await supabase
+            .from("traitement_seances")
+            .select("id")
+            .eq("traitement_type_id", traitement.id)
+            .eq("seance_type_id", newSeanceId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
           await supabase
             .from("patient_traitement_seance_dates")
             .insert({
               patient_id: patientId,
               traitement_id: traitement.id,
+              seance_id: insertedTs?.id ?? null,
               seance_ordre: nextOrdre,
               seance_date: seanceDate,
               user_id: user.id
@@ -513,15 +524,17 @@ export function PatientTraitementCard({
     setTraitement({ ...traitement, traitement_start_date: date || null });
   };
 
-  const handleSeanceDateChange = async (seanceOrdre: number, date: string) => {
+  const handleSeanceDateChange = async (seanceId: string, seanceOrdre: number, date: string) => {
     if (!traitement || !user) return;
-    
-    const existingDate = traitement.seanceDates.find(sd => sd.seance_ordre === seanceOrdre);
+
+    const existingDate = traitement.seanceDates.find(
+      sd => (sd.seance_id && sd.seance_id === seanceId) || (!sd.seance_id && sd.seance_ordre === seanceOrdre)
+    );
     
     if (existingDate) {
       const { error } = await supabase
         .from("patient_traitement_seance_dates")
-        .update({ seance_date: date || null })
+        .update({ seance_date: date || null, seance_id: seanceId })
         .eq("id", existingDate.id);
       
       if (error) {
@@ -532,7 +545,7 @@ export function PatientTraitementCard({
       setTraitement({
         ...traitement,
         seanceDates: traitement.seanceDates.map(sd =>
-          sd.seance_ordre === seanceOrdre ? { ...sd, seance_date: date || null } : sd
+          sd.id === existingDate.id ? { ...sd, seance_id: seanceId, seance_date: date || null } : sd
         )
       });
     } else {
@@ -541,6 +554,7 @@ export function PatientTraitementCard({
         .insert({
           patient_id: patientId,
           traitement_id: traitement.id,
+          seance_id: seanceId,
           seance_ordre: seanceOrdre,
           seance_date: date || null,
           user_id: user.id
@@ -555,7 +569,7 @@ export function PatientTraitementCard({
       
       setTraitement({
         ...traitement,
-        seanceDates: [...traitement.seanceDates, { id: newDate.id, seance_ordre: seanceOrdre, seance_date: date }]
+        seanceDates: [...traitement.seanceDates, { id: newDate.id, seance_id: seanceId, seance_ordre: seanceOrdre, seance_date: date }]
       });
     }
   };
@@ -943,8 +957,10 @@ export function PatientTraitementCard({
     printWindow.print();
   };
 
-  const getSeanceDate = (seanceOrdre: number): string => {
-    const date = traitement?.seanceDates.find(sd => sd.seance_ordre === seanceOrdre);
+  const getSeanceDate = (seanceId: string, seanceOrdre: number): string => {
+    const date = traitement?.seanceDates.find(
+      sd => (sd.seance_id && sd.seance_id === seanceId) || (!sd.seance_id && sd.seance_ordre === seanceOrdre)
+    );
     return date?.seance_date || "";
   };
 
@@ -1088,7 +1104,9 @@ export function PatientTraitementCard({
                         // Add seances — match dates by the seance's actual `ordre`,
                         // not by array index, since ordres can have gaps or duplicates.
                         traitement.seances?.forEach((seance, i) => {
-                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === seance.ordre);
+                          const seanceDate = traitement.seanceDates.find(
+                            sd => (sd.seance_id && sd.seance_id === seance.id) || (!sd.seance_id && sd.seance_ordre === seance.ordre)
+                          );
                           items.push({
                             type: 'seance',
                             data: seance,
@@ -1155,8 +1173,8 @@ export function PatientTraitementCard({
                                           {/* Date and actions row */}
                                           <div className="flex items-center justify-between gap-2 pl-11 sm:pl-0">
                                               <DatePickerInline
-                                                value={getSeanceDate(seance.ordre)}
-                                                onChange={(v) => handleSeanceDateChange(seance.ordre, v)}
+                                                value={getSeanceDate(seance.id, seance.ordre)}
+                                                onChange={(v) => handleSeanceDateChange(seance.id, seance.ordre, v)}
                                                className="w-full sm:w-36 h-9 sm:h-7 text-sm sm:text-xs"
                                                title="Date de la séance"
                                              />
