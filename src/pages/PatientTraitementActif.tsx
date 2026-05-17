@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+import { QuickAppointmentsDialog } from "@/components/patient/QuickAppointmentsDialog";
 
 export default function PatientTraitementActif() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ export default function PatientTraitementActif() {
   const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
   const [createTraitementDialogOpen, setCreateTraitementDialogOpen] = useState(false);
+  const [quickApptOpen, setQuickApptOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -175,10 +177,14 @@ export default function PatientTraitementActif() {
           <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${id}`)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg md:text-2xl font-display font-bold">Traitement actif</h1>
             <p className="text-sm text-muted-foreground">{patientName}</p>
           </div>
+          <Button onClick={() => setQuickApptOpen(true)} size="sm" className="gap-2">
+            <CalendarPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">Ajouter des rendez-vous</span>
+          </Button>
         </div>
 
         <PatientTraitementCard
@@ -202,6 +208,13 @@ export default function PatientTraitementActif() {
           open={createTraitementDialogOpen}
           onOpenChange={setCreateTraitementDialogOpen}
           onSuccess={handleCreateTraitementSuccess}
+        />
+
+        <QuickAppointmentsDialog
+          open={quickApptOpen}
+          onOpenChange={setQuickApptOpen}
+          patientId={id || ""}
+          patientName={patientName}
         />
       </div>
     </Layout>
