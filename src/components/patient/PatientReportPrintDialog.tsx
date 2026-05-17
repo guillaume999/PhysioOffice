@@ -305,15 +305,23 @@ export function PatientReportPrintDialog({
             const dateStr = seance.seance_date 
               ? new Date(seance.seance_date).toLocaleDateString("fr-FR") 
               : "____/____/________";
-            const objectifs = seance.objectifs_principaux.length > 0 
+            const objectifsPrincipaux = seance.objectifs_principaux.length > 0 
               ? escapeHtml(seance.objectifs_principaux.join(", ")) 
-              : escapeHtml(seance.pathologies.join(", ")) || "-";
+              : "-";
+            const objectifsSecondaires = seance.objectifs_secondaires.length > 0 
+              ? escapeHtml(seance.objectifs_secondaires.join(", ")) 
+              : "-";
+            const pathologies = seance.pathologies.length > 0 
+              ? escapeHtml(seance.pathologies.join(", ")) 
+              : "-";
             
             sections.push(`<tr>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${seance.ordre}</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">Séance</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${dateStr}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifs}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsPrincipaux}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsSecondaires}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${pathologies}</td>`);
             sections.push(`</tr>`);
           } else {
             const bilan = item.data;
