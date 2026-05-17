@@ -52,6 +52,7 @@ export function DatePickerInline({
         <Calendar
           mode="single"
           selected={date}
+          defaultMonth={date}
           onSelect={(d) => {
             if (d) onChange(format(d, "yyyy-MM-dd"));
             else onChange("");
