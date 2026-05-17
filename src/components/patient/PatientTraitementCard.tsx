@@ -97,6 +97,7 @@ interface PatientBilan {
 
 interface SeanceDate {
   id: string;
+  seance_id: string | null;
   seance_ordre: number;
   seance_date: string | null;
 }
@@ -203,7 +204,7 @@ export function PatientTraitementCard({
         // Fetch seance dates for this patient and traitement
         const { data: seanceDatesData } = await supabase
           .from("patient_traitement_seance_dates")
-          .select("id, seance_ordre, seance_date")
+          .select("id, seance_id, seance_ordre, seance_date")
           .eq("patient_id", patientId)
           .eq("traitement_id", activeTraitementId)
           .order("seance_ordre", { ascending: true });
@@ -365,11 +366,21 @@ export function PatientTraitementCard({
         
         // Create the date entry for this seance
         if (seanceDate) {
+          // Get the just-inserted traitement_seances row id so the date is bound to it
+          const { data: insertedTs } = await supabase
+            .from("traitement_seances")
+            .select("id")
+            .eq("traitement_type_id", traitement.id)
+            .eq("seance_type_id", newSeanceId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
           await supabase
             .from("patient_traitement_seance_dates")
             .insert({
               patient_id: patientId,
               traitement_id: traitement.id,
+              seance_id: insertedTs?.id ?? null,
               seance_ordre: nextOrdre,
               seance_date: seanceDate,
               user_id: user.id
