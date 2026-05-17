@@ -260,6 +260,8 @@ export default function Planning() {
       }
       
       setIsDuplicateDialogOpen(false);
+      // Jump the view to the target date so the user immediately sees the duplicates
+      setCurrentDate(targetDate);
       fetchAppointments();
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
