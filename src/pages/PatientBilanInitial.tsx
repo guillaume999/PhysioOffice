@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
 
 interface BilanEntry {
   id: string;
@@ -48,6 +48,7 @@ interface BilanData {
   examen_complementaire: string;
   ttt_deja_suivis: string;
   projets_attentes: string;
+  histoire_patient: string;
   
   // Bilan douleurs - tableau dynamique
   douleurs_entries: BilanEntry[];
@@ -105,6 +106,7 @@ const defaultBilan: BilanData = {
   examen_complementaire: "",
   ttt_deja_suivis: "",
   projets_attentes: "",
+  histoire_patient: "",
   douleurs_entries: [{ id: generateId(), zone: "", observation: "" }],
   morphodynamique_entries: [{ id: generateId(), zone: "", observation: "" }],
   morphostatique_entries: [{ id: generateId(), zone: "", observation: "" }],
@@ -439,6 +441,24 @@ export default function PatientBilanInitial() {
                   className="mt-1"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Histoire du patient */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Histoire du patient
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Histoire complète du patient : antécédents personnels et familiaux, événements de vie marquants, habitudes, contexte socio-professionnel..."
+                value={bilan.histoire_patient}
+                onChange={(e) => handleChange("histoire_patient", e.target.value)}
+                className="mt-1 min-h-[120px]"
+              />
             </CardContent>
           </Card>
 
