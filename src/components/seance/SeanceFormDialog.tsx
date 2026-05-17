@@ -408,7 +408,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
       onOpenChange(false);
       resetForm();
-      onSuccess(showDateField ? seanceDate : undefined);
+      onSuccess(showDateField ? seanceDate : undefined, seance?.id ? undefined : (newSeance?.id as string | undefined));
     } catch (error) {
       console.error("Error saving seance:", error);
       toast.error("Erreur lors de l'enregistrement");
