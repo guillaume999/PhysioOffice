@@ -1085,9 +1085,10 @@ export function PatientTraitementCard({
                         
                         const items: CombinedItem[] = [];
                         
-                        // Add seances
+                        // Add seances — match dates by the seance's actual `ordre`,
+                        // not by array index, since ordres can have gaps or duplicates.
                         traitement.seances?.forEach((seance, i) => {
-                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === i + 1);
+                          const seanceDate = traitement.seanceDates.find(sd => sd.seance_ordre === seance.ordre);
                           items.push({
                             type: 'seance',
                             data: seance,
