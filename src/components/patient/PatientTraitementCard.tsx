@@ -163,7 +163,7 @@ export function PatientTraitementCard({
 
   useEffect(() => {
     if (activeTraitementId) {
-      fetchTraitementDetails();
+      fetchTraitementDetails(true);
     } else {
       setTraitement(null);
     }
