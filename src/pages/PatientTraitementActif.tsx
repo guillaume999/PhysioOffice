@@ -215,6 +215,7 @@ export default function PatientTraitementActif() {
           onOpenChange={setQuickApptOpen}
           patientId={id || ""}
           patientName={patientName}
+          traitementId={activeTraitementId}
         />
       </div>
     </Layout>
