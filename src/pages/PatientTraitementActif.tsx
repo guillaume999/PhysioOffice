@@ -25,6 +25,7 @@ export default function PatientTraitementActif() {
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
   const [createTraitementDialogOpen, setCreateTraitementDialogOpen] = useState(false);
   const [quickApptOpen, setQuickApptOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -188,6 +189,7 @@ export default function PatientTraitementActif() {
         </div>
 
         <PatientTraitementCard
+          key={refreshKey}
           activeTraitementId={activeTraitementId}
           activeTraitementName={activeTraitementName}
           patientId={id || ""}
@@ -216,6 +218,7 @@ export default function PatientTraitementActif() {
           patientId={id || ""}
           patientName={patientName}
           traitementId={activeTraitementId}
+          onCreated={() => setRefreshKey((k) => k + 1)}
         />
       </div>
     </Layout>
