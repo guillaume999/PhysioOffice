@@ -172,6 +172,7 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
           comment: templateSeance.comment,
           is_hidden_from_list: true,
           is_shared: false,
+          is_copy: true,
         })
         .select("id")
         .single();
