@@ -48,7 +48,7 @@ interface SeanceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seance?: SeanceFormData | null;
-  onSuccess: (seanceDate?: string) => void;
+  onSuccess: (seanceDate?: string, newSeanceId?: string) => void;
   initialDate?: string;
   showDateField?: boolean;
   initialPathologies?: string[];
