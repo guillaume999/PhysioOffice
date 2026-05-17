@@ -345,6 +345,8 @@ export function PatientReportPrintDialog({
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">Bilan intermédiaire</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${dateStr}</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${objectifInter}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
             sections.push(`</tr>`);
           }
         });
