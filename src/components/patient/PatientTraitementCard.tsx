@@ -323,44 +323,27 @@ export function PatientTraitementCard({
     setSeanceFormDialogOpen(true);
   };
 
-  const handleSeanceFormSuccess = async (seanceDate?: string) => {
+  const handleSeanceFormSuccess = async (seanceDate?: string, newSeanceId?: string) => {
     if (!user || !traitement) return;
     
     // If we created a new copy, we need to update the traitement_seances
     if (editingSeanceIndex !== null) {
-      // Fetch the latest seance created by this user
-      const { data: latestSeance } = await supabase
-        .from("seance_types")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (latestSeance && traitement.seances[editingSeanceIndex]) {
+      if (newSeanceId && traitement.seances[editingSeanceIndex]) {
         // Update the traitement_seances to point to the new seance
         await supabase
           .from("traitement_seances")
-          .update({ seance_type_id: latestSeance.id })
+          .update({ seance_type_id: newSeanceId })
           .eq("id", traitement.seances[editingSeanceIndex].id);
         
         // Mark the new seance as hidden from list
         await supabase
           .from("seance_types")
           .update({ is_hidden_from_list: true })
-          .eq("id", latestSeance.id);
+          .eq("id", newSeanceId);
       }
     } else {
       // Adding a new seance to the treatment
-      const { data: latestSeance } = await supabase
-        .from("seance_types")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (latestSeance) {
+      if (newSeanceId) {
         // Calculate the next ordre
         const nextOrdre = (traitement.seances?.length || 0) + 1;
         
@@ -369,7 +352,7 @@ export function PatientTraitementCard({
           .from("traitement_seances")
           .insert({
             traitement_type_id: traitement.id,
-            seance_type_id: latestSeance.id,
+            seance_type_id: newSeanceId,
             ordre: nextOrdre
           });
         
@@ -377,7 +360,7 @@ export function PatientTraitementCard({
         await supabase
           .from("seance_types")
           .update({ is_hidden_from_list: true })
-          .eq("id", latestSeance.id);
+          .eq("id", newSeanceId);
         
         // Create the date entry for this seance
         if (seanceDate) {
