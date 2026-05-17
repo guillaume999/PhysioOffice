@@ -273,20 +273,28 @@ export function PatientReportPrintDialog({
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs</th>`);
         sections.push(`</tr></thead><tbody>`);
         
-        // Create combined list of seances and bilans sorted by position
-        const items: Array<{ type: 'seance' | 'bilan'; ordre: number; data: any }> = [];
+        // Create combined list of seances and bilans sorted by date (chronological)
+        const items: Array<{ type: 'seance' | 'bilan'; ordre: number; date: string | null; data: any }> = [];
         
         traitementSeances.forEach((seance) => {
-          items.push({ type: 'seance', ordre: seance.ordre, data: seance });
+          items.push({ type: 'seance', ordre: seance.ordre, date: seance.seance_date, data: seance });
         });
         
         bilansIntermediaires.forEach((bilan) => {
-          // Insert bilan after the corresponding seance
-          items.push({ type: 'bilan', ordre: bilan.position_after_seance + 0.5, data: bilan });
+          items.push({ type: 'bilan', ordre: bilan.position_after_seance + 0.5, date: bilan.bilan_date, data: bilan });
         });
         
-        // Sort by ordre to interleave seances and bilans
-        items.sort((a, b) => a.ordre - b.ordre);
+        // Sort chronologically by date; items without a date fall back to their ordre, after dated items
+        items.sort((a, b) => {
+          if (a.date && b.date) {
+            const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
+            if (diff !== 0) return diff;
+            return a.ordre - b.ordre;
+          }
+          if (a.date && !b.date) return -1;
+          if (!a.date && b.date) return 1;
+          return a.ordre - b.ordre;
+        });
         
         items.forEach((item) => {
           if (item.type === 'seance') {
