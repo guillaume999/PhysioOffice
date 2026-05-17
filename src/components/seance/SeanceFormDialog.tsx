@@ -48,7 +48,7 @@ interface SeanceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seance?: SeanceFormData | null;
-  onSuccess: (seanceDate?: string) => void;
+  onSuccess: (seanceDate?: string, newSeanceId?: string) => void;
   initialDate?: string;
   showDateField?: boolean;
   initialPathologies?: string[];
@@ -344,7 +344,8 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         toast.success("Séance modifiée avec succès");
       } else {
         // Create new seance
-        const { data: newSeance, error: insertError } = await supabase
+        var newSeance: { id: string } | null = null;
+        const { data: createdSeance, error: insertError } = await supabase
           .from("seance_types")
           .insert({
             user_id: user.id,
@@ -363,6 +364,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
           .single();
 
         if (insertError) throw insertError;
+        newSeance = createdSeance as { id: string } | null;
 
         // Insert exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
@@ -392,7 +394,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
           }
           
           await supabase.from("seance_exercices").insert({
-            seance_type_id: newSeance.id,
+            seance_type_id: newSeance!.id,
             exercice_id: exerciceId,
             name: ex.name,
             description: ex.description,
@@ -408,7 +410,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
       onOpenChange(false);
       resetForm();
-      onSuccess(showDateField ? seanceDate : undefined);
+      onSuccess(showDateField ? seanceDate : undefined, seance?.id ? undefined : (newSeance?.id as string | undefined));
     } catch (error) {
       console.error("Error saving seance:", error);
       toast.error("Erreur lors de l'enregistrement");
