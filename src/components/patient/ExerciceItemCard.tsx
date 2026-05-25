@@ -119,7 +119,7 @@ export function ExerciceItemCard({
       if (cancelled) return;
       setAvailableExercices((exData as ExerciceOption[]) || []);
       setAvailablePathologies([
-        ...new Set((pathoData?.map((p: { name: string }) => p.name) || [])),
+        ...new Set((((pathoData as any[]) ?? []).map((p: any) => p.name as string))),
       ]);
       // Pre-load existing pathology tags from the linked exercise
       if (exercice.exercice_id) {
