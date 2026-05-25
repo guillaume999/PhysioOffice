@@ -21,6 +21,59 @@ type Row = Record<string, any>;
 
 type QueryResult = { data: any; error: any; count: number | null };
 
+// ---------------------------------------------------------------------------
+// Field name translation: app (Supabase convention) <-> PocketBase storage.
+// Keys = name used in app code; values = real column name in PocketBase.
+// ---------------------------------------------------------------------------
+const APP_TO_PB: Record<string, string> = {
+  created_at: "created",
+  updated_at: "updated",
+  has_mutual: "mutuelle",
+  remaining_sessions: "seances_restantes",
+};
+const PB_TO_APP: Record<string, string> = Object.fromEntries(
+  Object.entries(APP_TO_PB).map(([k, v]) => [v, k])
+);
+
+/** App field name → PocketBase column name. */
+function toPb(field: string): string {
+  return APP_TO_PB[field] ?? field;
+}
+/** PocketBase column name → app field name. */
+function fromPb(field: string): string {
+  return PB_TO_APP[field] ?? field;
+}
+/** Translate a write payload from app → PocketBase. */
+function mapPayloadToPb(row: Row): Row {
+  const out: Row = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[toPb(k)] = v;
+  }
+  return out;
+}
+/** Translate a single record (or null) from PocketBase → app. */
+function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
+  if (!rec || typeof rec !== "object") return rec;
+  const out: Row = {};
+  for (const [k, v] of Object.entries(rec)) {
+    out[fromPb(k)] = v;
+  }
+  return out as T;
+}
+/** Translate a list of records from PocketBase → app. */
+function mapRecordsFromPb(items: any[]): any[] {
+  return items.map((r) => mapRecordFromPb(r));
+}
+/** Rewrite a PocketBase filter expression string, replacing app field names. */
+function translateFilterExpr(expr: string): string {
+  let out = expr;
+  for (const [app, pb] of Object.entries(APP_TO_PB)) {
+    // word-boundary replace so we don't touch substrings inside values
+    out = out.replace(new RegExp(`\\b${app}\\b`, "g"), pb);
+  }
+  return out;
+}
+
 function pbErrorToSupabase(err: unknown): { message: string; code?: string; details?: string } {
   if (err instanceof ClientResponseError) {
     // PocketBase wraps field-level errors in err.data.data — surface them
@@ -85,7 +138,11 @@ class QueryBuilder {
       .split(",")
       .map((f) => f.trim())
       .filter((f) => f && !f.includes("("));
-    this.selectFields = top.includes("*") || top.length === 0 ? "" : top.join(",");
+    // Translate app field names → PocketBase column names for the `fields` param.
+    this.selectFields =
+      top.includes("*") || top.length === 0
+        ? ""
+        : top.map((f) => toPb(f)).join(",");
     if (this.mode !== "insert" && this.mode !== "update" && this.mode !== "upsert" && this.mode !== "delete") {
       this.mode = "select";
     } else {
@@ -150,7 +207,7 @@ class QueryBuilder {
 
   order(col: string, opts?: { ascending?: boolean }): this {
     const prefix = opts?.ascending === false ? "-" : "+";
-    this.orderBy.push(`${prefix}${col}`);
+    this.orderBy.push(`${prefix}${toPb(col)}`);
     return this;
   }
   limit(n: number): this { this.limitN = n; return this; }
@@ -161,16 +218,17 @@ class QueryBuilder {
   private buildFilter(): string {
     return this.filters
       .map((f) => {
-        if (f.op === "raw") return f.val;
+        if (f.op === "raw") return translateFilterExpr(String(f.val));
+        const col = toPb(f.col);
         if (f.op === "in") {
           const arr = f.val as any[];
-          if (arr.length === 0) return `${f.col} = "__never__"`;
-          return "(" + arr.map((v) => `${f.col} = ${escapeFilterValue(v)}`).join(" || ") + ")";
+          if (arr.length === 0) return `${col} = "__never__"`;
+          return "(" + arr.map((v) => `${col} = ${escapeFilterValue(v)}`).join(" || ") + ")";
         }
         if (f.val === null) {
-          return f.op === "=" ? `${f.col} = null` : `${f.col} != null`;
+          return f.op === "=" ? `${col} = null` : `${col} != null`;
         }
-        return `${f.col} ${f.op} ${escapeFilterValue(f.val)}`;
+        return `${col} ${f.op} ${escapeFilterValue(f.val)}`;
       })
       .join(" && ");
   }
@@ -187,7 +245,7 @@ class QueryBuilder {
         if (this.singleMode !== "none") {
           try {
             const item = await coll.getFirstListItem(filter ?? "", { sort, fields });
-            return { data: item, error: null, count: 1 };
+            return { data: mapRecordFromPb(item), error: null, count: 1 };
           } catch (e) {
             if (e instanceof ClientResponseError && e.status === 404) {
               if (this.singleMode === "maybe") return { data: null, error: null, count: 0 };
@@ -201,11 +259,11 @@ class QueryBuilder {
           const perPage = this.limitN ?? ((this.rangeTo ?? 0) - (this.rangeFrom ?? 0) + 1);
           const page = this.rangeFrom !== null ? Math.floor(this.rangeFrom / perPage) + 1 : 1;
           const res = await coll.getList(page, perPage, { filter, sort, fields });
-          return { data: res.items, error: null, count: res.totalItems };
+          return { data: mapRecordsFromPb(res.items), error: null, count: res.totalItems };
         }
 
         const items = await coll.getFullList({ filter, sort, fields, batch: 500 });
-        return { data: items, error: null, count: items.length };
+        return { data: mapRecordsFromPb(items), error: null, count: items.length };
       }
 
       if (this.mode === "insert" || this.mode === "upsert") {
@@ -227,8 +285,8 @@ class QueryBuilder {
           ) {
             clean.user = currentUserId;
           }
-          const rec = await coll.create(clean);
-          created.push(rec);
+          const rec = await coll.create(mapPayloadToPb(clean));
+          created.push(mapRecordFromPb(rec));
         }
         if (this.singleMode !== "none") return { data: created[0] ?? null, error: null, count: created.length };
         return { data: this.returning || this.selectFields ? created : null, error: null, count: created.length };
@@ -240,10 +298,11 @@ class QueryBuilder {
         const matches = await coll.getFullList({ filter, batch: 500 });
         const clean: Row = {};
         Object.entries(this.payload as Row).forEach(([k, v]) => { if (v !== undefined) clean[k] = v; });
+        const pbPayload = mapPayloadToPb(clean);
         const updated: any[] = [];
         for (const m of matches) {
-          const rec = await coll.update(m.id, clean);
-          updated.push(rec);
+          const rec = await coll.update(m.id, pbPayload);
+          updated.push(mapRecordFromPb(rec));
         }
         if (this.singleMode !== "none") return { data: updated[0] ?? null, error: null, count: updated.length };
         return { data: this.returning || this.selectFields ? updated : null, error: null, count: updated.length };
@@ -290,7 +349,7 @@ function currentSession() {
     token_type: "bearer",
     expires_in: 3600,
     expires_at: 0,
-    user: model,
+    user: mapRecordFromPb(model),
   };
 }
 
@@ -309,7 +368,7 @@ const authApi = {
     if (!pb.authStore.isValid || !rec) {
       return { data: { user: null }, error: null };
     }
-    return { data: { user: rec }, error: null };
+    return { data: { user: mapRecordFromPb(rec) }, error: null };
   },
   onAuthStateChange(cb: AuthChangeCallback) {
     authListeners.add(cb);
@@ -326,7 +385,7 @@ const authApi = {
   async signInWithPassword({ email, password }: { email: string; password: string }) {
     try {
       const auth = await pb.collection("users").authWithPassword(email, password);
-      return { data: { user: auth.record, session: currentSession() }, error: null };
+      return { data: { user: mapRecordFromPb(auth.record as any), session: currentSession() }, error: null };
     } catch (e) {
       return { data: { user: null, session: null }, error: pbErrorToSupabase(e) };
     }
