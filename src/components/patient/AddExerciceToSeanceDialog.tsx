@@ -115,7 +115,7 @@ export function AddExerciceToSeanceDialog({
       .from("pathologies")
       .select("name")
       .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
+    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
 
     setLoading(false);
   };
