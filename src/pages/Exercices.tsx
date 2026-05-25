@@ -199,7 +199,7 @@ export default function Exercices() {
       const { data: pathoData } = await supabase
         .from("pathologies")
         .select("name");
-      setPathologies([...new Set(pathoData?.map((p) => p.name) || [])]);
+      setPathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");

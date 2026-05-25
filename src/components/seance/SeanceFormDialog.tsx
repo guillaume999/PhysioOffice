@@ -117,7 +117,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       .from("pathologies")
       .select("name")
       .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(pathoData?.map(p => p.name) || [])]);
+    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
 
     // Fetch objectifs
     const { data: objData } = await supabase
@@ -125,8 +125,9 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       .select("name, type")
       .eq("user_id", user.id);
     
-    const principaux = objData?.filter(o => o.type === "principal").map(o => o.name) || [];
-    const secondaires = objData?.filter(o => o.type === "secondaire").map(o => o.name) || [];
+    const objArr = (objData as any[]) ?? [];
+    const principaux = objArr.filter((o: any) => o.type === "principal").map((o: any) => o.name as string);
+    const secondaires = objArr.filter((o: any) => o.type === "secondaire").map((o: any) => o.name as string);
     setAvailableObjectifsPrincipaux([...new Set(principaux)]);
     setAvailableObjectifsSecondaires([...new Set(secondaires)]);
 

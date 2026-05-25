@@ -138,7 +138,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
       .from("pathologies")
       .select("name")
       .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(pathoData?.map(p => p.name) || [])]);
+    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
 
     // Fetch seances (user's own seances)
     const { data: seancesData } = await supabase

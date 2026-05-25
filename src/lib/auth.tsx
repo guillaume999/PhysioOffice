@@ -1,6 +1,21 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+// Locally-typed Supabase-compatible shapes (we no longer use @supabase/supabase-js).
+// User is now a PocketBase record; Session is a minimal token holder.
+export type User = {
+  id: string;
+  email?: string;
+  [key: string]: any;
+};
+export type Session = {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  expires_at?: number;
+  user: User;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -13,12 +28,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to clear all Supabase auth data from localStorage
+// Helper to clear any stale Supabase auth data from localStorage (legacy cleanup)
 function clearLocalAuthData() {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+    if (key && (key.startsWith('sb-') || key.includes('supabase') || key === 'pocketbase_auth')) {
       keysToRemove.push(key);
     }
   }
