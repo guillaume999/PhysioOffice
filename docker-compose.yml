@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  physiooffice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_PB_URL: ${VITE_PB_URL:-http://localhost:8090}
+    container_name: physiooffice
+    ports:
+      - "8080:8081"
+    restart: unless-stopped
+    environment:
+      - NGINX_ENTRYPOINT_QUIET_LOGS=1
