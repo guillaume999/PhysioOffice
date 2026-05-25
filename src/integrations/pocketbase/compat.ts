@@ -189,10 +189,22 @@ class QueryBuilder {
       if (this.mode === "insert" || this.mode === "upsert") {
         const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
         const created: any[] = [];
+        const currentUserId =
+          (pb.authStore as any).record?.id ?? (pb.authStore as any).model?.id ?? null;
         for (const row of rows) {
           // Strip undefined fields
           const clean: Row = {};
           Object.entries(row).forEach(([k, v]) => { if (v !== undefined) clean[k] = v; });
+          // Auto-inject the authenticated user id when not provided and
+          // we're not writing to the users collection itself.
+          if (
+            currentUserId &&
+            this.collection !== "users" &&
+            clean.user === undefined &&
+            clean.user_id === undefined
+          ) {
+            clean.user = currentUserId;
+          }
           const rec = await coll.create(clean);
           created.push(rec);
         }
