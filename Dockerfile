@@ -6,13 +6,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lock ./
-RUN apk add --no-cache bash curl \
-    && curl -fsSL https://bun.sh/install | bash \
-    && mv /root/.bun/bin/bun /usr/local/bin/bun
-
-RUN bun install
+# Install dependencies with npm
+COPY package.json package-lock.json* ./
+RUN npm install
 
 # Copy source
 COPY . .
@@ -20,7 +16,7 @@ COPY . .
 # Build the app with PocketBase URL injected at build time
 ARG VITE_PB_URL
 ENV VITE_PB_URL=${VITE_PB_URL}
-RUN bun run build
+RUN npm run build
 
 # ── Stage 2: Serve with nginx ────────────────────────────────────
 FROM nginx:alpine
