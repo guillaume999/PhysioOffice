@@ -275,7 +275,7 @@ const authApi = {
     return {
       data: {
         subscription: {
-          unsubscribe: () => authListeners.delete(cb),
+          unsubscribe: () => { authListeners.delete(cb); },
         },
       },
     };
@@ -313,7 +313,7 @@ const authApi = {
     pb.authStore.clear();
     return { error: null };
   },
-  async resetPasswordForEmail(email: string) {
+  async resetPasswordForEmail(email: string, _opts?: { redirectTo?: string }) {
     try {
       await pb.collection("users").requestPasswordReset(email);
       return { data: {}, error: null };
