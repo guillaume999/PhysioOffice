@@ -81,8 +81,12 @@ function mapPayloadToPb(row: Row): Row {
 /** Translate a single record (or null) from PocketBase → app. */
 function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   if (!rec || typeof rec !== "object") return rec;
+  // PocketBase returns RecordModel class instances; spread first to
+  // capture all enumerable own properties (id, collectionId, custom fields…)
+  // then translate column names back to the app convention.
+  const plain: Row = { ...(rec as any) };
   const out: Row = {};
-  for (const [k, v] of Object.entries(rec)) {
+  for (const [k, v] of Object.entries(plain)) {
     out[fromPb(k)] = v;
   }
   return out as T;
@@ -286,11 +290,15 @@ class QueryBuilder {
           const perPage = this.limitN ?? ((this.rangeTo ?? 0) - (this.rangeFrom ?? 0) + 1);
           const page = this.rangeFrom !== null ? Math.floor(this.rangeFrom / perPage) + 1 : 1;
           const res = await coll.getList(page, perPage, { filter, sort, fields });
-          return { data: mapRecordsFromPb(res.items), error: null, count: res.totalItems };
+          const data = mapRecordsFromPb(res.items);
+          console.debug(`[pb-compat] ${this.collection} getList →`, { totalItems: res.totalItems, returned: data.length });
+          return { data, error: null, count: res.totalItems };
         }
 
         const items = await coll.getFullList({ filter, sort, fields, batch: 500 });
-        return { data: mapRecordsFromPb(items), error: null, count: items.length };
+        const data = mapRecordsFromPb(items);
+        console.debug(`[pb-compat] ${this.collection} getFullList →`, { count: items.length, returned: data.length, first: data[0] });
+        return { data, error: null, count: items.length };
       }
 
       if (this.mode === "insert" || this.mode === "upsert") {
