@@ -23,10 +23,32 @@ type QueryResult = { data: any; error: any; count: number | null };
 
 function pbErrorToSupabase(err: unknown): { message: string; code?: string; details?: string } {
   if (err instanceof ClientResponseError) {
+    // PocketBase wraps field-level errors in err.data.data — surface them
+    // so the UI shows the actual reason (e.g. "users.name: field is required"
+    // or "Only superusers can perform this request") instead of the generic
+    // "Something went wrong while processing your request." message.
+    const data: any = err.data ?? {};
+    const fieldErrors = data?.data && typeof data.data === "object" ? data.data : null;
+    let message = data?.message || err.message;
+    if (fieldErrors) {
+      const parts = Object.entries(fieldErrors).map(([field, info]: [string, any]) => {
+        const msg = info?.message ?? JSON.stringify(info);
+        return `${field}: ${msg}`;
+      });
+      if (parts.length) message = `${message} — ${parts.join("; ")}`;
+    }
+    if (err.status === 403 || err.status === 401) {
+      message = `${message} (status ${err.status} — vérifier les règles d'accès de la collection "${(err as any).url ?? ""}" sur PocketBase)`;
+    }
+    if (err.status === 404) {
+      message = `${message} (404 — collection ou enregistrement introuvable)`;
+    }
+    // Log full payload to console for deeper debugging
+    console.error("[PocketBase error]", err.status, err.url, data);
     return {
-      message: err.message,
+      message,
       code: String(err.status),
-      details: JSON.stringify(err.data ?? {}),
+      details: JSON.stringify(data),
     };
   }
   return { message: err instanceof Error ? err.message : String(err) };
