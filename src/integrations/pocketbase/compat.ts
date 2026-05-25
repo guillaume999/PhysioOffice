@@ -19,7 +19,10 @@ import { pb } from "./client";
 
 type Row = Record<string, any>;
 
-type QueryResult = { data: any; error: any; count: number | null };
+type AnyArray = any[];
+type QueryResult = { data: AnyArray | any; error: any; count: number | null };
+type SingleResult = { data: any; error: any; count: number | null };
+type ListResult = { data: AnyArray; error: any; count: number | null };
 
 function pbErrorToSupabase(err: unknown): { message: string; code?: string; details?: string } {
   if (err instanceof ClientResponseError) {
@@ -231,13 +234,15 @@ class QueryBuilder {
     }
   }
 
-  then<TResult1 = QueryResult, TResult2 = never>(
-    onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
+  // Two overloaded then signatures depending on whether single() was called.
+  // When singleMode !== "none" data is a single record; otherwise data is an array.
+  then<TResult1 = ListResult | SingleResult, TResult2 = never>(
+    onfulfilled?: ((value: ListResult & SingleResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.exec().then(onfulfilled as any, onrejected as any) as Promise<TResult1 | TResult2>;
   }
-  catch<R = never>(onrejected?: ((r: any) => R | PromiseLike<R>) | null): Promise<QueryResult | R> {
+  catch<R = never>(onrejected?: ((r: any) => R | PromiseLike<R>) | null): Promise<any> {
     return this.exec().catch(onrejected as any) as any;
   }
 }
