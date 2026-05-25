@@ -39,17 +39,26 @@ const PB_TO_APP: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * Fields stored as PocketBase Select with capitalised values
- * ("Oui" / "Non" rather than "oui" / "non"). Values written to these
- * fields are auto-capitalised so legacy app code can keep sending lowercase.
+ * Explicit value mapping for PocketBase Select fields.
+ * The app uses English/snake_case values; PocketBase stores French
+ * capitalised labels. Lookup is case-insensitive on the source value.
  */
-const PB_SELECT_FIELDS = new Set<string>([
-  "prescription",
-]);
+const PB_VALUE_MAP: Record<string, Record<string, string>> = {
+  prescription: { none: "Non", non: "Non", yes: "Oui", oui: "Oui", no: "Non" },
+  status: {
+    active: "Actif",
+    actif: "Actif",
+    inactive: "Inactif",
+    inactif: "Inactif",
+    waiting: "En attente",
+    en_traitement: "En traitement",
+  },
+};
 
-function capitalizeSelect(value: any): any {
-  if (typeof value !== "string" || value.length === 0) return value;
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function mapSelectValue(pbField: string, value: any): any {
+  const dict = PB_VALUE_MAP[pbField];
+  if (!dict || typeof value !== "string") return value;
+  return dict[value] ?? dict[value.toLowerCase()] ?? value;
 }
 
 /** App field name → PocketBase column name. */
@@ -65,7 +74,7 @@ function mapPayloadToPb(row: Row): Row {
   const out: Row = {};
   for (const [k, v] of Object.entries(row)) {
     const pbKey = toPb(k);
-    out[pbKey] = PB_SELECT_FIELDS.has(pbKey) ? capitalizeSelect(v) : v;
+    out[pbKey] = pbKey in PB_VALUE_MAP ? mapSelectValue(pbKey, v) : v;
   }
   return out;
 }
