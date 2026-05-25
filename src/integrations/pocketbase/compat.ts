@@ -296,12 +296,59 @@ const authApi = {
   async signUp({ email, password, options }: { email: string; password: string; options?: any }) {
     try {
       const meta = options?.data ?? {};
-      const rec = await pb.collection("users").create({
+      // Map Supabase-style metadata to PocketBase default `users` collection fields.
+      // PocketBase's built-in users collection has: email, password, passwordConfirm,
+      // username, name, avatar, emailVisibility, verified.
+      // Custom fields (pseudo, first_name, last_name) are forwarded only if present —
+      // PocketBase will reject unknown fields, so we also expose `name` (full name)
+      // and `username` derived from the pseudo when provided.
+      const payload: Record<string, any> = {
         email,
         password,
         passwordConfirm: password,
-        ...meta,
-      });
+        emailVisibility: true,
+      };
+
+      const firstName = meta.first_name ?? meta.firstName;
+      const lastName = meta.last_name ?? meta.lastName;
+      const pseudo = meta.pseudo;
+
+      if (pseudo) {
+        payload.pseudo = pseudo;
+        // PocketBase requires `username` to be 3-150 chars, alphanumeric + _-.
+        payload.username = String(pseudo).toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 150);
+      }
+      if (firstName) payload.first_name = firstName;
+      if (lastName) payload.last_name = lastName;
+      const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+      if (fullName) payload.name = fullName;
+
+      // Forward any other metadata fields verbatim (caller's responsibility
+      // to ensure they exist on the PocketBase users collection).
+      for (const [k, v] of Object.entries(meta)) {
+        if (["first_name", "firstName", "last_name", "lastName", "pseudo"].includes(k)) continue;
+        if (v !== undefined && !(k in payload)) payload[k] = v;
+      }
+
+      let rec;
+      try {
+        rec = await pb.collection("users").create(payload);
+      } catch (e) {
+        // Retry without optional custom fields if PocketBase complains about unknown columns.
+        if (e instanceof ClientResponseError && e.status === 400) {
+          const minimal: Record<string, any> = {
+            email,
+            password,
+            passwordConfirm: password,
+            emailVisibility: true,
+          };
+          if (payload.username) minimal.username = payload.username;
+          if (payload.name) minimal.name = payload.name;
+          rec = await pb.collection("users").create(minimal);
+        } else {
+          throw e;
+        }
+      }
       try {
         await pb.collection("users").requestVerification(email);
       } catch {}
