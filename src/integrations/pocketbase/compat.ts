@@ -30,10 +30,27 @@ const APP_TO_PB: Record<string, string> = {
   updated_at: "updated",
   has_mutual: "mutuelle",
   remaining_sessions: "seances_restantes",
+  // PocketBase's auth relation is conventionally named `user`,
+  // while the app uses Supabase's `user_id` everywhere.
+  user_id: "user",
 };
 const PB_TO_APP: Record<string, string> = Object.fromEntries(
   Object.entries(APP_TO_PB).map(([k, v]) => [v, k])
 );
+
+/**
+ * Fields stored as PocketBase Select with capitalised values
+ * ("Oui" / "Non" rather than "oui" / "non"). Values written to these
+ * fields are auto-capitalised so legacy app code can keep sending lowercase.
+ */
+const PB_SELECT_FIELDS = new Set<string>([
+  "prescription",
+]);
+
+function capitalizeSelect(value: any): any {
+  if (typeof value !== "string" || value.length === 0) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 /** App field name → PocketBase column name. */
 function toPb(field: string): string {
@@ -47,7 +64,8 @@ function fromPb(field: string): string {
 function mapPayloadToPb(row: Row): Row {
   const out: Row = {};
   for (const [k, v] of Object.entries(row)) {
-    out[toPb(k)] = v;
+    const pbKey = toPb(k);
+    out[pbKey] = PB_SELECT_FIELDS.has(pbKey) ? capitalizeSelect(v) : v;
   }
   return out;
 }
