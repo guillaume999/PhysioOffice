@@ -213,7 +213,7 @@ export function PatientTraitementCard({
         // Fetch traitement_start_date from patient_care_plans
         const { data: carePlanData } = await supabase
           .from("patient_care_plans")
-          .select("traitement_start_date, created_by, user")
+          .select("traitement_start_date, user")
           .eq("patient_id", patientId)
           .maybeSingle();
 
@@ -245,8 +245,6 @@ export function PatientTraitementCard({
           seanceDates: seanceDatesData || [],
           traitement_start_date: carePlanData?.traitement_start_date || null,
           care_plan_author:
-            (carePlanData as any)?.created_by?.pseudo ||
-            (carePlanData as any)?.created_by?.name ||
             (carePlanData as any)?.user?.pseudo ||
             (carePlanData as any)?.user?.name ||
             null,

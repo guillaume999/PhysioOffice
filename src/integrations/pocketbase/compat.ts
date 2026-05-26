@@ -246,7 +246,7 @@ const AUTO_EXPAND: Record<string, string[]> = {
   traitement_types: ["created_by", "user"],
   seance_types: ["created_by", "user"],
   exercices: ["created_by", "user"],
-  patient_care_plans: ["created_by", "user"],
+  patient_care_plans: ["user"],
 };
 
 class QueryBuilder {
@@ -468,16 +468,6 @@ class QueryBuilder {
             clean.user_id === undefined
           ) {
             clean.user = currentUserId;
-          }
-          // Auto-inject the author (created_by) for collections that track
-          // the practitioner who created the record (e.g. patient_care_plans).
-          if (
-            currentUserId &&
-            this.collection === "patient_care_plans" &&
-            clean.created_by === undefined &&
-            clean.created_by_id === undefined
-          ) {
-            clean.created_by = currentUserId;
           }
           const rec = await coll.create(mapPayloadToPb(clean));
           created.push(mapRecordFromPb(rec));
