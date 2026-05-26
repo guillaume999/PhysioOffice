@@ -216,6 +216,7 @@ export function PatientTraitementCard({
           .select("traitement_start_date, user")
           .eq("patient_id", patientId)
           .maybeSingle();
+        console.log('[debug-author] care plan record:', JSON.stringify(carePlanData));
 
         // Fetch exercices for each seance
         const seancesWithExercices = await Promise.all(

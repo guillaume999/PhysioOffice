@@ -414,13 +414,19 @@ class QueryBuilder {
       if (this.mode === "select") {
         const filter = this.buildFilter() || undefined;
         const sort = this.orderBy.length ? this.orderBy.join(",") : undefined;
-        const fields = this.selectFields || undefined;
         // Auto-expand author relations for collections where the UI displays the creator.
         const autoExpand = AUTO_EXPAND[this.collection];
         const expandParts = new Set<string>();
         if (this.expandFields) this.expandFields.split(",").forEach((s) => s && expandParts.add(s));
         if (autoExpand) autoExpand.forEach((s) => expandParts.add(s));
         const expand = expandParts.size ? Array.from(expandParts).join(",") : undefined;
+        // When `fields` is set, PocketBase filters the response and drops the
+        // `expand` block unless we explicitly include it. Append `expand.*` so
+        // auto-expanded relations actually reach the client.
+        let fields = this.selectFields || undefined;
+        if (fields && expand) {
+          fields = `${fields},expand.*`;
+        }
 
         if (this.singleMode !== "none") {
           try {
