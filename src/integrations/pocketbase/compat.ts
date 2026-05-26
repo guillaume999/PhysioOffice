@@ -115,6 +115,13 @@ function mapPayloadToPb(row: Row): Row {
   }
   return out;
 }
+function normalizePbDate(value: unknown): unknown {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
+    return value.substring(0, 10);
+  }
+  return value;
+}
+
 /** Translate a single record (or null) from PocketBase → app. */
 function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   if (!rec || typeof rec !== "object") return rec;
@@ -127,7 +134,7 @@ function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   for (const [k, v] of Object.entries(plain)) {
     if (k === "expand") continue;
     const appKey = fromPb(k);
-    out[appKey] = PB_SELECT_FIELDS.has(k) ? mapSelectValueFromPb(v) : v;
+    out[appKey] = normalizePbDate(PB_SELECT_FIELDS.has(k) ? mapSelectValueFromPb(v) : v);
   }
   // Flatten expanded relations: PB `record.expand.patient` (object or array)
   // becomes `record.patient` so the app sees the joined data directly,
