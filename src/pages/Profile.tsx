@@ -81,27 +81,7 @@ export default function Profile() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate pseudo is required
-    if (!pseudo || pseudo.trim().length < 3) {
-      toast({
-        title: "Pseudo requis",
-        description: "Le pseudo doit contenir au moins 3 caractères",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    // Client-side validation for reserved pseudo
-    if (pseudo.toLowerCase() === "admin") {
-      toast({
-        title: "Pseudo non autorisé",
-        description: "Le pseudo 'admin' est réservé et ne peut pas être utilisé",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setSaving(true);
 
     try {
@@ -111,21 +91,16 @@ export default function Profile() {
           first_name: firstName,
           last_name: lastName,
           specialty: specialty,
-          pseudo: pseudo || null,
         })
         .eq("user_id", user!.id);
 
       if (error) {
         let errorMessage = "Impossible de mettre à jour le profil";
-        
+
         if (error.code === "23505") {
-          if (error.message.includes("idx_profiles_pseudo_unique")) {
-            errorMessage = "Ce pseudo est déjà utilisé par un autre utilisateur";
-          } else if (error.message.includes("idx_profiles_email_unique")) {
+          if (error.message.includes("idx_profiles_email_unique")) {
             errorMessage = "Cet email est déjà utilisé par un autre utilisateur";
           }
-        } else if (error.message.includes("admin")) {
-          errorMessage = "Le pseudo 'admin' est réservé et ne peut pas être utilisé";
         }
         
         toast({
@@ -258,17 +233,17 @@ export default function Profile() {
 
                 <div className="space-y-2">
                   <Label htmlFor="pseudo">Pseudo * (affiché comme auteur)</Label>
-                  <Input
-                    id="pseudo"
-                    value={pseudo}
-                    onChange={(e) => setPseudo(e.target.value)}
-                    placeholder="MonPseudo"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">Ce pseudo sera utilisé comme nom d'auteur pour vos séances, exercices et traitements partagés</p>
-                  {!pseudo && (
-                    <p className="text-xs text-amber-600">Le pseudo est obligatoire pour créer du contenu</p>
-                  )}
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="pseudo"
+                      value={pseudo}
+                      disabled
+                      readOnly
+                      className="pl-10 bg-muted"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Le pseudo ne peut pas être modifié</p>
                 </div>
 
                 <div className="space-y-2">
