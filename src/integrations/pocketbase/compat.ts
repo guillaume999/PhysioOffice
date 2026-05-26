@@ -111,10 +111,23 @@ function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   // capture all enumerable own properties (id, collectionId, custom fields…)
   // then translate column names back to the app convention.
   const plain: Row = { ...(rec as any) };
+  const expand: Row | undefined = plain.expand;
   const out: Row = {};
   for (const [k, v] of Object.entries(plain)) {
+    if (k === "expand") continue;
     const appKey = fromPb(k);
     out[appKey] = PB_SELECT_FIELDS.has(k) ? mapSelectValueFromPb(v) : v;
+  }
+  // Flatten expanded relations: PB `record.expand.patient` (object or array)
+  // becomes `record.patient` so the app sees the joined data directly,
+  // mirroring Supabase's `select('*, patients(*)')` shape. The FK string
+  // remains available under `<relation>_id` (e.g. `patient_id`).
+  if (expand && typeof expand === "object") {
+    for (const [relKey, relVal] of Object.entries(expand)) {
+      out[relKey] = Array.isArray(relVal)
+        ? relVal.map((r) => mapRecordFromPb(r))
+        : mapRecordFromPb(relVal as Row);
+    }
   }
   return out as T;
 }
