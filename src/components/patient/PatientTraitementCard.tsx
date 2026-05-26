@@ -113,6 +113,7 @@ interface TraitementDetails {
   bilans: PatientBilan[];
   seanceDates: SeanceDate[];
   traitement_start_date: string | null;
+  care_plan_author?: string | null;
 }
 
 interface PatientTraitementCardProps {
@@ -212,7 +213,7 @@ export function PatientTraitementCard({
         // Fetch traitement_start_date from patient_care_plans
         const { data: carePlanData } = await supabase
           .from("patient_care_plans")
-          .select("traitement_start_date")
+          .select("traitement_start_date, created_by, user")
           .eq("patient_id", patientId)
           .maybeSingle();
 
@@ -243,6 +244,12 @@ export function PatientTraitementCard({
           bilans: bilansData || [],
           seanceDates: seanceDatesData || [],
           traitement_start_date: carePlanData?.traitement_start_date || null,
+          care_plan_author:
+            (carePlanData as any)?.created_by?.name ||
+            (carePlanData as any)?.created_by?.email ||
+            (carePlanData as any)?.user?.name ||
+            (carePlanData as any)?.user?.email ||
+            null,
         });
       }
     } catch (error) {
@@ -1012,7 +1019,7 @@ export function PatientTraitementCard({
                        title="Date de début du traitement"
                      />
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate">par {traitement.author_name || "Anonyme"}</span>
+                      <span className="truncate">par {traitement.care_plan_author || traitement.author_name || "Anonyme"}</span>
                       <span>• {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances</span>
                     </div>
                   </div>
