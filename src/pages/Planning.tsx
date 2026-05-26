@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy, Share2, Pencil } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
@@ -38,11 +39,11 @@ interface Appointment {
 
 type ViewMode = "week" | "day";
 
-const TIME_SLOTS = Array.from({ length: 52 }, (_, i) => {
-  const hours = Math.floor(i / 4) + 7; // Start at 7:00
+const TIME_SLOTS = Array.from({ length: 96 }, (_, i) => {
+  const hours = Math.floor(i / 4); // 00:00 → 23:45
   const minutes = (i % 4) * 15;
   return { hours, minutes, label: `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}` };
-}).filter(slot => slot.hours < 20); // End at 19:45 (last slot before 20:00)
+});
 
 export default function Planning() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -91,10 +92,17 @@ export default function Planning() {
   const fetchAppointments = async () => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-    
+
+    const userId = pb.authStore.model?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
+      .eq("user_id", userId)
       .gte("start_time", weekStart.toISOString())
       .lte("start_time", weekEnd.toISOString())
       .order("start_time");
@@ -105,7 +113,8 @@ export default function Planning() {
       // Fetch patient info for each appointment
       const appointmentsWithPatients = await Promise.all(
         (data || []).map(async (apt) => {
-          const patient = patients.find(p => p.id === apt.patient_id) || 
+          if (!apt.patient_id) return { ...apt, patient: undefined };
+          const patient = patients.find(p => p.id === apt.patient_id) ||
             (await supabase.from("patients").select("id, name, numero, status").eq("id", apt.patient_id).single()).data;
           return { ...apt, patient: patient || undefined };
         })
