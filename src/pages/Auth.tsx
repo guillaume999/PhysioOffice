@@ -14,7 +14,11 @@ import { z } from "zod";
 const emailSchema = z.string().email("Email invalide").max(255, "Email trop long");
 const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
 const nameSchema = z.string().max(100, "Nom trop long").optional();
-const pseudoSchema = z.string().min(3, "Le pseudo doit contenir au moins 3 caractères").max(30, "Le pseudo ne doit pas dépasser 30 caractères");
+const pseudoSchema = z
+  .string()
+  .min(3, "Le pseudo doit contenir au moins 3 caractères")
+  .max(30, "Le pseudo ne doit pas dépasser 30 caractères")
+  .regex(/^[A-Za-z0-9-]+$/, "Le pseudo ne peut contenir que des lettres, chiffres et tirets");
 
 type AuthMode = "login" | "signup" | "forgot-password";
 
@@ -135,7 +139,20 @@ export default function Auth() {
       } else {
         const { error } = await signUp(email, password, firstName, lastName, pseudo);
         if (error) {
-          if (error.message.includes("User already registered")) {
+          const msg = error.message || "";
+          const details = (error as any).details || "";
+          const pseudoTaken =
+            /pseudo[\s\S]*validation_not_unique/i.test(details) ||
+            /pseudo[\s\S]*validation_not_unique/i.test(msg) ||
+            /pseudo[\s\S]*(déjà|already|unique)/i.test(msg);
+          if (pseudoTaken) {
+            setErrors((prev) => ({ ...prev, pseudo: "Ce pseudo est déjà pris" }));
+            toast({
+              title: "Pseudo indisponible",
+              description: "Ce pseudo est déjà pris",
+              variant: "destructive",
+            });
+          } else if (msg.includes("User already registered")) {
             toast({
               title: "Compte existant",
               description: "Un compte existe déjà avec cet email. Essayez de vous connecter.",
@@ -144,7 +161,7 @@ export default function Auth() {
           } else {
             toast({
               title: "Erreur",
-              description: error.message,
+              description: msg,
               variant: "destructive",
             });
           }
