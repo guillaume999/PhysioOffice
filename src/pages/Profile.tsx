@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { Loader2, User, Mail, Lock, Save, FileText } from "lucide-react";
 import { z } from "zod";
 import { PagePopup } from "@/components/popup/PagePopup";
@@ -57,22 +58,19 @@ export default function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, email, specialty, pseudo")
-        .eq("user_id", user!.id)
-        .single();
-
-      if (error && error.code !== "PGRST116") {
-        console.error("Error fetching profile:", error);
-      }
-
-      if (data) {
-        setProfile(data);
-        setFirstName(data.first_name || "");
-        setLastName(data.last_name || "");
-        setSpecialty(data.specialty || "");
-        setPseudo(data.pseudo || "");
+      const rec: any = pb.authStore.record ?? (pb.authStore as any).model ?? null;
+      if (rec) {
+        setProfile({
+          first_name: rec.first_name ?? null,
+          last_name: rec.last_name ?? null,
+          email: rec.email ?? null,
+          specialty: rec.specialty ?? null,
+          pseudo: rec.pseudo ?? null,
+        });
+        setFirstName(rec.first_name || "");
+        setLastName(rec.last_name || "");
+        setSpecialty(rec.specialty || "");
+        setPseudo(rec.pseudo || "");
       }
     } finally {
       setLoading(false);
@@ -85,35 +83,27 @@ export default function Profile() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          specialty: specialty,
-        })
-        .eq("user_id", user!.id);
-
-      if (error) {
-        let errorMessage = "Impossible de mettre à jour le profil";
-
-        if (error.code === "23505") {
-          if (error.message.includes("idx_profiles_email_unique")) {
-            errorMessage = "Cet email est déjà utilisé par un autre utilisateur";
-          }
-        }
-        
-        toast({
-          title: "Erreur",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Profil mis à jour",
-          description: "Vos informations ont été enregistrées",
-        });
-      }
+      const id = (pb.authStore.record ?? (pb.authStore as any).model)?.id;
+      if (!id) throw new Error("Utilisateur non authentifié");
+      await pb.collection("users").update(id, {
+        first_name: firstName,
+        last_name: lastName,
+        specialty: specialty,
+      });
+      try {
+        await pb.collection("users").authRefresh();
+      } catch {}
+      toast({
+        title: "Profil mis à jour",
+        description: "Vos informations ont été enregistrées",
+      });
+    } catch (err: any) {
+      console.error("Profile update failed:", err);
+      toast({
+        title: "Erreur",
+        description: err?.message || "Impossible de mettre à jour le profil",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
