@@ -39,26 +39,45 @@ const PB_TO_APP: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * Explicit value mapping for PocketBase Select fields.
+ * Bidirectional value mapping for PocketBase Select fields.
  * The app uses English/snake_case values; PocketBase stores French
- * capitalised labels. Lookup is case-insensitive on the source value.
+ * capitalised labels. PB stores mixed values across creates/updates,
+ * so we normalise on both directions.
  */
-const PB_VALUE_MAP: Record<string, Record<string, string>> = {
-  prescription: { none: "Non", non: "Non", yes: "Oui", oui: "Oui", no: "Non" },
-  status: {
-    active: "Actif",
-    actif: "Actif",
-    inactive: "Inactif",
-    inactif: "Inactif",
-    waiting: "En attente",
-    en_traitement: "En traitement",
-  },
+const PB_SELECT_FIELDS = new Set(["status", "prescription"]);
+
+// app value → PocketBase stored value (on write)
+const PB_VALUE_MAP: Record<string, string> = {
+  // status
+  active: "Actif",
+  inactive: "Inactif",
+  in_treatment: "En traitement",
+  en_traitement: "En traitement",
+  waiting: "En attente",
+  // prescription
+  none: "Non",
+  None: "Non",
+  yes: "Oui",
+  no: "Non",
 };
 
-function mapSelectValue(pbField: string, value: any): any {
-  const dict = PB_VALUE_MAP[pbField];
-  if (!dict || typeof value !== "string") return value;
-  return dict[value] ?? dict[value.toLowerCase()] ?? value;
+// PocketBase stored value → app value (on read)
+const PB_VALUE_MAP_INVERSE: Record<string, string> = {
+  Actif: "active",
+  Inactif: "inactive",
+  "En traitement": "in_treatment",
+  "En attente": "waiting",
+  Oui: "yes",
+  Non: "none",
+};
+
+function mapSelectValueToPb(value: any): any {
+  if (typeof value !== "string") return value;
+  return PB_VALUE_MAP[value] ?? PB_VALUE_MAP[value.toLowerCase()] ?? value;
+}
+function mapSelectValueFromPb(value: any): any {
+  if (typeof value !== "string") return value;
+  return PB_VALUE_MAP_INVERSE[value] ?? value;
 }
 
 /** App field name → PocketBase column name. */
@@ -74,7 +93,7 @@ function mapPayloadToPb(row: Row): Row {
   const out: Row = {};
   for (const [k, v] of Object.entries(row)) {
     const pbKey = toPb(k);
-    out[pbKey] = pbKey in PB_VALUE_MAP ? mapSelectValue(pbKey, v) : v;
+    out[pbKey] = PB_SELECT_FIELDS.has(pbKey) ? mapSelectValueToPb(v) : v;
   }
   return out;
 }
@@ -87,7 +106,8 @@ function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   const plain: Row = { ...(rec as any) };
   const out: Row = {};
   for (const [k, v] of Object.entries(plain)) {
-    out[fromPb(k)] = v;
+    const appKey = fromPb(k);
+    out[appKey] = PB_SELECT_FIELDS.has(k) ? mapSelectValueFromPb(v) : v;
   }
   return out as T;
 }
