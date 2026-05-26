@@ -239,6 +239,15 @@ function singularizeRelation(name: string): string {
 
 type Filter = { op: string; col: string; val: any };
 
+// Collections whose records reference an author/owner that the UI displays.
+// Auto-add these relations to PocketBase `expand` so `record.expand.<rel>` is
+// populated and flattened by mapRecordFromPb.
+const AUTO_EXPAND: Record<string, string[]> = {
+  traitement_types: ["created_by", "user"],
+  seance_types: ["created_by", "user"],
+  exercices: ["created_by", "user"],
+};
+
 class QueryBuilder {
   private filters: Filter[] = [];
   private orderBy: string[] = [];
