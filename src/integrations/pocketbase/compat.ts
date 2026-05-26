@@ -40,6 +40,13 @@ const APP_TO_PB: Record<string, string> = {
   seance_id: "seance",
   seance_type_id: "seance_type",
   exercice_id: "exercice",
+  active_traitement_id: "active_traitement",
+  original_id: "original",
+  video_id: "video",
+  conversation_id: "conversation",
+  owner_user_id: "owner_user",
+  shared_with_user_id: "shared_with_user",
+  created_by_id: "created_by",
 };
 const PB_TO_APP: Record<string, string> = Object.fromEntries(
   Object.entries(APP_TO_PB).map(([k, v]) => [v, k])
@@ -89,7 +96,11 @@ function mapSelectValueFromPb(value: any): any {
 
 /** App field name → PocketBase column name. */
 function toPb(field: string): string {
-  return APP_TO_PB[field] ?? field;
+  if (APP_TO_PB[field]) return APP_TO_PB[field];
+  // Generic fallback: Supabase uses `<relation>_id`, PocketBase uses `<relation>`.
+  // Strip trailing `_id` so unknown FK fields still map correctly on write.
+  if (field.endsWith("_id") && field !== "id") return field.slice(0, -3);
+  return field;
 }
 /** PocketBase column name → app field name. */
 function fromPb(field: string): string {
