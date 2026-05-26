@@ -471,6 +471,23 @@ class QueryBuilder {
 
       return { data: null, error: { message: `Unknown mode ${this.mode}` }, count: 0 };
     } catch (e) {
+      // A 404 here means the PocketBase collection does not exist (or the
+      // record was not found by id). For read queries, fall back to an empty
+      // result so unrelated parts of the page can still render instead of
+      // crashing on a missing optional collection.
+      if (
+        e instanceof ClientResponseError &&
+        e.status === 404 &&
+        this.mode === "select"
+      ) {
+        console.warn(
+          `[pb-compat] collection "${this.collection}" 404 — returning empty result`
+        );
+        if (this.singleMode !== "none") {
+          return { data: null, error: null, count: 0 };
+        }
+        return { data: [], error: null, count: 0 };
+      }
       return { data: null, error: pbErrorToSupabase(e), count: 0 };
     }
   }
