@@ -405,7 +405,12 @@ class QueryBuilder {
         const filter = this.buildFilter() || undefined;
         const sort = this.orderBy.length ? this.orderBy.join(",") : undefined;
         const fields = this.selectFields || undefined;
-        const expand = this.expandFields || undefined;
+        // Auto-expand author relations for collections where the UI displays the creator.
+        const autoExpand = AUTO_EXPAND[this.collection];
+        const expandParts = new Set<string>();
+        if (this.expandFields) this.expandFields.split(",").forEach((s) => s && expandParts.add(s));
+        if (autoExpand) autoExpand.forEach((s) => expandParts.add(s));
+        const expand = expandParts.size ? Array.from(expandParts).join(",") : undefined;
 
         if (this.singleMode !== "none") {
           try {
