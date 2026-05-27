@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { PagePopup } from "@/components/popup/PagePopup";
 
@@ -67,6 +69,16 @@ export default function Planning() {
   const [sourceDate, setSourceDate] = useState<Date | undefined>(new Date());
   const [targetDate, setTargetDate] = useState<Date | undefined>(addDays(new Date(), 7));
   const [isDuplicating, setIsDuplicating] = useState(false);
+
+  // ===== Print options =====
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [printStartHour, setPrintStartHour] = useState<number>(7);
+  const [printEndHour, setPrintEndHour] = useState<number>(20);
+  const [printFontSize, setPrintFontSize] = useState<"sm" | "md" | "lg">("md");
+  // Indices 0..6 (Mon..Sun) of weekDays the user wants printed
+  const [printDayIndices, setPrintDayIndices] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  // When true, the table is rendered with the print filters applied
+  const [printMode, setPrintMode] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -213,7 +225,23 @@ export default function Planning() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setIsPrintDialogOpen(true);
+  };
+
+  const launchPrint = () => {
+    setIsPrintDialogOpen(false);
+    setPrintMode(true);
+    // Let React commit the filtered DOM before opening the system print dialog
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintMode(false), 300);
+    }, 100);
+  };
+
+  const togglePrintDay = (idx: number) => {
+    setPrintDayIndices((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx].sort((a, b) => a - b)
+    );
   };
 
   const handleDuplicate = async () => {
@@ -348,7 +376,16 @@ export default function Planning() {
   }
 
   const weekDays = getWeekDays();
-  const displayDays = viewMode === "week" ? weekDays : [currentDate];
+  const baseDisplayDays = viewMode === "week" ? weekDays : [currentDate];
+  const displayDays =
+    printMode && viewMode === "week"
+      ? printDayIndices.map((i) => weekDays[i]).filter(Boolean)
+      : baseDisplayDays;
+  const visibleSlots = printMode
+    ? TIME_SLOTS.filter(
+        (s) => s.hours >= printStartHour && (s.hours < printEndHour || (s.hours === printEndHour && s.minutes === 0))
+      )
+    : TIME_SLOTS;
 
   return (
     <Layout>
@@ -419,7 +456,10 @@ export default function Planning() {
         )}
 
         {/* Calendar Grid */}
-        <Card className="print:shadow-none print:border-none">
+        <Card
+          className="print:shadow-none print:border-none"
+          data-print-font={printFontSize}
+        >
           <CardContent className="p-0" ref={printRef}>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse min-w-[800px]">
@@ -448,7 +488,7 @@ export default function Planning() {
                   </tr>
                 </thead>
                 <tbody>
-                  {TIME_SLOTS.map((slot, slotIdx) => (
+                  {visibleSlots.map((slot, slotIdx) => (
                     <tr key={slotIdx} className={slot.minutes === 0 ? "border-t-2" : ""}>
                       <td className="border p-1 text-xs text-muted-foreground text-center bg-muted/30">
                         {slot.minutes === 0 ? slot.label : ""}
@@ -866,8 +906,130 @@ export default function Planning() {
           .border-t-2 {
             border-top: 1px solid #999 !important;
           }
+
+          /* Font-size variants chosen in the print dialog */
+          [data-print-font="sm"] table { font-size: 7px !important; }
+          [data-print-font="sm"] thead th { font-size: 7px !important; }
+          [data-print-font="sm"] tbody tr,
+          [data-print-font="sm"] th,
+          [data-print-font="sm"] td { height: 3mm !important; max-height: 3mm !important; }
+          [data-print-font="sm"] .absolute.inset-0\\.5 { font-size: 7px !important; }
+
+          [data-print-font="lg"] table { font-size: 11px !important; }
+          [data-print-font="lg"] thead th { font-size: 11px !important; }
+          [data-print-font="lg"] tbody tr,
+          [data-print-font="lg"] th,
+          [data-print-font="lg"] td { height: 5mm !important; max-height: 5mm !important; }
+          [data-print-font="lg"] .absolute.inset-0\\.5 { font-size: 11px !important; }
         }
       `}</style>
+
+      {/* Print options dialog */}
+      <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Options d'impression</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5">
+            {/* Time range */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Heure de début</Label>
+                <Select
+                  value={String(printStartHour)}
+                  onValueChange={(v) => setPrintStartHour(Number(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {i.toString().padStart(2, "0")}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Heure de fin</Label>
+                <Select
+                  value={String(printEndHour)}
+                  onValueChange={(v) => setPrintEndHour(Number(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                      <SelectItem key={h} value={String(h)}>
+                        {h.toString().padStart(2, "0")}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Days (only meaningful in week view) */}
+            {viewMode === "week" && (
+              <div>
+                <Label className="mb-2 block">Jours à imprimer</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DAY_NAMES.map((name, idx) => (
+                    <label
+                      key={idx}
+                      className="flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={printDayIndices.includes(idx)}
+                        onCheckedChange={() => togglePrintDay(idx)}
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Font size */}
+            <div>
+              <Label className="mb-2 block">Taille des caractères</Label>
+              <RadioGroup
+                value={printFontSize}
+                onValueChange={(v) => setPrintFontSize(v as "sm" | "md" | "lg")}
+                className="flex gap-4"
+              >
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="sm" /> Petite
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="md" /> Moyenne
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="lg" /> Grande
+                </label>
+              </RadioGroup>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Astuce : dans la fenêtre d'aperçu de votre navigateur, vous pourrez
+              choisir les pages à imprimer (champ « Pages »).
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={launchPrint}
+              disabled={
+                printEndHour <= printStartHour ||
+                (viewMode === "week" && printDayIndices.length === 0)
+              }
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
