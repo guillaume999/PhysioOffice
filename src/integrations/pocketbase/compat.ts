@@ -60,6 +60,15 @@ const PB_EXPAND_TO_SUPABASE_JOIN: Record<string, string> = {
   profile: "profiles",
 };
 
+// ---------------------------------------------------------------------------
+// Table-level aliases: app collection name → real PocketBase collection name.
+// Supabase code refers to `profiles`, but PocketBase stores user-profile
+// data directly on the `users` auth collection.
+// ---------------------------------------------------------------------------
+const TABLE_ALIAS: Record<string, string> = {
+  profiles: "users",
+};
+
 /**
  * Bidirectional value mapping for PocketBase Select fields.
  * The app uses English/snake_case values; PocketBase stores French
@@ -278,7 +287,12 @@ class QueryBuilder {
   private returning: boolean = false;
   private singleMode: "none" | "single" | "maybe" = "none";
 
-  constructor(private collection: string) {}
+  private originalCollection: string;
+  private collection: string;
+  constructor(collection: string) {
+    this.originalCollection = collection;
+    this.collection = TABLE_ALIAS[collection] ?? collection;
+  }
 
   select(fields: string = "*", _opts?: { count?: string; head?: boolean }): this {
     // Split on top-level commas only — commas inside parentheses belong to
@@ -424,6 +438,36 @@ class QueryBuilder {
 
   private async exec(): Promise<QueryResult> {
     try {
+      // Virtual collection: user_roles is stored as users.subscription_tier === "admin".
+      if (this.originalCollection === "user_roles") {
+        return await this.execUserRoles();
+      }
+      // Users collection: app code uses `user_id` to mean the auth record id.
+      if (this.collection === "users") {
+        this.filters = this.filters.map((f) => ({
+          ...f,
+          col: f.col === "user_id" ? "id" : f.col,
+        }));
+        if (this.selectFields) {
+          this.selectFields = this.selectFields
+            .split(",")
+            .map((s) => (s.trim() === "user_id" ? "id" : s))
+            .join(",");
+        }
+        if (this.payload) {
+          const adapt = (row: Row) => {
+            const out: Row = { ...row };
+            if ("user_id" in out) {
+              out.id = out.user_id;
+              delete out.user_id;
+            }
+            return out;
+          };
+          this.payload = Array.isArray(this.payload)
+            ? this.payload.map(adapt)
+            : adapt(this.payload);
+        }
+      }
       const coll = pb.collection(this.collection);
 
       if (this.mode === "select") {
@@ -446,7 +490,7 @@ class QueryBuilder {
         if (this.singleMode !== "none") {
           try {
             const item = await coll.getFirstListItem(filter ?? "", { sort, fields, expand });
-            return { data: mapRecordFromPb(item), error: null, count: 1 };
+            return { data: this.postMapUsers(mapRecordFromPb(item)), error: null, count: 1 };
           } catch (e) {
             if (e instanceof ClientResponseError && e.status === 404) {
               if (this.singleMode === "maybe") return { data: null, error: null, count: 0 };
@@ -460,13 +504,13 @@ class QueryBuilder {
           const perPage = this.limitN ?? ((this.rangeTo ?? 0) - (this.rangeFrom ?? 0) + 1);
           const page = this.rangeFrom !== null ? Math.floor(this.rangeFrom / perPage) + 1 : 1;
           const res = await coll.getList(page, perPage, { filter, sort, fields, expand });
-          const data = mapRecordsFromPb(res.items);
+          const data = mapRecordsFromPb(res.items).map((r) => this.postMapUsers(r));
           console.debug(`[pb-compat] ${this.collection} getList →`, { totalItems: res.totalItems, returned: data.length });
           return { data, error: null, count: res.totalItems };
         }
 
         const items = await coll.getFullList({ filter, sort, fields, expand, batch: 500 });
-        const data = mapRecordsFromPb(items);
+        const data = mapRecordsFromPb(items).map((r) => this.postMapUsers(r));
         console.debug(`[pb-compat] ${this.collection} getFullList →`, { count: items.length, returned: data.length, first: data[0] });
         return { data, error: null, count: items.length };
       }
@@ -554,6 +598,64 @@ class QueryBuilder {
   }
   catch<R = never>(onrejected?: ((r: any) => R | PromiseLike<R>) | null): Promise<any> {
     return this.exec().catch(onrejected as any) as any;
+  }
+
+  /** When reading from `users`, alias `id` back to `user_id` so calling code
+   *  written against the Supabase `profiles` table keeps working. */
+  private postMapUsers<T extends Row | null | undefined>(rec: T): T {
+    if (!rec || typeof rec !== "object") return rec;
+    if (this.collection !== "users") return rec;
+    const out: any = { ...(rec as any) };
+    if (out.id !== undefined && out.user_id === undefined) out.user_id = out.id;
+    return out;
+  }
+
+  /** Virtual `user_roles` collection backed by `users.subscription_tier`.
+   *  A record with `subscription_tier === "admin"` is treated as having
+   *  the admin role. */
+  private async execUserRoles(): Promise<QueryResult> {
+    const usersColl = pb.collection("users");
+    // Extract well-known filters
+    let userIdFilter: string | null = null;
+    let roleFilter: string | null = null;
+    for (const f of this.filters) {
+      if (f.col === "user_id" && (f.op === "=" || f.op === "eq")) userIdFilter = String(f.val);
+      if (f.col === "role" && (f.op === "=" || f.op === "eq")) roleFilter = String(f.val);
+    }
+    try {
+      if (this.mode === "select") {
+        // Only the "admin" role is modelled.
+        if (roleFilter && roleFilter !== "admin") {
+          return { data: this.singleMode !== "none" ? null : [], error: null, count: 0 };
+        }
+        const filterParts: string[] = [`subscription_tier = "admin"`];
+        if (userIdFilter) filterParts.push(`id = "${userIdFilter}"`);
+        const items = await usersColl.getFullList({ filter: filterParts.join(" && "), batch: 500 });
+        const rows = items.map((u: any) => ({ user_id: u.id, role: "admin" }));
+        if (this.singleMode !== "none") {
+          return { data: rows[0] ?? null, error: null, count: rows.length };
+        }
+        return { data: rows, error: null, count: rows.length };
+      }
+      if (this.mode === "insert" || this.mode === "upsert") {
+        const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+        for (const r of rows) {
+          const uid = r?.user_id ?? r?.user;
+          if (uid) await usersColl.update(String(uid), { subscription_tier: "admin" });
+        }
+        return { data: null, error: null, count: rows.length };
+      }
+      if (this.mode === "delete") {
+        if (!userIdFilter) {
+          return { data: null, error: { message: "DELETE on user_roles requires a user_id filter" }, count: 0 };
+        }
+        await usersColl.update(userIdFilter, { subscription_tier: "free" });
+        return { data: null, error: null, count: 1 };
+      }
+      return { data: null, error: { message: `Unsupported user_roles mode ${this.mode}` }, count: 0 };
+    } catch (e) {
+      return { data: null, error: pbErrorToSupabase(e), count: 0 };
+    }
   }
 }
 
