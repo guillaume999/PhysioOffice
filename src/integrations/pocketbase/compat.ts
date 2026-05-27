@@ -599,6 +599,64 @@ class QueryBuilder {
   catch<R = never>(onrejected?: ((r: any) => R | PromiseLike<R>) | null): Promise<any> {
     return this.exec().catch(onrejected as any) as any;
   }
+
+  /** When reading from `users`, alias `id` back to `user_id` so calling code
+   *  written against the Supabase `profiles` table keeps working. */
+  private postMapUsers<T extends Row | null | undefined>(rec: T): T {
+    if (!rec || typeof rec !== "object") return rec;
+    if (this.collection !== "users") return rec;
+    const out: any = { ...(rec as any) };
+    if (out.id !== undefined && out.user_id === undefined) out.user_id = out.id;
+    return out;
+  }
+
+  /** Virtual `user_roles` collection backed by `users.subscription_tier`.
+   *  A record with `subscription_tier === "admin"` is treated as having
+   *  the admin role. */
+  private async execUserRoles(): Promise<QueryResult> {
+    const usersColl = pb.collection("users");
+    // Extract well-known filters
+    let userIdFilter: string | null = null;
+    let roleFilter: string | null = null;
+    for (const f of this.filters) {
+      if (f.col === "user_id" && (f.op === "=" || f.op === "eq")) userIdFilter = String(f.val);
+      if (f.col === "role" && (f.op === "=" || f.op === "eq")) roleFilter = String(f.val);
+    }
+    try {
+      if (this.mode === "select") {
+        // Only the "admin" role is modelled.
+        if (roleFilter && roleFilter !== "admin") {
+          return { data: this.singleMode !== "none" ? null : [], error: null, count: 0 };
+        }
+        const filterParts: string[] = [`subscription_tier = "admin"`];
+        if (userIdFilter) filterParts.push(`id = "${userIdFilter}"`);
+        const items = await usersColl.getFullList({ filter: filterParts.join(" && "), batch: 500 });
+        const rows = items.map((u: any) => ({ user_id: u.id, role: "admin" }));
+        if (this.singleMode !== "none") {
+          return { data: rows[0] ?? null, error: null, count: rows.length };
+        }
+        return { data: rows, error: null, count: rows.length };
+      }
+      if (this.mode === "insert" || this.mode === "upsert") {
+        const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+        for (const r of rows) {
+          const uid = r?.user_id ?? r?.user;
+          if (uid) await usersColl.update(String(uid), { subscription_tier: "admin" });
+        }
+        return { data: null, error: null, count: rows.length };
+      }
+      if (this.mode === "delete") {
+        if (!userIdFilter) {
+          return { data: null, error: { message: "DELETE on user_roles requires a user_id filter" }, count: 0 };
+        }
+        await usersColl.update(userIdFilter, { subscription_tier: "free" });
+        return { data: null, error: null, count: 1 };
+      }
+      return { data: null, error: { message: `Unsupported user_roles mode ${this.mode}` }, count: 0 };
+    } catch (e) {
+      return { data: null, error: pbErrorToSupabase(e), count: 0 };
+    }
+  }
 }
 
 // ===== Auth shim =====
