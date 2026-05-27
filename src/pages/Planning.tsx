@@ -448,7 +448,7 @@ export default function Planning() {
         </div>
 
         {appointments.length === 0 && (
-          <Alert className="mb-4">
+          <Alert className="mb-4 print:hidden">
             <AlertTitle>Aucun rendez-vous affiché</AlertTitle>
             <AlertDescription>
               Vous êtes connecté en tant que <span className="font-medium">{user?.email}</span>. Ce compte n'a aucun rendez-vous enregistré.
