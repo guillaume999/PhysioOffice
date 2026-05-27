@@ -762,6 +762,10 @@ export default function Planning() {
           
           * {
             box-sizing: border-box !important;
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            cursor: default !important;
+            outline: none !important;
           }
           
           html, body {
