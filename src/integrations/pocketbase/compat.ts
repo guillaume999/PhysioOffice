@@ -490,7 +490,7 @@ class QueryBuilder {
         if (this.singleMode !== "none") {
           try {
             const item = await coll.getFirstListItem(filter ?? "", { sort, fields, expand });
-            return { data: mapRecordFromPb(item), error: null, count: 1 };
+            return { data: this.postMapUsers(mapRecordFromPb(item)), error: null, count: 1 };
           } catch (e) {
             if (e instanceof ClientResponseError && e.status === 404) {
               if (this.singleMode === "maybe") return { data: null, error: null, count: 0 };
@@ -504,7 +504,7 @@ class QueryBuilder {
           const perPage = this.limitN ?? ((this.rangeTo ?? 0) - (this.rangeFrom ?? 0) + 1);
           const page = this.rangeFrom !== null ? Math.floor(this.rangeFrom / perPage) + 1 : 1;
           const res = await coll.getList(page, perPage, { filter, sort, fields, expand });
-          const data = mapRecordsFromPb(res.items);
+          const data = mapRecordsFromPb(res.items).map((r) => this.postMapUsers(r));
           console.debug(`[pb-compat] ${this.collection} getList →`, { totalItems: res.totalItems, returned: data.length });
           return { data, error: null, count: res.totalItems };
         }
