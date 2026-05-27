@@ -285,6 +285,7 @@ export default function PatientBilanInitial() {
         </div>
 
         <div className="space-y-6 print:space-y-4">
+          <style>{`@media print { input::placeholder, textarea::placeholder { color: transparent !important; opacity: 0 !important; } }`}</style>
           {/* En-tête pour impression avec champs nom/prénom vides */}
           <Card className="hidden print:block">
             <CardHeader>
