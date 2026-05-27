@@ -765,11 +765,8 @@ export default function Planning() {
           }
           
           html, body {
-            width: 287mm !important;
-            height: 200mm !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             font-size: 10px !important;
@@ -789,9 +786,6 @@ export default function Planning() {
           }
           
           #root {
-            height: 200mm !important;
-            max-height: 200mm !important;
-            overflow: hidden !important;
             padding: 0 !important;
             margin: 0 !important;
           }
@@ -840,7 +834,6 @@ export default function Planning() {
           
           .overflow-x-auto {
             overflow: visible !important;
-            max-height: 195mm !important;
           }
           
           table {
@@ -848,10 +841,13 @@ export default function Planning() {
             width: 100% !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
-            page-break-inside: avoid !important;
-            page-break-after: avoid !important;
           }
-          
+
+          /* Repeat header row on every printed page */
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
+          tr, td, th { page-break-inside: avoid !important; break-inside: avoid !important; }
+
           thead th {
             font-size: 9px !important;
             padding: 1mm !important;
