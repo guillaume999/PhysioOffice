@@ -451,7 +451,7 @@ export function PatientTraitementCard({
             objectifs_principaux: seanceTypes.objectifs_principaux,
             objectifs_secondaires: seanceTypes.objectifs_secondaires,
             comment: seanceTypes.comment,
-            is_hidden_from_list: false, // New seance is visible
+            is_hidden_from_list: true, // New seance is hidden from "Séances" list by default
             is_shared: false
           })
           .select("id")
