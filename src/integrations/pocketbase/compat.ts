@@ -52,6 +52,14 @@ const PB_TO_APP: Record<string, string> = Object.fromEntries(
   Object.entries(APP_TO_PB).map(([k, v]) => [v, k])
 );
 
+const PB_EXPAND_TO_SUPABASE_JOIN: Record<string, string> = {
+  patient: "patients",
+  traitement_type: "traitement_types",
+  seance_type: "seance_types",
+  exercice: "exercices",
+  profile: "profiles",
+};
+
 /**
  * Bidirectional value mapping for PocketBase Select fields.
  * The app uses English/snake_case values; PocketBase stores French
@@ -146,9 +154,12 @@ function mapRecordFromPb<T extends Row | null | undefined>(rec: T): T {
   // remains available under `<relation>_id` (e.g. `patient_id`).
   if (expand && typeof expand === "object") {
     for (const [relKey, relVal] of Object.entries(expand)) {
-      out[relKey] = Array.isArray(relVal)
+      const mappedRelation = Array.isArray(relVal)
         ? relVal.map((r) => mapRecordFromPb(r))
         : mapRecordFromPb(relVal as Row);
+      out[relKey] = mappedRelation;
+      const supabaseJoinKey = PB_EXPAND_TO_SUPABASE_JOIN[relKey];
+      if (supabaseJoinKey) out[supabaseJoinKey] = mappedRelation;
     }
   }
   return out as T;
