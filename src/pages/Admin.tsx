@@ -53,7 +53,7 @@ interface UserProfile {
   is_banned: boolean | null;
   can_share: boolean | null;
   created_at: string;
-  subscription_tier: "free" | "basic" | "premium";
+  subscription_tier: "free" | "basic" | "premium" | "admin";
   subscription_end_date: string | null;
   has_stripe_account: boolean | null;
 }
@@ -1062,7 +1062,9 @@ export default function Admin() {
                     </thead>
                     <tbody>
                       {filteredUsers.map((u) => {
-                        const isUserAdmin = adminUserIds.has(u.user_id);
+                         const isUserAdmin =
+                           adminUserIds.has(u.user_id) ||
+                           u.subscription_tier === "admin";
 
                         return (
                           <tr key={u.user_id} className={`border-b hover:bg-muted/50 ${u.is_banned ? "bg-red-500/10" : ""} ${isUserAdmin ? "bg-primary/5" : ""}`}>
