@@ -231,11 +231,12 @@ export default function Planning() {
   const launchPrint = () => {
     setIsPrintDialogOpen(false);
     setPrintMode(true);
-    // Let React commit the filtered DOM before opening the system print dialog
+    // Wait long enough for Radix to fully unmount the dialog portal (exit anim)
+    // and for React to commit the filtered table DOM before opening the print dialog.
     setTimeout(() => {
       window.print();
-      setTimeout(() => setPrintMode(false), 300);
-    }, 100);
+      setTimeout(() => setPrintMode(false), 400);
+    }, 350);
   };
 
   const togglePrintDay = (idx: number) => {
@@ -777,6 +778,15 @@ export default function Planning() {
           nav, footer, header, .print\\:hidden, [class*="MobileBottomNav"], .mt-4, button {
             display: none !important;
           }
+
+          /* Hide any Radix dialog/popover portals and toasts during print */
+          [role="dialog"],
+          [role="alertdialog"],
+          [data-radix-popper-content-wrapper],
+          [data-sonner-toaster],
+          [data-radix-portal] {
+            display: none !important;
+          }
           
           #root {
             height: 200mm !important;
@@ -926,7 +936,7 @@ export default function Planning() {
 
       {/* Print options dialog */}
       <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg print:hidden">
           <DialogHeader>
             <DialogTitle>Options d'impression</DialogTitle>
           </DialogHeader>
