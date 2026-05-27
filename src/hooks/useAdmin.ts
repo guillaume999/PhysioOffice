@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 
 export function useAdmin() {
   const { user } = useAuth();
@@ -17,6 +18,15 @@ export function useAdmin() {
 
       // In dev mode, grant admin access automatically
       if (import.meta.env.DEV) {
+        setIsAdmin(true);
+        setLoading(false);
+        return;
+      }
+
+      // PocketBase: read subscription_tier directly from authStore
+      const pbRecord =
+        (pb.authStore as any).record ?? (pb.authStore as any).model;
+      if (pbRecord?.subscription_tier === "admin") {
         setIsAdmin(true);
         setLoading(false);
         return;
