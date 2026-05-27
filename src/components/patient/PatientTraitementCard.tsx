@@ -1463,6 +1463,7 @@ export function PatientTraitementCard({
         onSuccess={handleSeanceFormSuccess}
         showDateField={editingSeanceIndex === null}
         initialPathologies={traitement?.pathologie ? [traitement.pathologie] : undefined}
+        hiddenFromListByDefault
       />
 
       <AlertDialog open={removeConfirmDialogOpen} onOpenChange={setRemoveConfirmDialogOpen}>
