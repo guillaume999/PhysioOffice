@@ -438,6 +438,36 @@ class QueryBuilder {
 
   private async exec(): Promise<QueryResult> {
     try {
+      // Virtual collection: user_roles is stored as users.subscription_tier === "admin".
+      if (this.originalCollection === "user_roles") {
+        return await this.execUserRoles();
+      }
+      // Users collection: app code uses `user_id` to mean the auth record id.
+      if (this.collection === "users") {
+        this.filters = this.filters.map((f) => ({
+          ...f,
+          col: f.col === "user_id" ? "id" : f.col,
+        }));
+        if (this.selectFields) {
+          this.selectFields = this.selectFields
+            .split(",")
+            .map((s) => (s.trim() === "user_id" ? "id" : s))
+            .join(",");
+        }
+        if (this.payload) {
+          const adapt = (row: Row) => {
+            const out: Row = { ...row };
+            if ("user_id" in out) {
+              out.id = out.user_id;
+              delete out.user_id;
+            }
+            return out;
+          };
+          this.payload = Array.isArray(this.payload)
+            ? this.payload.map(adapt)
+            : adapt(this.payload);
+        }
+      }
       const coll = pb.collection(this.collection);
 
       if (this.mode === "select") {
@@ -480,7 +510,7 @@ class QueryBuilder {
         }
 
         const items = await coll.getFullList({ filter, sort, fields, expand, batch: 500 });
-        const data = mapRecordsFromPb(items);
+        const data = mapRecordsFromPb(items).map((r) => this.postMapUsers(r));
         console.debug(`[pb-compat] ${this.collection} getFullList →`, { count: items.length, returned: data.length, first: data[0] });
         return { data, error: null, count: items.length };
       }
