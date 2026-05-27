@@ -906,8 +906,130 @@ export default function Planning() {
           .border-t-2 {
             border-top: 1px solid #999 !important;
           }
+
+          /* Font-size variants chosen in the print dialog */
+          [data-print-font="sm"] table { font-size: 7px !important; }
+          [data-print-font="sm"] thead th { font-size: 7px !important; }
+          [data-print-font="sm"] tbody tr,
+          [data-print-font="sm"] th,
+          [data-print-font="sm"] td { height: 3mm !important; max-height: 3mm !important; }
+          [data-print-font="sm"] .absolute.inset-0\\.5 { font-size: 7px !important; }
+
+          [data-print-font="lg"] table { font-size: 11px !important; }
+          [data-print-font="lg"] thead th { font-size: 11px !important; }
+          [data-print-font="lg"] tbody tr,
+          [data-print-font="lg"] th,
+          [data-print-font="lg"] td { height: 5mm !important; max-height: 5mm !important; }
+          [data-print-font="lg"] .absolute.inset-0\\.5 { font-size: 11px !important; }
         }
       `}</style>
+
+      {/* Print options dialog */}
+      <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Options d'impression</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5">
+            {/* Time range */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Heure de début</Label>
+                <Select
+                  value={String(printStartHour)}
+                  onValueChange={(v) => setPrintStartHour(Number(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {i.toString().padStart(2, "0")}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Heure de fin</Label>
+                <Select
+                  value={String(printEndHour)}
+                  onValueChange={(v) => setPrintEndHour(Number(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                      <SelectItem key={h} value={String(h)}>
+                        {h.toString().padStart(2, "0")}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Days (only meaningful in week view) */}
+            {viewMode === "week" && (
+              <div>
+                <Label className="mb-2 block">Jours à imprimer</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DAY_NAMES.map((name, idx) => (
+                    <label
+                      key={idx}
+                      className="flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={printDayIndices.includes(idx)}
+                        onCheckedChange={() => togglePrintDay(idx)}
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Font size */}
+            <div>
+              <Label className="mb-2 block">Taille des caractères</Label>
+              <RadioGroup
+                value={printFontSize}
+                onValueChange={(v) => setPrintFontSize(v as "sm" | "md" | "lg")}
+                className="flex gap-4"
+              >
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="sm" /> Petite
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="md" /> Moyenne
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <RadioGroupItem value="lg" /> Grande
+                </label>
+              </RadioGroup>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Astuce : dans la fenêtre d'aperçu de votre navigateur, vous pourrez
+              choisir les pages à imprimer (champ « Pages »).
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={launchPrint}
+              disabled={
+                printEndHour <= printStartHour ||
+                (viewMode === "week" && printDayIndices.length === 0)
+              }
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
