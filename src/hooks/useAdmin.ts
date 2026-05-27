@@ -15,6 +15,13 @@ export function useAdmin() {
         return;
       }
 
+      // In dev mode, grant admin access automatically
+      if (import.meta.env.DEV) {
+        setIsAdmin(true);
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from("user_roles")
