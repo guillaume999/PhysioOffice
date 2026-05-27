@@ -4,11 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { pb } from "@/integrations/pocketbase/client";
 
 export function useAdmin() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     const checkAdmin = async () => {
       if (!user) {
         setIsAdmin(false);
@@ -55,7 +59,7 @@ export function useAdmin() {
     };
 
     checkAdmin();
-  }, [user]);
+  }, [user, authLoading]);
 
   return { isAdmin, loading };
 }
