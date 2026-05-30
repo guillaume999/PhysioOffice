@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_PB_URL: ${VITE_PB_URL:-http://localhost:8090}
+    pull_policy: build
     container_name: ${CONTAINER_NAME:-physiooffice}
     ports:
       - "${HOST_PORT:-8080}:8081"
