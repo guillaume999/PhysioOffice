@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { Loader2, Search, ChevronDown, ChevronRight, Play } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -84,25 +84,19 @@ export function ImportTraitementDialog({
 
   const fetchUserPseudo = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("pseudo")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setUserPseudo(data?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || null);
   };
 
   const fetchTraitements = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("traitement_types")
-      .select("id, pathologie, description, author_name, is_shared, is_validated, user_id")
-      .eq("is_hidden_from_list", false)
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setTraitements(data);
-    }
+    try {
+      const data = await pb.collection("traitement_types").getFullList({
+        filter: 'is_hidden_from_list = false',
+        sort: "-created",
+        fields: "id,pathologie,description,author_name,is_shared,is_validated,user",
+      });
+      setTraitements(data.map((r: any) => ({ ...r, user_id: r.user })));
+    } catch(e) { console.error(e); }
     setLoading(false);
   };
 
@@ -111,19 +105,14 @@ export function ImportTraitementDialog({
     
     setLoadingSeances(prev => new Set(prev).add(traitementId));
     
-    const { data, error } = await supabase
-      .from("traitement_seances")
-      .select(`
-        id,
-        ordre,
-        seance_type:seance_types(id, pathologie, pathologies, objectif_principal, objectifs_principaux)
-      `)
-      .eq("traitement_type_id", traitementId)
-      .order("ordre", { ascending: true });
-
-    if (!error && data) {
-      setSeancesMap(prev => ({ ...prev, [traitementId]: data as TraitementSeance[] }));
-    }
+    try {
+      const data = await pb.collection("traitement_seances").getFullList({
+        filter: `traitement_type = "${traitementId}"`,
+        sort: "ordre",
+        expand: "seance_type",
+      });
+      setSeancesMap(prev => ({ ...prev, [traitementId]: data.map((r: any) => ({ ...r, seance_type: r.expand?.seance_type })) as any[] }));
+    } catch(e) { console.error(e); }
     
     setLoadingSeances(prev => {
       const next = new Set(prev);
@@ -137,22 +126,14 @@ export function ImportTraitementDialog({
     
     setLoadingExercices(prev => new Set(prev).add(seanceId));
     
-    const { data, error } = await supabase
-      .from("seance_exercices")
-      .select(`
-        id,
-        ordre,
-        series,
-        repetitions,
-        duration_seconds,
-        exercice:exercices(id, title, thumbnail_url)
-      `)
-      .eq("seance_type_id", seanceId)
-      .order("ordre", { ascending: true });
-
-    if (!error && data) {
-      setExercicesMap(prev => ({ ...prev, [seanceId]: data }));
-    }
+    try {
+      const data = await pb.collection("seance_exercices").getFullList({
+        filter: `seance_type = "${seanceId}"`,
+        sort: "ordre",
+        expand: "exercice",
+      });
+      setExercicesMap(prev => ({ ...prev, [seanceId]: data.map((r: any) => ({ ...r, exercice: r.expand?.exercice })) }));
+    } catch(e) { console.error(e); }
     
     setLoadingExercices(prev => {
       const next = new Set(prev);
@@ -207,54 +188,38 @@ export function ImportTraitementDialog({
     setCopying(true);
 
     try {
-      const { data: newTraitement, error: traitementError } = await supabase
-        .from("traitement_types")
-        .insert({
-          user_id: user.id,
+      const newTraitement = await pb.collection("traitement_types").create({
+          user: user.id,
           pathologie: traitement.pathologie,
           description: traitement.description,
           author_name: userPseudo || traitement.author_name,
           is_shared: false,
           is_copy: true,
           is_hidden_from_list: true,
-          original_id: traitement.id
-        })
-        .select()
-        .single();
+          original: traitement.id,
+        });
 
-      if (traitementError) throw traitementError;
-
-      const { data: testsData } = await supabase
-        .from("traitement_tests")
-        .select("*")
-        .eq("traitement_type_id", traitement.id)
-        .order("ordre", { ascending: true });
-
-      if (testsData && testsData.length > 0) {
-        for (const test of testsData) {
-          await supabase.from("traitement_tests").insert({
-            traitement_type_id: newTraitement.id,
-            description: test.description,
-            exercice_id: test.exercice_id,
-            ordre: test.ordre
-          });
-        }
+      const testsData = await pb.collection("traitement_tests").getFullList({
+        filter: `traitement_type = "${traitement.id}"`, sort: "ordre",
+      });
+      for (const test of testsData) {
+        await pb.collection("traitement_tests").create({
+          traitement_type: newTraitement.id,
+          description: test.description,
+          exercice: test.exercice,
+          ordre: test.ordre,
+        });
       }
 
-      const { data: seancesData } = await supabase
-        .from("traitement_seances")
-        .select("*")
-        .eq("traitement_type_id", traitement.id)
-        .order("ordre", { ascending: true });
-
-      if (seancesData && seancesData.length > 0) {
-        for (const seance of seancesData) {
-          await supabase.from("traitement_seances").insert({
-            traitement_type_id: newTraitement.id,
-            seance_type_id: seance.seance_type_id,
-            ordre: seance.ordre
-          });
-        }
+      const seancesData = await pb.collection("traitement_seances").getFullList({
+        filter: `traitement_type = "${traitement.id}"`, sort: "ordre",
+      });
+      for (const seance of seancesData) {
+        await pb.collection("traitement_seances").create({
+          traitement_type: newTraitement.id,
+          seance_type: seance.seance_type,
+          ordre: seance.ordre,
+        });
       }
 
       toast.success("Traitement importé pour ce patient");

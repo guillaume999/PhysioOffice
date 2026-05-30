@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
 import { pb } from "@/integrations/pocketbase/client";
 
 export function useAdmin() {
@@ -13,52 +12,22 @@ export function useAdmin() {
       setLoading(true);
       return;
     }
-    const checkAdmin = async () => {
-      if (!user) {
-        setIsAdmin(false);
-        setLoading(false);
-        return;
-      }
 
-      // In dev mode, grant admin access automatically
-      if (import.meta.env.DEV) {
-        setIsAdmin(true);
-        setLoading(false);
-        return;
-      }
+    if (!user) {
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
 
-      // PocketBase: read subscription_tier directly from authStore
-      const pbRecord =
-        (pb.authStore as any).record ?? (pb.authStore as any).model;
-      if (pbRecord?.subscription_tier === "admin") {
-        setIsAdmin(true);
-        setLoading(false);
-        return;
-      }
+    if (import.meta.env.DEV) {
+      setIsAdmin(true);
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const { data, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error checking admin status:", error);
-          setIsAdmin(false);
-        } else {
-          setIsAdmin(!!data);
-        }
-      } catch (err) {
-        console.error("Error checking admin status:", err);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdmin();
+    const record = pb.authStore.record;
+    setIsAdmin(record?.subscription_tier === "admin");
+    setLoading(false);
   }, [user, authLoading]);
 
   return { isAdmin, loading };

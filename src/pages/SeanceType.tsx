@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
@@ -155,68 +155,31 @@ export default function SeanceType() {
     setLoading(true);
     try {
       // Fetch user profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("can_share")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      
-      setUserCanShare(profileData?.can_share !== false);
+      setUserCanShare(pb.authStore.record?.can_share !== false);
 
-      // Fetch featured seances
-      const { data: featuredData } = await supabase
-        .from("featured_seances")
-        .select("seance_type_id");
-      setFeaturedSeanceIds(featuredData?.map((f) => f.seance_type_id) || []);
+      const [featuredData, seancesData] = await Promise.all([
+        pb.collection("featured_seances").getFullList({ fields: "seance_type" }),
+        pb.collection("seance_types").getFullList({ sort: "-created" }),
+      ]);
+      setFeaturedSeanceIds(featuredData.map((f: any) => f.seance_type));
 
-      // Fetch seance types
-      const { data: seancesData, error: seancesError } = await supabase
-        .from("seance_types")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (seancesError) throw seancesError;
-
-      // Fetch exercices for each seance with exercice details
       const seancesWithDetails = await Promise.all(
-        (seancesData || []).map(async (seance) => {
-          const { data: exercicesData } = await supabase
-            .from("seance_exercices")
-            .select("*")
-            .eq("seance_type_id", seance.id)
-            .order("ordre");
+        seancesData.map(async (seance: any) => {
+          const exercicesData = await pb.collection("seance_exercices").getFullList({
+            filter: `seance_type = "${seance.id}"`, sort: "ordre", expand: "exercice",
+          });
+          const exercicesWithDetails = exercicesData.map((ex: any) => ({
+            ...ex, exercice_id: ex.exercice, exercice: ex.expand?.exercice ?? null,
+          }));
 
-          // Fetch exercice details for each seance_exercice
-          const exercicesWithDetails = await Promise.all(
-            (exercicesData || []).map(async (ex) => {
-              if (ex.exercice_id) {
-                const { data: exerciceDetail } = await supabase
-                  .from("exercices")
-                  .select("id, title, thumbnail_url, video_url")
-                  .eq("id", ex.exercice_id)
-                  .maybeSingle();
-                return { ...ex, exercice: exerciceDetail };
-              }
-              return { ...ex, exercice: null };
-            })
-          );
-
-          const { count: likesCount } = await supabase
-            .from("seance_likes")
-            .select("*", { count: "exact", head: true })
-            .eq("seance_type_id", seance.id);
-
-          const { count: commentsCount } = await supabase
-            .from("seance_comments")
-            .select("*", { count: "exact", head: true })
-            .eq("seance_type_id", seance.id);
-
-          const { data: userLike } = await supabase
-            .from("seance_likes")
-            .select("id")
-            .eq("seance_type_id", seance.id)
-            .eq("user_id", user?.id)
-            .maybeSingle();
+          const [likesRes, commentsRes, userLikeRes] = await Promise.all([
+            pb.collection("seance_likes").getList(1, 1, { filter: `seance_type = "${seance.id}"` }),
+            pb.collection("seance_comments").getList(1, 1, { filter: `seance_type = "${seance.id}"` }),
+            pb.collection("seance_likes").getList(1, 1, { filter: `seance_type = "${seance.id}" && user = "${user?.id}"` }),
+          ]);
+          const likesCount = likesRes.totalItems;
+          const commentsCount = commentsRes.totalItems;
+          const userLike = userLikeRes.items[0] ?? null;
 
           return {
             ...seance,
@@ -281,10 +244,7 @@ export default function SeanceType() {
       return;
     }
     try {
-      await supabase
-        .from("seance_types")
-        .update({ is_shared: !currentlyShared, is_validated: false })
-        .eq("id", seanceId);
+      await pb.collection("seance_types").update(seanceId, { is_shared: !currentlyShared, is_validated: false });
       
       toast.success(currentlyShared ? "Séance non partagée" : "Séance partagée (en attente de validation)");
       fetchData();
@@ -299,15 +259,10 @@ export default function SeanceType() {
 
     try {
       if (currentlyLiked) {
-        await supabase
-          .from("seance_likes")
-          .delete()
-          .eq("seance_type_id", seanceId)
-          .eq("user_id", user.id);
+        const likes = await pb.collection("seance_likes").getFullList({ filter: `seance_type = "${seanceId}" && user = "${user.id}"` });
+        for (const l of likes) await pb.collection("seance_likes").delete(l.id);
       } else {
-        await supabase
-          .from("seance_likes")
-          .insert({ seance_type_id: seanceId, user_id: user.id });
+        await pb.collection("seance_likes").create({ seance_type: seanceId, user: user.id });
       }
       fetchData();
     } catch (error) {
@@ -318,8 +273,9 @@ export default function SeanceType() {
   const deleteSeance = async (id: string) => {
     try {
       // Delete exercices first
-      await supabase.from("seance_exercices").delete().eq("seance_type_id", id);
-      await supabase.from("seance_types").delete().eq("id", id);
+      const ses = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${id}"` });
+      for (const s of ses) await pb.collection("seance_exercices").delete(s.id);
+      await pb.collection("seance_types").delete(id);
       toast.success("Séance supprimée");
       fetchData();
     } catch (error) {
@@ -332,18 +288,11 @@ export default function SeanceType() {
     if (!user) return;
 
     try {
-      // Fetch user pseudo
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("pseudo")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const profileData = pb.authStore.record;
 
       // Create the seance copy
-      const { data: newSeance, error: seanceError } = await supabase
-        .from("seance_types")
-        .insert({
-          user_id: user.id,
+      const newSeance = await pb.collection("seance_types").create({
+          user: user.id,
           pathologie: seance.pathologie,
           pathologies: seance.pathologies || [],
           objectif_principal: seance.objectif_principal,
@@ -353,19 +302,15 @@ export default function SeanceType() {
           author_name: profileData?.pseudo || seance.author_name,
           is_shared: false,
           is_copy: seance.user_id !== user.id,
-          original_id: seance.user_id !== user.id ? seance.id : null,
-        })
-        .select()
-        .single();
-
-      if (seanceError) throw seanceError;
+          original: seance.user_id !== user.id ? seance.id : null,
+        });
 
       // Copy exercices
       if (seance.exercices && seance.exercices.length > 0) {
         for (const ex of seance.exercices) {
-          await supabase.from("seance_exercices").insert({
-            seance_type_id: newSeance.id,
-            exercice_id: ex.exercice_id,
+          await pb.collection("seance_exercices").create({
+            seance_type: newSeance.id,
+            exercice: ex.exercice_id,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,

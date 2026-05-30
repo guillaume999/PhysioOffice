@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export type SubscriptionTier = "free" | "basic" | "premium";
@@ -13,7 +13,7 @@ interface SubscriptionStatus {
 }
 
 export function useSubscription() {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [status, setStatus] = useState<SubscriptionStatus>({
     tier: "free",
@@ -23,119 +23,51 @@ export function useSubscription() {
   });
 
   const checkSubscription = useCallback(async () => {
-    if (!user || !session) {
-      setStatus({
-        tier: "free",
-        subscribed: false,
-        subscriptionEnd: null,
-        loading: false,
-      });
+    if (!user) {
+      setStatus({ tier: "free", subscribed: false, subscriptionEnd: null, loading: false });
       return;
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke("check-subscription", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      // Lire le tier directement depuis le record PocketBase
+      const record = pb.authStore.record;
+      const tier = (record?.subscription_tier as SubscriptionTier) || "free";
+      const subscriptionEnd = record?.subscription_end ? new Date(record.subscription_end) : null;
+      const subscribed = tier !== "free" && (!subscriptionEnd || subscriptionEnd > new Date());
 
-      if (error) {
-        console.error("Error checking subscription:", error);
-        return;
-      }
-
-      setStatus({
-        tier: (data?.tier as SubscriptionTier) || "free",
-        subscribed: data?.subscribed || false,
-        subscriptionEnd: data?.subscription_end ? new Date(data.subscription_end) : null,
-        loading: false,
-      });
+      setStatus({ tier, subscribed, subscriptionEnd, loading: false });
     } catch (err) {
       console.error("Error checking subscription:", err);
       setStatus(prev => ({ ...prev, loading: false }));
     }
-  }, [user, session]);
+  }, [user]);
 
   useEffect(() => {
     checkSubscription();
   }, [checkSubscription]);
 
-  // Auto-refresh every 60 seconds
   useEffect(() => {
     if (!user) return;
-    
     const interval = setInterval(checkSubscription, 60000);
     return () => clearInterval(interval);
   }, [user, checkSubscription]);
 
-  const startCheckout = async (priceId: string) => {
-    if (!session) {
-      toast({
-        title: "Connexion requise",
-        description: "Vous devez être connecté pour souscrire à un abonnement.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      }
-    } catch (err) {
-      console.error("Error creating checkout:", err);
-      toast({
-        title: "Erreur",
-        description: "Impossible de démarrer le paiement. Veuillez réessayer.",
-        variant: "destructive",
-      });
-    }
+  // TODO: implémenter checkout via PocketBase hook ou service externe
+  const startCheckout = async (_priceId: string) => {
+    toast({
+      title: "Non disponible",
+      description: "Le paiement doit être configuré via un PocketBase hook ou service externe.",
+      variant: "destructive",
+    });
   };
 
   const openCustomerPortal = async () => {
-    if (!session) {
-      toast({
-        title: "Connexion requise",
-        description: "Vous devez être connecté pour gérer votre abonnement.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke("customer-portal", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      }
-    } catch (err) {
-      console.error("Error opening customer portal:", err);
-      toast({
-        title: "Erreur",
-        description: "Impossible d'ouvrir le portail client. Veuillez réessayer.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Non disponible",
+      description: "Le portail client doit être configuré via un service externe.",
+      variant: "destructive",
+    });
   };
 
-  return {
-    ...status,
-    checkSubscription,
-    startCheckout,
-    openCustomerPortal,
-  };
+  return { ...status, checkSubscription, startCheckout, openCustomerPortal };
 }

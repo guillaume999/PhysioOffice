@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, MapPin, Phone, Loader2 } from "lucide-react";
 
@@ -17,8 +17,8 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from("contact_messages").insert(form);
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    try { await pb.collection("contact_messages").create(form);
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); return; }
     else { toast({ title: "Message envoyé !" }); setForm({ name: "", email: "", subject: "", message: "" }); }
     setLoading(false);
   };

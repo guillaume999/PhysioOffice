@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -85,12 +85,7 @@ export function ExerciceDetailDialog({
     setLoading(true);
     try {
       const newStatus = exercice.status === "shared" ? "pending" : "shared";
-      const { error } = await supabase
-        .from("exercices")
-        .update({ status: newStatus, rejection_reason: null })
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+      await pb.collection("exercices").update(exercice.id, { status: newStatus, rejection_reason: null });
 
       toast({
         title: "Succès",
@@ -121,15 +116,7 @@ export function ExerciceDetailDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("exercices")
-        .update({ 
-          status: "rejected",
-          rejection_reason: rejectionReason.trim()
-        })
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+      await pb.collection("exercices").update(exercice.id, { status: "rejected", rejection_reason: rejectionReason.trim() });
 
       toast({
         title: "Exercice refusé",
@@ -155,12 +142,7 @@ export function ExerciceDetailDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("exercices")
-        .delete()
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+      await pb.collection("exercices").delete(exercice.id);
 
       toast({ title: "Exercice supprimé" });
       onOpenChange(false);
@@ -182,22 +164,16 @@ export function ExerciceDetailDialog({
     try {
       if (isFeatured) {
         // Remove from featured
-        const { error } = await supabase
-          .from("featured_exercices")
-          .delete()
-          .eq("exercice_id", exercice.id);
-
-        if (error) throw error;
+        const feat = await pb.collection("featured_exercices").getFullList({ filter: `exercice = "${exercice.id}"` });
+        for (const f of feat) await pb.collection("featured_exercices").delete(f.id);
 
         toast({ title: "Exercice retiré de la plateforme" });
       } else {
         // Add to featured
-        const { error } = await supabase.from("featured_exercices").insert({
-          exercice_id: exercice.id,
+        await pb.collection("featured_exercices").create({
+          exercice: exercice.id,
           added_by: user?.id || "",
         });
-
-        if (error) throw error;
 
         toast({ title: "Exercice ajouté à la plateforme" });
       }

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { FRENCH_REGIONS, ANNONCE_TYPES, AnnonceType } from "@/lib/french-regions";
@@ -106,37 +106,20 @@ export default function Annonces() {
     setLoading(true);
     try {
       // Fetch settings
-      const { data: settingsData } = await supabase
-        .from("annonce_settings")
-        .select("free_duration_days")
-        .limit(1)
-        .maybeSingle();
-      
-      if (settingsData) {
-        setSettings(settingsData);
-      }
+      const settingsRes = await pb.collection("annonce_settings").getList(1, 1, { fields: "free_duration_days" });
+      if (settingsRes.items[0]) setSettings(settingsRes.items[0] as any);
 
       // Fetch all active annonces
-      const { data: annoncesData, error: annoncesError } = await supabase
-        .from("annonces")
-        .select("*")
-        .eq("is_active", true)
-        .gt("expires_at", new Date().toISOString())
-        .order("is_featured", { ascending: false })
-        .order("created_at", { ascending: false });
-
-      if (annoncesError) throw annoncesError;
-      setAnnonces((annoncesData as unknown as Annonce[]) || []);
+      const annoncesData = await pb.collection("annonces").getFullList({
+        filter: `is_active = true && expires_at > "${new Date().toISOString()}"`,
+        sort: "-is_featured,-created",
+      });
+      setAnnonces(annoncesData as unknown as Annonce[]);
 
       // Fetch my annonces if logged in
       if (user) {
-        const { data: myData } = await supabase
-          .from("annonces")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        
-        setMyAnnonces((myData as unknown as Annonce[]) || []);
+        const myData = await pb.collection("annonces").getFullList({ filter: `user = "${user.id}"`, sort: "-created" });
+        setMyAnnonces(myData as unknown as Annonce[]);
       }
     } catch (error) {
       console.error("Error fetching annonces:", error);
@@ -183,8 +166,8 @@ export default function Annonces() {
     try {
       const expiresAt = addDays(new Date(), settings.free_duration_days);
 
-      const { error } = await supabase.from("annonces").insert({
-        user_id: user.id,
+      try { await pb.collection("annonces").create({
+        user: user.id,
         title: formTitle.trim(),
         description: formDescription.trim(),
         type: formType,
@@ -219,8 +202,7 @@ export default function Annonces() {
 
   const handleDeleteAnnonce = async (id: string) => {
     try {
-      const { error } = await supabase.from("annonces").delete().eq("id", id);
-      if (error) throw error;
+      await pb.collection("annonces").delete(id);
 
       toast({ title: "Annonce supprimée" });
       fetchData();

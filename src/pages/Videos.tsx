@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
@@ -66,14 +66,7 @@ export default function Videos() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setVideos(data || []);
+      setVideos(await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created" }) as any[]);
     } catch (error) {
       console.error("Error fetching videos:", error);
       toast.error("Erreur lors du chargement des vidéos");
@@ -192,21 +185,11 @@ export default function Videos() {
       
       const objectName = `${user.id}/thumbnails/${Date.now()}.jpg`;
       
-      const { error: uploadError } = await supabase.storage
-        .from("exercice-videos")
-        .upload(objectName, blob, {
-          cacheControl: "3600",
-          contentType: "image/jpeg",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error("Thumbnail upload error:", uploadError);
-        return null;
-      }
-
-      const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
-      return data.publicUrl;
+      const fd = new FormData();
+      fd.append("file", blob, "thumbnail.jpg");
+      fd.append("user", user.id);
+      const rec = await pb.collection("video_thumbnails").create(fd);
+      return pb.files.getURL(rec, rec.file as string);
     } catch (error) {
       console.error("Error uploading thumbnail:", error);
       return null;
@@ -230,21 +213,11 @@ export default function Videos() {
     }
     const objectName = `${user.id}/${Date.now()}.${fileExt}`;
 
-    // Use standard upload instead of TUS for simplicity
-    const { error: uploadError } = await supabase.storage
-      .from("exercice-videos")
-      .upload(objectName, videoFile, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
-    return data.publicUrl;
+    const fd = new FormData();
+    fd.append("file", videoFile);
+    fd.append("user", user.id);
+    const rec = await pb.collection("exercice_videos").create(fd);
+    return pb.files.getURL(rec, rec.file as string);
   };
 
   const handleSubmit = async () => {
@@ -277,16 +250,10 @@ export default function Videos() {
       const videoUrl = await uploadVideoToStorage(formVideoFile);
       setUploadProgress(80);
 
-      const { error } = await supabase
-        .from("videos")
-        .insert({
-          user_id: user.id,
-          title: formTitle.trim(),
-          video_url: videoUrl,
-          thumbnail_url: thumbnailUrl,
+      await pb.collection("videos").create({
+          user: user.id, title: formTitle.trim(), video_url: videoUrl, thumbnail_url: thumbnailUrl,
+          name: formVideoFile?.name || formTitle.trim(),
         });
-
-      if (error) throw error;
 
       setUploadProgress(100);
       toast.success("Vidéo ajoutée avec succès");
@@ -342,16 +309,7 @@ export default function Videos() {
         setUploadProgress(80);
       }
 
-      const { error } = await supabase
-        .from("videos")
-        .update({
-          title: formTitle.trim(),
-          video_url: videoUrl,
-          thumbnail_url: thumbnailUrl,
-        })
-        .eq("id", selectedVideo.id);
-
-      if (error) throw error;
+      await pb.collection("videos").update(selectedVideo.id, { title: formTitle.trim(), video_url: videoUrl, thumbnail_url: thumbnailUrl });
 
       setUploadProgress(100);
       toast.success(thumbnailUrl && !selectedVideo.thumbnail_url 
@@ -374,25 +332,11 @@ export default function Videos() {
 
     try {
       // First, remove the video reference from all exercices using it
-      await supabase
-        .from("exercices")
-        .update({ video_id: null, video_url: null, thumbnail_url: null })
-        .eq("video_id", video.id);
+      const linkedEx = await pb.collection("exercices").getFullList({ filter: `video = "${video.id}"` });
+      for (const ex of linkedEx) await pb.collection("exercices").update(ex.id, { video: null, video_url: null, thumbnail_url: null });
 
-      // Extract object path from URL and delete from storage
-      const urlParts = video.video_url.split("/exercice-videos/");
-      if (urlParts.length > 1) {
-        const objectPath = urlParts[1];
-        await supabase.storage.from("exercice-videos").remove([objectPath]);
-      }
-
-      // Delete the video record
-      const { error } = await supabase
-        .from("videos")
-        .delete()
-        .eq("id", video.id);
-
-      if (error) throw error;
+      // Delete the video record (PocketBase auto-deletes the linked file)
+      await pb.collection("videos").delete(video.id);
 
       toast.success("Vidéo supprimée avec succès");
       fetchVideos();

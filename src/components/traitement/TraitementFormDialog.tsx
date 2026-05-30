@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, X, Trash2, Calendar, GripVertical, ChevronUp, ChevronDown, Search, ChevronRight, Play, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -126,45 +126,25 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     if (!user) return;
 
     // Fetch user pseudo
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("pseudo")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setUserPseudo(profileData?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || null);
 
     // Fetch pathologies
-    const { data: pathoData } = await supabase
-      .from("pathologies")
-      .select("name")
-      .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     // Fetch seances (user's own seances)
-    const { data: seancesData } = await supabase
-      .from("seance_types")
-      .select("id, code, pathologie, pathologies, objectif_principal, objectifs_principaux")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    
-    setAvailableSeances(seancesData?.map(s => ({
-      ...s,
-      code: s.code || '',
-      pathologies: s.pathologies || [],
-      objectifs_principaux: s.objectifs_principaux || []
-    })) || []);
+    const seancesData = await pb.collection("seance_types").getFullList({
+      filter: `user = "${user.id}"`, sort: "-created",
+      fields: "id,code,pathologie,pathologies,objectif_principal,objectifs_principaux",
+    });
+    setAvailableSeances(seancesData.map((s: any) => ({ ...s, code: s.code || '', pathologies: s.pathologies || [], objectifs_principaux: s.objectifs_principaux || [] })));
 
     // Fetch exercices (user's own + platform exercices)
-    const { data: exercicesData } = await supabase
-      .from("exercices")
-      .select("id, code, title, description, thumbnail_url, pathologie_tags")
-      .or(`user_id.eq.${user.id},status.eq.shared`)
-      .order("title", { ascending: true });
-    
-    setAvailableExercices(exercicesData?.map(e => ({
-      ...e,
-      code: e.code || ''
-    })) || []);
+    const exercicesData = await pb.collection("exercices").getFullList({
+      filter: `(user = "${user.id}" || status = "shared")`,
+      sort: "title", fields: "id,code,title,description,thumbnail_url,pathologie_tags",
+    });
+    setAvailableExercices(exercicesData.map((e: any) => ({ ...e, code: e.code || '' })));
   };
 
   const toggleSeanceExpansion = async (seanceId: string) => {
@@ -179,13 +159,11 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
       if (!seanceExercices[seanceId]) {
         setLoadingSeanceExercices(prev => new Set(prev).add(seanceId));
         
-        const { data } = await supabase
-          .from("seance_exercices")
-          .select("id, name, description, series, repetitions, duration_seconds, exercices:exercice_id(id, title, thumbnail_url)")
-          .eq("seance_type_id", seanceId)
-          .order("ordre", { ascending: true });
-        
-        setSeanceExercices(prev => ({ ...prev, [seanceId]: data || [] }));
+        const data = await pb.collection("seance_exercices").getFullList({
+          filter: `seance_type = "${seanceId}"`, sort: "ordre",
+          expand: "exercice", fields: "id,name,description,series,repetitions,duration_seconds,expand",
+        });
+        setSeanceExercices(prev => ({ ...prev, [seanceId]: data.map((r: any) => ({ ...r, exercices: r.expand?.exercice })) }));
         setLoadingSeanceExercices(prev => {
           const next = new Set(prev);
           next.delete(seanceId);
@@ -295,81 +273,69 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     try {
       // Save new pathologie if needed
       if (newPathologie && !availablePathologies.includes(newPathologie)) {
-        await supabase.from("pathologies").insert({ user_id: user.id, name: newPathologie });
+        await pb.collection("pathologies").create({ user: user.id, name: newPathologie });
       }
 
       if (traitement?.id) {
         // Update existing traitement
-        const { error: updateError } = await supabase
-          .from("traitement_types")
-          .update({
-            pathologie: finalPathologie,
-            description
-          })
-          .eq("id", traitement.id);
-
-        if (updateError) throw updateError;
+        await pb.collection("traitement_types").update(traitement.id, { pathologie: finalPathologie, description });
 
         // Delete old tests
-        await supabase.from("traitement_tests").delete().eq("traitement_type_id", traitement.id);
+        const oldTests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${traitement.id}"` });
+        for (const t of oldTests) await pb.collection("traitement_tests").delete(t.id);
 
         // Insert new tests
         for (const test of tests) {
-          await supabase.from("traitement_tests").insert({
-            traitement_type_id: traitement.id,
-            exercice_id: test.exercice_id,
+          await pb.collection("traitement_tests").create({
+            traitement_type: traitement.id,
+            exercice: test.exercice_id,
             description: test.exercice?.description || '',
-            ordre: test.ordre
+            ordre: test.ordre,
           });
         }
 
         // Delete old seances
-        await supabase.from("traitement_seances").delete().eq("traitement_type_id", traitement.id);
+        const oldSeances = await pb.collection("traitement_seances").getFullList({ filter: `traitement_type = "${traitement.id}"` });
+        for (const s of oldSeances) await pb.collection("traitement_seances").delete(s.id);
 
         // Insert new seances
         for (const seance of selectedSeances) {
-          await supabase.from("traitement_seances").insert({
-            traitement_type_id: traitement.id,
-            seance_type_id: seance.seance_type_id,
-            ordre: seance.ordre
+          await pb.collection("traitement_seances").create({
+            traitement_type: traitement.id,
+            seance_type: seance.seance_type_id,
+            ordre: seance.ordre,
           });
         }
 
         toast.success("Traitement modifié avec succès");
       } else {
         // Create new traitement
-        const { data: newTraitement, error: insertError } = await supabase
-          .from("traitement_types")
-          .insert({
-            user_id: user.id,
+        const newTraitement = await pb.collection("traitement_types").create({
+            user: user.id,
             pathologie: finalPathologie,
             description,
             author_name: userPseudo,
             is_shared: false,
             is_copy: false,
-            is_hidden_from_list: isHiddenFromList
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
+            is_hidden_from_list: isHiddenFromList,
+          });
 
         // Insert tests
         for (const test of tests) {
-          await supabase.from("traitement_tests").insert({
-            traitement_type_id: newTraitement.id,
-            exercice_id: test.exercice_id,
+          await pb.collection("traitement_tests").create({
+            traitement_type: newTraitement.id,
+            exercice: test.exercice_id,
             description: test.exercice?.description || '',
-            ordre: test.ordre
+            ordre: test.ordre,
           });
         }
 
         // Insert seances
         for (const seance of selectedSeances) {
-          await supabase.from("traitement_seances").insert({
-            traitement_type_id: newTraitement.id,
-            seance_type_id: seance.seance_type_id,
-            ordre: seance.ordre
+          await pb.collection("traitement_seances").create({
+            traitement_type: newTraitement.id,
+            seance_type: seance.seance_type_id,
+            ordre: seance.ordre,
           });
         }
 

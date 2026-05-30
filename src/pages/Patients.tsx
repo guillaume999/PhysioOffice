@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Users, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Share2 } from "lucide-react";
 import { BulkSharePatientsDialog } from "@/components/sharing/BulkSharePatientsDialog";
@@ -76,36 +76,55 @@ export default function Patients() {
   }, [user]);
 
   const fetchPatients = async () => {
-    const { data, error } = await supabase
-      .from("patients")
-      .select("id, name, numero, status, has_mutual, remaining_sessions, prescription")
-      .order("created_at", { ascending: false });
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else setPatients(data || []);
-    setLoading(false);
+    try {
+      const data = await pb.collection("patients").getFullList({
+        filter: `user = "${user!.id}"`,
+        sort: "-created",
+        fields: "id,name,numero,status,mutuelle,seances_restantes,prescription",
+      });
+      setPatients(data.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        numero: r.numero,
+        status: r.status,
+        has_mutual: r.mutuelle,
+        remaining_sessions: r.seances_restantes,
+        prescription: r.prescription,
+      })));
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updatePatientStatus = async (patientId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("patients")
-      .update({ status: newStatus })
-      .eq("id", patientId);
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else {
+    try {
+      await pb.collection("patients").update(patientId, { status: newStatus });
       setPatients(patients.map(p => p.id === patientId ? { ...p, status: newStatus } : p));
       toast({ title: "Statut mis à jour" });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from("patients").insert({ ...formData, user_id: user?.id });
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else { 
-      toast({ title: "Patient ajouté" }); 
-      setIsDialogOpen(false); 
-      setFormData({ name: "", status: "active", has_mutual: false, remaining_sessions: 0, prescription: "none" }); 
-      fetchPatients(); 
+    try {
+      await pb.collection("patients").create({
+        name: formData.name,
+        status: formData.status,
+        mutuelle: formData.has_mutual,
+        seances_restantes: formData.remaining_sessions,
+        prescription: formData.prescription,
+        user: user?.id,
+      });
+      toast({ title: "Patient ajouté" });
+      setIsDialogOpen(false);
+      setFormData({ name: "", status: "active", has_mutual: false, remaining_sessions: 0, prescription: "none" });
+      fetchPatients();
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
   };
 

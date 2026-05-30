@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Share2, Trash2, Users, Calendar, UserCheck, Clock, Edit, Eye } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
@@ -59,38 +59,19 @@ export function ShareResourceDialog({
     setLoading(true);
 
     try {
-      let query = supabase
-        .from("resource_shares")
-        .select("*")
-        .eq("owner_user_id", user.id)
-        .eq("resource_type", resourceType);
+      let filter = `owner_user = "${user.id}" && resource_type = "${resourceType}"`;
+      if (resourceType === "patient" && resourceId) filter += ` && resource_id = "${resourceId}"`;
+      else if (resourceType === "planning") filter += ` && resource_id = null`;
 
-      if (resourceType === "patient" && resourceId) {
-        query = query.eq("resource_id", resourceId);
-      } else if (resourceType === "planning") {
-        query = query.is("resource_id", null);
-      }
+      const data = await pb.collection("resource_shares").getFullList({ filter, expand: "shared_with_user" });
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Fetch user info for each share
-      const sharesWithUsers = await Promise.all(
-        (data || []).map(async (share) => {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("email, pseudo")
-            .eq("user_id", share.shared_with_user_id)
-            .maybeSingle();
-
-          return {
-            ...share,
-            shared_user_email: profileData?.email || "Utilisateur inconnu",
-            shared_user_pseudo: profileData?.pseudo,
-          };
-        })
-      );
+      const sharesWithUsers = data.map((share: any) => ({
+        ...share,
+        shared_with_user_id: share.shared_with_user,
+        owner_user_id: share.owner_user,
+        shared_user_email: share.expand?.shared_with_user?.email || "Utilisateur inconnu",
+        shared_user_pseudo: share.expand?.shared_with_user?.pseudo,
+      }));
 
       setShares(sharesWithUsers);
     } catch (error) {
@@ -131,13 +112,8 @@ export function ShareResourceDialog({
     setSubmitting(true);
     try {
       // Find user by email
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("email", email.trim().toLowerCase())
-        .maybeSingle();
-
-      if (profileError) throw profileError;
+      const profRes = await pb.collection("users").getList(1, 1, { filter: `email = "${email.trim().toLowerCase()}"`, fields: "id" });
+      const profileData = profRes.items[0] ? { user_id: profRes.items[0].id } : null;
 
       if (!profileData) {
         toast({
@@ -166,13 +142,18 @@ export function ShareResourceDialog({
         expires_at: getExpirationDate(),
       };
 
-      const { error } = await supabase
-        .from("resource_shares")
-        .upsert(shareData, {
-          onConflict: "owner_user_id,shared_with_user_id,resource_type,resource_id",
+      try {
+        await pb.collection("resource_shares").create({
+          owner_user: shareData.owner_user_id,
+          shared_with_user: shareData.shared_with_user_id,
+          resource_type: shareData.resource_type,
+          resource_id: shareData.resource_id,
+          permission: shareData.permission,
+          expires_at: shareData.expires_at,
         });
-
-      if (error) throw error;
+      } catch(e: any) {
+        if (!e?.data?.message?.includes("unique")) throw e;
+      }
 
       toast({
         title: "Partage créé",
@@ -195,12 +176,7 @@ export function ShareResourceDialog({
 
   const handleRemoveShare = async (shareId: string) => {
     try {
-      const { error } = await supabase
-        .from("resource_shares")
-        .delete()
-        .eq("id", shareId);
-
-      if (error) throw error;
+      await pb.collection("resource_shares").delete(shareId);
 
       toast({
         title: "Partage supprimé",
@@ -220,12 +196,7 @@ export function ShareResourceDialog({
 
   const handleUpdatePermission = async (shareId: string, newPermission: string) => {
     try {
-      const { error } = await supabase
-        .from("resource_shares")
-        .update({ permission: newPermission })
-        .eq("id", shareId);
-
-      if (error) throw error;
+      await pb.collection("resource_shares").update(shareId, { permission: newPermission });
 
       toast({
         title: "Permission mise à jour",

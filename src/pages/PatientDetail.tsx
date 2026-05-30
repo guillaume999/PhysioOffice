@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
@@ -123,40 +123,28 @@ export default function PatientDetail() {
   }, [user, id]);
 
   const fetchPatient = async () => {
-    const { data, error } = await supabase
-      .from("patients")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      navigate("/patients");
-    } else if (!data) {
+    try {
+      const data = await pb.collection("patients").getOne(id as string);
+      setPatient(data as any);
+      setFormData(data as any);
+    } catch(e: any) {
       toast({ title: "Patient non trouvé", variant: "destructive" });
       navigate("/patients");
-    } else {
-      setPatient(data);
-      setFormData(data);
-    }
-    setLoading(false);
+    } finally { setLoading(false); }
   };
 
   const fetchCarePlan = async () => {
-    const { data, error } = await supabase
-      .from("patient_care_plans")
-      .select("*, bilan_initial_data")
-      .eq("patient_id", id)
-      .maybeSingle();
+    const cpRes = await pb.collection("patient_care_plans").getList(1, 1, { filter: `patient = "${id}"` });
+    const data: any = cpRes.items[0] ?? null;
+    {
     
-    if (data) {
-      setCarePlan({
+    if (data) { setCarePlan({
         id: data.id,
         comments: data.comments || "",
         motif_consultation: data.motif_consultation || "",
         bilan_kine: data.bilan_kine || "",
         objectifs_prise_en_charge: data.objectifs_prise_en_charge || "",
-        active_traitement_id: data.active_traitement_id,
+        active_traitement_id: data.active_traitement ?? data.active_traitement_id,
         bilan_initial_date: data.bilan_initial_date || null,
         traitement_start_date: data.traitement_start_date || null,
       });
@@ -174,37 +162,22 @@ export default function PatientDetail() {
       }
       
       if (data.active_traitement_id) {
-        const { data: traitement } = await supabase
-          .from("traitement_types")
-          .select("pathologie")
-          .eq("id", data.active_traitement_id)
-          .maybeSingle();
-        
-        if (traitement) {
+        try {
+          const traitement = await pb.collection("traitement_types").getOne(data.active_traitement ?? data.active_traitement_id, { fields: "pathologie" });
           setActiveTraitementName(traitement.pathologie);
-        }
+        } catch {}
 
         // Fetch seances of the treatment with their dates
-        const { data: traitementSeancesData } = await supabase
-          .from("traitement_seances")
-          .select(`
-            ordre,
-            seance_type_id,
-            seance_types (
-              objectifs_principaux,
-              objectifs_secondaires,
-              pathologies
-            )
-          `)
-          .eq("traitement_type_id", data.active_traitement_id)
-          .order("ordre", { ascending: true });
+        const traitementSeancesData = await pb.collection("traitement_seances").getFullList({
+          filter: `traitement_type = "${data.active_traitement ?? data.active_traitement_id}"`,
+          sort: "ordre", expand: "seance_type",
+        }).then(d => d.map((r: any) => ({ ...r, seance_type_id: r.seance_type, seance_types: r.expand?.seance_type })));
 
         // Fetch seance dates for this patient and treatment
-        const { data: seanceDatesData } = await supabase
-          .from("patient_traitement_seance_dates")
-          .select("seance_ordre, seance_date")
-          .eq("patient_id", id)
-          .eq("traitement_id", data.active_traitement_id);
+        const seanceDatesData = await pb.collection("patient_traitement_seance_dates").getFullList({
+          filter: `patient = "${id}" && traitement = "${data.active_traitement ?? data.active_traitement_id}"`,
+          fields: "seance_ordre,seance_date",
+        });
 
         const datesMap = new Map<number, string | null>();
         seanceDatesData?.forEach((d) => {
@@ -223,18 +196,11 @@ export default function PatientDetail() {
         }
 
         // Fetch bilans intermediaires
-        const { data: bilansData } = await supabase
-          .from("patient_bilans")
-          .select("id, position_after_seance, bilan_date, content")
-          .eq("patient_id", id)
-          .eq("traitement_id", data.active_traitement_id)
-          .order("position_after_seance", { ascending: true });
-
-        if (bilansData) {
-          setBilansIntermediaires(bilansData);
-        } else {
-          setBilansIntermediaires([]);
-        }
+        const bilansData = await pb.collection("patient_bilans").getFullList({
+          filter: `patient = "${id}" && traitement = "${data.active_traitement ?? data.active_traitement_id}"`,
+          sort: "position_after_seance", fields: "id,position_after_seance,bilan_date,content",
+        });
+        setBilansIntermediaires(bilansData as any[]);
       } else {
         setTraitementSeances([]);
         setBilansIntermediaires([]);
@@ -252,63 +218,33 @@ export default function PatientDetail() {
     setSaving(true);
     
     // Save patient data
-    const { error: patientError } = await supabase
-      .from("patients")
-      .update({
-        name: formData.name,
-        status: formData.status,
-        has_mutual: formData.has_mutual ?? false,
-        remaining_sessions: formData.remaining_sessions,
-        prescription: formData.prescription,
-        address: formData.address,
-        postal_code: formData.postal_code,
-        medical_notes: formData.medical_notes,
-        allergies: formData.allergies,
-        blood_type: formData.blood_type,
-        antecedents: formData.antecedents,
-      })
-      .eq("id", id);
-    
-    if (patientError) {
-      toast({ title: "Erreur", description: patientError.message, variant: "destructive" });
-      setSaving(false);
-      return;
-    }
+    try {
+      await pb.collection("patients").update(id as string, {
+        name: formData.name, status: formData.status,
+        mutuelle: formData.has_mutual ?? false, seances_restantes: formData.remaining_sessions,
+        prescription: formData.prescription, address: formData.address,
+        postal_code: formData.postal_code, medical_notes: formData.medical_notes,
+        allergies: formData.allergies, blood_type: formData.blood_type, antecedents: formData.antecedents,
+      });
+    } catch(e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); setSaving(false); return; }
 
     // Save or update care plan
     if (carePlan.id) {
-      await supabase
-        .from("patient_care_plans")
-        .update({
-          comments: carePlan.comments,
-          motif_consultation: carePlan.motif_consultation,
-          bilan_kine: carePlan.bilan_kine,
-          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-          active_traitement_id: carePlan.active_traitement_id,
-          bilan_initial_date: carePlan.bilan_initial_date,
-          traitement_start_date: carePlan.traitement_start_date,
-        })
-        .eq("id", carePlan.id);
+      await pb.collection("patient_care_plans").update(carePlan.id, {
+        comments: carePlan.comments, motif_consultation: carePlan.motif_consultation,
+        bilan_kine: carePlan.bilan_kine, objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+        active_traitement: carePlan.active_traitement_id,
+        bilan_initial_date: carePlan.bilan_initial_date, traitement_start_date: carePlan.traitement_start_date,
+      });
     } else {
-      const { data: newPlan } = await supabase
-        .from("patient_care_plans")
-        .insert({
-          patient_id: id,
-          user_id: user.id,
-          comments: carePlan.comments,
-          motif_consultation: carePlan.motif_consultation,
-          bilan_kine: carePlan.bilan_kine,
-          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-          active_traitement_id: carePlan.active_traitement_id,
-          bilan_initial_date: carePlan.bilan_initial_date,
-          traitement_start_date: carePlan.traitement_start_date,
-        })
-        .select()
-        .single();
-      
-      if (newPlan) {
-        setCarePlan({ ...carePlan, id: newPlan.id });
-      }
+      const newPlan = await pb.collection("patient_care_plans").create({
+        patient: id, user: user.id,
+        comments: carePlan.comments, motif_consultation: carePlan.motif_consultation,
+        bilan_kine: carePlan.bilan_kine, objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+        active_traitement: carePlan.active_traitement_id,
+        bilan_initial_date: carePlan.bilan_initial_date, traitement_start_date: carePlan.traitement_start_date,
+      });
+      if (newPlan) setCarePlan({ ...carePlan, id: newPlan.id });
     }
 
     toast({ title: "Patient mis à jour" });
@@ -319,13 +255,12 @@ export default function PatientDetail() {
   const handleDelete = async () => {
     if (!id) return;
     
-    const { error } = await supabase.from("patients").delete().eq("id", id);
-    
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await pb.collection("patients").delete(id);
       toast({ title: "Patient supprimé" });
       navigate("/patients");
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
   };
 
@@ -335,14 +270,12 @@ export default function PatientDetail() {
 
     try {
       // Create new patient with same data (except numero)
-      const { data: newPatient, error: patientError } = await supabase
-        .from("patients")
-        .insert({
-          user_id: user.id,
+      const newPatient = await pb.collection("patients").create({
+          user: user.id,
           name: `${patient.name} (copie)`,
           status: patient.status,
-          has_mutual: patient.has_mutual,
-          remaining_sessions: patient.remaining_sessions,
+          mutuelle: patient.has_mutual,
+          seances_restantes: patient.remaining_sessions,
           prescription: patient.prescription,
           address: patient.address,
           postal_code: patient.postal_code,
@@ -350,24 +283,18 @@ export default function PatientDetail() {
           allergies: patient.allergies,
           blood_type: patient.blood_type,
           antecedents: patient.antecedents,
-        })
-        .select()
-        .single();
-
-      if (patientError || !newPatient) {
-        throw patientError || new Error("Erreur lors de la création du patient");
-      }
+        });
 
       // Copy care plan if options selected
       if (duplicateOptions.keepComments || duplicateOptions.keepObjectives || duplicateOptions.keepTraitement) {
-        await supabase.from("patient_care_plans").insert({
-          patient_id: newPatient.id,
-          user_id: user.id,
+        await pb.collection("patient_care_plans").create({
+          patient: newPatient.id,
+          user: user.id,
           comments: duplicateOptions.keepComments ? carePlan.comments : "",
           motif_consultation: duplicateOptions.keepObjectives ? carePlan.motif_consultation : "",
           bilan_kine: duplicateOptions.keepObjectives ? carePlan.bilan_kine : "",
           objectifs_prise_en_charge: duplicateOptions.keepObjectives ? carePlan.objectifs_prise_en_charge : "",
-          active_traitement_id: duplicateOptions.keepTraitement ? carePlan.active_traitement_id : null,
+          active_traitement: duplicateOptions.keepTraitement ? carePlan.active_traitement_id : null,
         });
       }
 
@@ -390,57 +317,33 @@ export default function PatientDetail() {
     if (!id || !user) return;
     
     // Save patient data
-    await supabase
-      .from("patients")
-      .update({
-        name: formData.name,
-        status: formData.status,
-        has_mutual: formData.has_mutual ?? false,
-        remaining_sessions: formData.remaining_sessions,
-        prescription: formData.prescription,
-        address: formData.address,
-        postal_code: formData.postal_code,
-        medical_notes: formData.medical_notes,
-        allergies: formData.allergies,
-        blood_type: formData.blood_type,
-        antecedents: formData.antecedents,
-      })
-      .eq("id", id);
+    try { await pb.collection("patients").update(id as string, {
+      name: formData.name, status: formData.status,
+      mutuelle: formData.has_mutual ?? false, seances_restantes: formData.remaining_sessions,
+      prescription: formData.prescription, address: formData.address, postal_code: formData.postal_code,
+      medical_notes: formData.medical_notes, allergies: formData.allergies,
+      blood_type: formData.blood_type, antecedents: formData.antecedents,
+    }); } catch {}
 
     // Save or update care plan
     if (carePlan.id) {
-      await supabase
-        .from("patient_care_plans")
-        .update({
-          comments: carePlan.comments,
-          motif_consultation: carePlan.motif_consultation,
-          bilan_kine: carePlan.bilan_kine,
-          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-          active_traitement_id: carePlan.active_traitement_id,
-          bilan_initial_date: carePlan.bilan_initial_date,
-          traitement_start_date: carePlan.traitement_start_date,
-        })
-        .eq("id", carePlan.id);
+      try { await pb.collection("patient_care_plans").update(carePlan.id, {
+        comments: carePlan.comments, motif_consultation: carePlan.motif_consultation,
+        bilan_kine: carePlan.bilan_kine, objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+        active_traitement: carePlan.active_traitement_id,
+        bilan_initial_date: carePlan.bilan_initial_date, traitement_start_date: carePlan.traitement_start_date,
+      }); } catch {}
     } else {
-      const { data: newPlan } = await supabase
-        .from("patient_care_plans")
-        .insert({
-          patient_id: id,
-          user_id: user.id,
-          comments: carePlan.comments,
-          motif_consultation: carePlan.motif_consultation,
-          bilan_kine: carePlan.bilan_kine,
-          objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-          active_traitement_id: carePlan.active_traitement_id,
-          bilan_initial_date: carePlan.bilan_initial_date,
-          traitement_start_date: carePlan.traitement_start_date,
-        })
-        .select()
-        .single();
-      
-      if (newPlan) {
-        setCarePlan(prev => ({ ...prev, id: newPlan.id }));
-      }
+      try {
+        const newPlan = await pb.collection("patient_care_plans").create({
+          patient: id, user: user.id,
+          comments: carePlan.comments, motif_consultation: carePlan.motif_consultation,
+          bilan_kine: carePlan.bilan_kine, objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
+          active_traitement: carePlan.active_traitement_id,
+          bilan_initial_date: carePlan.bilan_initial_date, traitement_start_date: carePlan.traitement_start_date,
+        });
+        if (newPlan) setCarePlan(prev => ({ ...prev, id: newPlan.id }));
+      } catch {}
     }
   };
 
@@ -449,45 +352,23 @@ export default function PatientDetail() {
     setCarePlan(newCarePlan);
     
     // Set the treatment visibility to hidden by default when assigned to a patient
-    await supabase
-      .from("traitement_types")
-      .update({ is_hidden_from_list: true })
-      .eq("id", traitementId);
-    
-    const { data: traitement } = await supabase
-      .from("traitement_types")
-      .select("pathologie")
-      .eq("id", traitementId)
-      .maybeSingle();
-    
-    if (traitement) {
+    try { await pb.collection("traitement_types").update(traitementId, { is_hidden_from_list: true }); } catch {}
+    try {
+      const traitement = await pb.collection("traitement_types").getOne(traitementId, { fields: "pathologie" });
       setActiveTraitementName(traitement.pathologie);
-    }
+    } catch {}
 
-    // Auto-save the care plan with the new treatment
     if (newCarePlan.id) {
-      await supabase
-        .from("patient_care_plans")
-        .update({ active_traitement_id: traitementId })
-        .eq("id", newCarePlan.id);
+      try { await pb.collection("patient_care_plans").update(newCarePlan.id, { active_traitement: traitementId }); } catch {}
     } else if (user && id) {
-      const { data: newPlan } = await supabase
-        .from("patient_care_plans")
-        .insert({
-          patient_id: id,
-          user_id: user.id,
-          comments: newCarePlan.comments,
-          motif_consultation: newCarePlan.motif_consultation,
-          bilan_kine: newCarePlan.bilan_kine,
-          objectifs_prise_en_charge: newCarePlan.objectifs_prise_en_charge,
-          active_traitement_id: traitementId,
-        })
-        .select()
-        .single();
-      
-      if (newPlan) {
-        setCarePlan({ ...newCarePlan, id: newPlan.id });
-      }
+      try {
+        const newPlan = await pb.collection("patient_care_plans").create({
+          patient: id, user: user.id, comments: newCarePlan.comments,
+          motif_consultation: newCarePlan.motif_consultation, bilan_kine: newCarePlan.bilan_kine,
+          objectifs_prise_en_charge: newCarePlan.objectifs_prise_en_charge, active_traitement: traitementId,
+        });
+        if (newPlan) setCarePlan({ ...newCarePlan, id: newPlan.id });
+      } catch {}
     }
     
     toast({ title: "Traitement enregistré" });
@@ -503,18 +384,12 @@ export default function PatientDetail() {
     // Fetch the latest traitement created by this user to set as active
     if (!user) return;
     
-    const { data: latestTraitement } = await supabase
-      .from("traitement_types")
-      .select("id, pathologie")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (latestTraitement) {
-      // Use handleSelectTraitement to both update state and save to DB
-      await handleSelectTraitement(latestTraitement.id);
-    }
+    try {
+      const res = await pb.collection("traitement_types").getList(1, 1, {
+        filter: `user = "${user.id}"`, sort: "-created", fields: "id,pathologie",
+      });
+      if (res.items[0]) await handleSelectTraitement(res.items[0].id);
+    } catch {}
   };
 
   const handleRemoveTraitement = async () => {
@@ -523,10 +398,7 @@ export default function PatientDetail() {
     
     // Auto-save the removal
     if (carePlan.id) {
-      await supabase
-        .from("patient_care_plans")
-        .update({ active_traitement_id: null })
-        .eq("id", carePlan.id);
+      try { await pb.collection("patient_care_plans").update(carePlan.id, { active_traitement: null }); } catch {}
       toast({ title: "Traitement retiré" });
     }
   };

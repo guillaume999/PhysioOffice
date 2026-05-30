@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, MapPin, Save, Plus, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { FRENCH_REGIONS } from "@/lib/french-regions";
 
@@ -191,13 +191,8 @@ export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
 
   const fetchEntries = async () => {
     try {
-      const { data, error } = await supabase
-        .from("practitioner_directory")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-
-      if (error) {
+      let data: any[] = [];
+      try { data = await pb.collection("practitioner_directory").getFullList({ filter: `user = "${userId}"`, sort: "created" }); } catch (error) {
         console.error("Error fetching directory:", error);
         return;
       }
@@ -258,17 +253,12 @@ export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
 
       let error;
       if (entry.id) {
-        ({ error } = await supabase.from("practitioner_directory").update(payload).eq("id", entry.id));
+        try { await pb.collection("practitioner_directory").update(entry.id, payload); } catch(e: any) { error = e; }
       } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from("practitioner_directory")
-          .insert(payload)
-          .select("id")
-          .single();
-        error = insertError;
-        if (!error && inserted) {
+        try {
+          const inserted = await pb.collection("practitioner_directory").create(payload);
           setEntries((prev) => prev.map((e, i) => i === index ? { ...e, id: inserted.id } : e));
-        }
+        } catch(e: any) { error = e; }
       }
 
       if (error) {
@@ -290,12 +280,12 @@ export function DirectorySettingsCard({ userId }: DirectorySettingsCardProps) {
     const entry = entries[index];
     if (entry.id) {
       setSaving(true);
-      const { error } = await supabase.from("practitioner_directory").delete().eq("id", entry.id);
-      setSaving(false);
-      if (error) {
+      try { await pb.collection("practitioner_directory").delete(entry.id); } catch(e: any) {
+        setSaving(false);
         toast({ title: "Erreur", description: "Impossible de supprimer la fiche", variant: "destructive" });
         return;
       }
+      setSaving(false);
     }
     const newEntries = entries.filter((_, i) => i !== index);
     if (newEntries.length === 0) newEntries.push(emptyEntry());

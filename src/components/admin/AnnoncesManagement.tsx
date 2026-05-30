@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ANNONCE_TYPES, AnnonceType } from "@/lib/french-regions";
 import { 
@@ -66,22 +66,10 @@ export function AnnoncesManagement() {
     setLoading(true);
     try {
       // Fetch all annonces
-      const { data: annoncesData, error: annoncesError } = await supabase
-        .from("annonces")
-        .select("*")
-        .order("created_at", { ascending: false });
+      setAnnonces(await pb.collection("annonces").getFullList({ sort: "-created" }) as unknown as Annonce[]);
 
-      if (annoncesError) throw annoncesError;
-      setAnnonces((annoncesData as unknown as Annonce[]) || []);
-
-      // Fetch settings
-      const { data: settingsData, error: settingsError } = await supabase
-        .from("annonce_settings")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-
-      if (settingsError) throw settingsError;
+      const settingsRes = await pb.collection("annonce_settings").getList(1, 1, {});
+      const settingsData = settingsRes.items[0] ?? null;
       if (settingsData) {
         const typedSettings = settingsData as unknown as AnnonceSettings;
         setSettings(typedSettings);
@@ -107,17 +95,7 @@ export function AnnoncesManagement() {
 
     setSavingSettings(true);
     try {
-      const { error } = await supabase
-        .from("annonce_settings")
-        .update({
-          free_duration_days: formFreeDays,
-          featured_price_cents: formFeaturedPrice,
-          extension_price_cents: formExtensionPrice,
-          extension_duration_days: formExtensionDays,
-        })
-        .eq("id", settings.id);
-
-      if (error) throw error;
+      await pb.collection("annonce_settings").update(settings.id, { free_duration_days: formFreeDays, featured_price_cents: formFeaturedPrice, extension_price_cents: formExtensionPrice, extension_duration_days: formExtensionDays });
 
       toast({
         title: "Paramètres sauvegardés",
@@ -139,12 +117,7 @@ export function AnnoncesManagement() {
 
   const handleToggleFeatured = async (annonce: Annonce) => {
     try {
-      const { error } = await supabase
-        .from("annonces")
-        .update({ is_featured: !annonce.is_featured })
-        .eq("id", annonce.id);
-
-      if (error) throw error;
+      await pb.collection("annonces").update(annonce.id, { is_featured: !annonce.is_featured });
 
       toast({
         title: annonce.is_featured ? "Mise en avant retirée" : "Annonce mise en avant",
@@ -163,12 +136,7 @@ export function AnnoncesManagement() {
 
   const handleToggleActive = async (annonce: Annonce) => {
     try {
-      const { error } = await supabase
-        .from("annonces")
-        .update({ is_active: !annonce.is_active })
-        .eq("id", annonce.id);
-
-      if (error) throw error;
+      await pb.collection("annonces").update(annonce.id, { is_active: !annonce.is_active });
 
       toast({
         title: annonce.is_active ? "Annonce désactivée" : "Annonce activée",
@@ -187,9 +155,7 @@ export function AnnoncesManagement() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from("annonces").delete().eq("id", id);
-
-      if (error) throw error;
+      await pb.collection("annonces").delete(id);
 
       toast({ title: "Annonce supprimée" });
       fetchData();

@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
@@ -69,32 +69,14 @@ export default function PatientCertificats() {
 
   const fetchPatientAndCertificats = async () => {
     try {
-      const { data: patient } = await supabase
-        .from("patients")
-        .select("name")
-        .eq("id", patientId)
-        .single();
+      try { const patient = await pb.collection("patients").getOne(patientId, { fields: "name" }); setPatientName(patient.name); } catch {}
 
-      if (patient) {
-        setPatientName(patient.name);
-      }
-
-      const { data: notes, error } = await supabase
-        .from("notes")
-        .select("*")
-        .eq("patient_id", patientId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      setCertificats(
-        notes?.map((note) => ({
-          id: note.id,
-          title: note.title,
-          content: note.content || "",
-          created_at: note.created_at,
-        })) || []
-      );
+      const notes = await pb.collection("notes").getFullList({
+        filter: `patient = "${patientId}"`, sort: "-created",
+      });
+      setCertificats(notes.map((note: any) => ({
+        id: note.id, title: note.title, content: note.content || "", created_at: note.created,
+      })));
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -105,14 +87,7 @@ export default function PatientCertificats() {
 
   const fetchModels = async () => {
     try {
-      const { data, error } = await supabase
-        .from("certificat_models")
-        .select("*")
-        .order("is_platform", { ascending: false })
-        .order("title");
-
-      if (error) throw error;
-      setModels(data || []);
+      setModels(await pb.collection("certificat_models").getFullList({ sort: "-is_platform,title" }) as any[]);
     } catch (error) {
       console.error("Error fetching models:", error);
     }
@@ -122,25 +97,15 @@ export default function PatientCertificats() {
     if (!newTitle.trim() || !user) return;
 
     try {
-      const { data, error } = await supabase
-        .from("notes")
-        .insert({
-          title: newTitle,
-          content: newContent,
-          patient_id: patientId,
-          user_id: user.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      const data = await pb.collection("notes").create({
+          title: newTitle, content: newContent, patient: patientId, user: user.id,
+        });
       setCertificats([
         {
           id: data.id,
           title: data.title,
           content: data.content || "",
-          created_at: data.created_at,
+          created_at: data.created,
         },
         ...certificats,
       ]);
@@ -155,9 +120,7 @@ export default function PatientCertificats() {
 
   const handleDeleteCertificat = async (id: string) => {
     try {
-      const { error } = await supabase.from("notes").delete().eq("id", id);
-
-      if (error) throw error;
+      await pb.collection("notes").delete(id);
 
       setCertificats(certificats.filter((c) => c.id !== id));
       toast.success("Certificat supprimé");
@@ -183,15 +146,7 @@ export default function PatientCertificats() {
     if (!editingId || !editTitle.trim()) return;
 
     try {
-      const { error } = await supabase
-        .from("notes")
-        .update({
-          title: editTitle,
-          content: editContent,
-        })
-        .eq("id", editingId);
-
-      if (error) throw error;
+      await pb.collection("notes").update(editingId, { title: editTitle, content: editContent });
 
       setCertificats(
         certificats.map((c) =>
@@ -220,14 +175,12 @@ export default function PatientCertificats() {
     if (!user) return;
 
     try {
-      const { error } = await supabase.from("certificat_models").insert({
-        user_id: user.id,
+      await pb.collection("certificat_models").create({
+        user: user.id,
         title: certificat.title,
         content: certificat.content,
         is_platform: false,
       });
-
-      if (error) throw error;
 
       await fetchModels();
       toast.success("Certificat enregistré comme modèle");

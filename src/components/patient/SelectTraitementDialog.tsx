@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Plus, ClipboardList, Users } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 
 interface Traitement {
@@ -55,41 +55,36 @@ export function SelectTraitementDialog({
 
     try {
       // Fetch personal traitements (not hidden from list)
-      const { data: personal } = await supabase
-        .from("traitement_types")
-        .select("id, pathologie, description, author_name, is_shared")
-        .eq("user_id", user.id)
-        .eq("is_hidden_from_list", false)
-        .order("created_at", { ascending: false });
-
-      // Fetch shared/platform traitements (validated and not user's own)
-      const { data: platform } = await supabase
-        .from("traitement_types")
-        .select("id, pathologie, description, author_name, is_shared")
-        .eq("is_shared", true)
-        .eq("is_validated", true)
-        .neq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [personal, platform] = await Promise.all([
+        pb.collection("traitement_types").getFullList({
+          filter: `user = "${user.id}" && is_hidden_from_list = false`,
+          sort: "-created", fields: "id,pathologie,description,author_name,is_shared",
+        }),
+        pb.collection("traitement_types").getFullList({
+          filter: `is_shared = true && is_validated = true && user != "${user.id}"`,
+          sort: "-created", fields: "id,pathologie,description,author_name,is_shared",
+        }),
+      ]);
 
       // Fetch counts for personal traitements
       const personalWithCounts = await Promise.all(
         (personal || []).map(async (t) => {
-          const [{ count: seancesCount }, { count: testsCount }] = await Promise.all([
-            supabase.from("traitement_seances").select("*", { count: "exact", head: true }).eq("traitement_type_id", t.id),
-            supabase.from("traitement_tests").select("*", { count: "exact", head: true }).eq("traitement_type_id", t.id),
+          const [seancesRes, testsRes] = await Promise.all([
+            pb.collection("traitement_seances").getList(1, 1, { filter: `traitement_type = "${t.id}"` }),
+            pb.collection("traitement_tests").getList(1, 1, { filter: `traitement_type = "${t.id}"` }),
           ]);
-          return { ...t, seances_count: seancesCount || 0, tests_count: testsCount || 0 };
+          return { ...t, seances_count: seancesRes.totalItems, tests_count: testsRes.totalItems };
         })
       );
 
       // Fetch counts for platform traitements
       const platformWithCounts = await Promise.all(
         (platform || []).map(async (t) => {
-          const [{ count: seancesCount }, { count: testsCount }] = await Promise.all([
-            supabase.from("traitement_seances").select("*", { count: "exact", head: true }).eq("traitement_type_id", t.id),
-            supabase.from("traitement_tests").select("*", { count: "exact", head: true }).eq("traitement_type_id", t.id),
+          const [seancesRes, testsRes] = await Promise.all([
+            pb.collection("traitement_seances").getList(1, 1, { filter: `traitement_type = "${t.id}"` }),
+            pb.collection("traitement_tests").getList(1, 1, { filter: `traitement_type = "${t.id}"` }),
           ]);
-          return { ...t, seances_count: seancesCount || 0, tests_count: testsCount || 0 };
+          return { ...t, seances_count: seancesRes.totalItems, tests_count: testsRes.totalItems };
         })
       );
 

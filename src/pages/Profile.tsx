@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { pb } from "@/integrations/pocketbase/client";
 import { Loader2, User, Mail, Lock, Save, FileText } from "lucide-react";
 import { z } from "zod";
@@ -16,94 +15,53 @@ import { DirectorySettingsCard } from "@/components/profile/DirectorySettingsCar
 
 const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
 
-interface Profile {
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  specialty: string | null;
-  pseudo: string | null;
-}
-
 export default function Profile() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [pseudo, setPseudo] = useState("");
 
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<{ new?: string; confirm?: string }>({});
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    }
+    if (!authLoading && !user) navigate("/auth");
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
-    try {
-      const rec: any = pb.authStore.record ?? (pb.authStore as any).model ?? null;
+      const rec = pb.authStore.record;
       if (rec) {
-        setProfile({
-          first_name: rec.first_name ?? null,
-          last_name: rec.last_name ?? null,
-          email: rec.email ?? null,
-          specialty: rec.specialty ?? null,
-          pseudo: rec.pseudo ?? null,
-        });
         setFirstName(rec.first_name || "");
         setLastName(rec.last_name || "");
         setSpecialty(rec.specialty || "");
         setPseudo(rec.pseudo || "");
       }
-    } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setSaving(true);
-
     try {
-      const id = (pb.authStore.record ?? (pb.authStore as any).model)?.id;
-      if (!id) throw new Error("Utilisateur non authentifié");
-      await pb.collection("users").update(id, {
+      await pb.collection("users").update(pb.authStore.record!.id, {
         first_name: firstName,
         last_name: lastName,
-        specialty: specialty,
+        specialty,
       });
-      try {
-        await pb.collection("users").authRefresh();
-      } catch {}
-      toast({
-        title: "Profil mis à jour",
-        description: "Vos informations ont été enregistrées",
-      });
+      try { await pb.collection("users").authRefresh(); } catch {}
+      toast({ title: "Profil mis à jour", description: "Vos informations ont été enregistrées" });
     } catch (err: any) {
-      console.error("Profile update failed:", err);
-      toast({
-        title: "Erreur",
-        description: err?.message || "Impossible de mettre à jour le profil",
-        variant: "destructive",
-      });
+      toast({ title: "Erreur", description: err?.message || "Impossible de mettre à jour le profil", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -111,60 +69,35 @@ export default function Profile() {
 
   const validatePasswordForm = () => {
     const errors: { new?: string; confirm?: string } = {};
-
-    const newPasswordResult = passwordSchema.safeParse(newPassword);
-    if (!newPasswordResult.success) {
-      errors.new = newPasswordResult.error.errors[0].message;
-    }
-
-    if (newPassword !== confirmPassword) {
-      errors.confirm = "Les mots de passe ne correspondent pas";
-    }
-
+    const result = passwordSchema.safeParse(newPassword);
+    if (!result.success) errors.new = result.error.errors[0].message;
+    if (newPassword !== confirmPassword) errors.confirm = "Les mots de passe ne correspondent pas";
     setPasswordErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validatePasswordForm()) return;
-
     setPasswordLoading(true);
-
     try {
-      const { error } = await supabase.auth.updateUser({
+      await pb.collection("users").update(pb.authStore.record!.id, {
         password: newPassword,
+        passwordConfirm: newPassword,
+        oldPassword: "",
       });
-
-      if (error) {
-        toast({
-          title: "Erreur",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Mot de passe modifié",
-          description: "Votre mot de passe a été mis à jour avec succès",
-        });
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      }
+      toast({ title: "Mot de passe modifié", description: "Votre mot de passe a été mis à jour avec succès" });
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err?.message || "Impossible de modifier le mot de passe", variant: "destructive" });
     } finally {
       setPasswordLoading(false);
     }
   };
 
   if (authLoading || loading) {
-    return (
-      <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </Layout>
-    );
+    return <Layout><div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></Layout>;
   }
 
   return (
@@ -176,117 +109,60 @@ export default function Profile() {
             <h1 className="text-3xl font-display font-bold text-foreground">Mon Profil</h1>
             <p className="text-muted-foreground mt-2">Gérez vos informations personnelles et votre mot de passe</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/journal")}
-            className="gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            Journal d'activité
+          <Button variant="outline" onClick={() => navigate("/journal")} className="gap-2">
+            <FileText className="w-4 h-4" />Journal d'activité
           </Button>
         </div>
 
         <div className="space-y-6">
-          {/* Profile Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Informations personnelles
-              </CardTitle>
-              <CardDescription>
-                Mettez à jour vos informations de profil
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2"><User className="w-5 h-5" />Informations personnelles</CardTitle>
+              <CardDescription>Mettez à jour vos informations de profil</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveProfile} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">Prénom</Label>
-                    <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Jean"
-                    />
+                    <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jean" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName">Nom</Label>
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Dupont"
-                    />
+                    <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Dupont" />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="pseudo">Pseudo * (affiché comme auteur)</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="pseudo"
-                      value={pseudo}
-                      disabled
-                      readOnly
-                      className="pl-10 bg-muted"
-                    />
+                    <Input id="pseudo" value={pseudo} disabled readOnly className="pl-10 bg-muted" />
                   </div>
                   <p className="text-xs text-muted-foreground">Le pseudo ne peut pas être modifié</p>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      value={user?.email || ""}
-                      disabled
-                      className="pl-10 bg-muted"
-                    />
+                    <Input id="email" value={user?.email || ""} disabled className="pl-10 bg-muted" />
                   </div>
                   <p className="text-xs text-muted-foreground">L'email ne peut pas être modifié</p>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="specialty">Spécialité</Label>
-                  <Input
-                    id="specialty"
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    placeholder="Kinésithérapeute, Ostéopathe..."
-                  />
+                  <Input id="specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Kinésithérapeute, Ostéopathe..." />
                 </div>
-
                 <Button type="submit" disabled={saving} className="gradient-primary text-primary-foreground">
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Enregistrement...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Enregistrer
-                    </>
-                  )}
+                  {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enregistrement...</> : <><Save className="w-4 h-4 mr-2" />Enregistrer</>}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          {/* Change Password */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="w-5 h-5" />
-                Modifier le mot de passe
-              </CardTitle>
-              <CardDescription>
-                Changez votre mot de passe pour sécuriser votre compte
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" />Modifier le mot de passe</CardTitle>
+              <CardDescription>Changez votre mot de passe pour sécuriser votre compte</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleChangePassword} className="space-y-4">
@@ -294,58 +170,29 @@ export default function Profile() {
                   <Label htmlFor="newPassword">Nouveau mot de passe</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => {
-                        setNewPassword(e.target.value);
-                        setPasswordErrors((prev) => ({ ...prev, new: undefined }));
-                      }}
-                      placeholder="••••••••"
-                      className={`pl-10 ${passwordErrors.new ? "border-destructive" : ""}`}
-                    />
+                    <Input id="newPassword" type="password" value={newPassword}
+                      onChange={(e) => { setNewPassword(e.target.value); setPasswordErrors(p => ({ ...p, new: undefined })); }}
+                      placeholder="••••••••" className={`pl-10 ${passwordErrors.new ? "border-destructive" : ""}`} />
                   </div>
-                  {passwordErrors.new && (
-                    <p className="text-sm text-destructive">{passwordErrors.new}</p>
-                  )}
+                  {passwordErrors.new && <p className="text-sm text-destructive">{passwordErrors.new}</p>}
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirmer le nouveau mot de passe</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        setPasswordErrors((prev) => ({ ...prev, confirm: undefined }));
-                      }}
-                      placeholder="••••••••"
-                      className={`pl-10 ${passwordErrors.confirm ? "border-destructive" : ""}`}
-                    />
+                    <Input id="confirmPassword" type="password" value={confirmPassword}
+                      onChange={(e) => { setConfirmPassword(e.target.value); setPasswordErrors(p => ({ ...p, confirm: undefined })); }}
+                      placeholder="••••••••" className={`pl-10 ${passwordErrors.confirm ? "border-destructive" : ""}`} />
                   </div>
-                  {passwordErrors.confirm && (
-                    <p className="text-sm text-destructive">{passwordErrors.confirm}</p>
-                  )}
+                  {passwordErrors.confirm && <p className="text-sm text-destructive">{passwordErrors.confirm}</p>}
                 </div>
-
                 <Button type="submit" disabled={passwordLoading} variant="outline">
-                  {passwordLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Modification...
-                    </>
-                  ) : (
-                    "Modifier le mot de passe"
-                  )}
+                  {passwordLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Modification...</> : "Modifier le mot de passe"}
                 </Button>
               </form>
             </CardContent>
           </Card>
-          {/* Directory Settings */}
+
           {user && <DirectorySettingsCard userId={user.id} />}
         </div>
       </div>

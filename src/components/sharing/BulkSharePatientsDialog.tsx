@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Share2, Search, Users, UserCheck, Clock, Edit, Eye } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { addDays, addWeeks, addMonths } from "date-fns";
@@ -103,13 +103,8 @@ export function BulkSharePatientsDialog({ patients, trigger }: BulkSharePatients
     setSubmitting(true);
     try {
       // Find user by email
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("email", email.trim().toLowerCase())
-        .maybeSingle();
-
-      if (profileError) throw profileError;
+      const profileRes = await pb.collection("users").getList(1, 1, { filter: `email = "${email.trim().toLowerCase()}"`, fields: "id" });
+      const profileData = profileRes.items[0] ? { user_id: profileRes.items[0].id } : null;
 
       if (!profileData) {
         toast({
@@ -141,13 +136,21 @@ export function BulkSharePatientsDialog({ patients, trigger }: BulkSharePatients
         expires_at: expiresAt,
       }));
 
-      const { error } = await supabase
-        .from("resource_shares")
-        .upsert(shares, {
-          onConflict: "owner_user_id,shared_with_user_id,resource_type,resource_id",
-        });
-
-      if (error) throw error;
+      for (const share of shares) {
+        try {
+          await pb.collection("resource_shares").create({
+            owner_user: share.owner_user_id,
+            shared_with_user: share.shared_with_user_id,
+            resource_type: share.resource_type,
+            resource_id: share.resource_id,
+            permission: share.permission,
+            expires_at: share.expires_at,
+          });
+        } catch(e: any) {
+          // ignore duplicate
+          if (!e?.data?.message?.includes("unique")) throw e;
+        }
+      }
 
       toast({
         title: "Partage créé",

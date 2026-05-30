@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Upload, Video, Loader2, X, Pencil, Library, Search } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SearchableExerciceTitleInput } from "./SearchableExerciceTitleInput";
@@ -95,27 +95,15 @@ export function AddExerciceToSeanceDialog({
     setLoading(true);
 
     // Fetch user pseudo
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("pseudo")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setUserPseudo(profileData?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || null);
 
     // Fetch exercices (user's own exercices)
-    const { data: exData } = await supabase
-      .from("exercices")
-      .select("id, code, title, description, video_url, thumbnail_url")
-      .eq("user_id", user.id)
-      .order("title");
-    setAvailableExercices(exData || []);
+    const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url" });
+    setAvailableExercices(exData);
 
     // Fetch pathologies for search
-    const { data: pathoData } = await supabase
-      .from("pathologies")
-      .select("name")
-      .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     setLoading(false);
   };
@@ -217,21 +205,11 @@ export function AddExerciceToSeanceDialog({
       
       const objectName = `${user.id}/thumbnails/${Date.now()}.jpg`;
       
-      const { error: uploadError } = await supabase.storage
-        .from("exercice-videos")
-        .upload(objectName, blob, {
-          cacheControl: "3600",
-          contentType: "image/jpeg",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error("Thumbnail upload error:", uploadError);
-        return null;
-      }
-
-      const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
-      return data.publicUrl;
+      const fd = new FormData();
+      fd.append("file", blob, "thumbnail.jpg");
+      fd.append("user", user.id);
+      const rec = await pb.collection("video_thumbnails").create(fd);
+      return pb.files.getURL(rec, rec.file as string);
     } catch (error) {
       console.error("Error uploading thumbnail:", error);
       return null;
@@ -254,29 +232,22 @@ export function AddExerciceToSeanceDialog({
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("exercice-videos")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("exercice-videos").getPublicUrl(fileName);
+      const vfd = new FormData();
+      vfd.append("file", file);
+      vfd.append("user", user.id);
+      const vRec = await pb.collection("exercice_videos").create(vfd);
+      const publicUrl = pb.files.getURL(vRec, vRec.file as string);
 
       // Also add to video library for sync
-      const { error: videoError } = await supabase
-        .from("videos")
-        .insert({
-          user_id: user.id,
+      try {
+        await pb.collection("videos").create({
+          user: user.id,
           title: name.trim() || file.name.replace(/\.[^/.]+$/, ""),
           video_url: publicUrl,
           name: file.name,
-          thumbnail_url: generatedThumbnailUrl
+          thumbnail_url: generatedThumbnailUrl,
         });
+      } catch(e) { console.error("Video library error:", e); }
 
       if (videoError) {
         console.error("Error adding to video library:", videoError);
@@ -303,14 +274,8 @@ export function AddExerciceToSeanceDialog({
     if (!user) return;
     setLibraryLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("id, title, video_url, thumbnail_url")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setLibraryVideos(data || []);
+      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      setLibraryVideos(data);
     } catch (error) {
       console.error("Error fetching library videos:", error);
       toast.error("Erreur lors du chargement de la vidéothèque");
@@ -352,42 +317,26 @@ export function AddExerciceToSeanceDialog({
         // Persist any new pathologies to the user's library
         for (const patho of pathologieTags) {
           if (!availablePathologies.includes(patho)) {
-            await supabase
-              .from("pathologies")
-              .insert({ user_id: user.id, name: patho });
+            await pb.collection("pathologies").create({ user: user.id, name: patho });
           }
         }
 
-        const { data: newExercice, error: exerciceError } = await supabase
-          .from("exercices")
-          .insert({
-            user_id: user.id,
-            title: name.trim(),
-            description: description.trim() || null,
-            status: "draft",
-            pathologie_tags: pathologieTags,
-            video_url: videoUrl || null,
-            thumbnail_url: thumbnailUrl || null,
-            author_name: userPseudo,
-          })
-          .select()
-          .single();
-
-        if (exerciceError) {
-          console.error("Error creating exercice:", exerciceError);
-          throw exerciceError;
-        }
+        const newExercice = await pb.collection("exercices").create({
+            user: user.id, title: name.trim(), description: description.trim() || null,
+            status: "draft", pathologie_tags: pathologieTags,
+            video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null, author_name: userPseudo,
+          });
         finalExerciceId = newExercice.id;
       }
 
       // Add to seance_exercices
-      const { error } = await supabase.from("seance_exercices").insert({
-        seance_type_id: seanceTypeId,
-        exercice_id: finalExerciceId,
+      await pb.collection("seance_exercices").create({
+        seance_type: seanceTypeId,
+        exercice: finalExerciceId,
         name: name.trim(),
         description: description.trim() || null,
-        series: series,
-        repetitions: repetitions,
+        series,
+        repetitions,
         duration_seconds: durationSeconds,
         force_1: force1,
         duration_seconds_2: durationSeconds2,
@@ -396,18 +345,16 @@ export function AddExerciceToSeanceDialog({
         ordre: currentExercicesCount + 1,
       });
 
-      if (error) throw error;
-
       // Log activity
-      await supabase.from("user_activity_logs").insert({
-        user_id: user.id,
+      try { await pb.collection("user_activity_logs").create({
+        user: user.id,
         section: "seances",
         action_type: "edit",
         title: `Exercice "${name.trim()}" ajouté${patientName ? ` pour ${patientName}` : ""}`,
         details: patientName ? `Ajout de l'exercice à la séance du patient ${patientName}` : `Ajout de l'exercice à la séance`,
         resource_id: seanceTypeId,
         resource_type: "seance_type",
-      });
+      }); } catch(e) {}
 
       toast.success("Exercice ajouté");
       onSuccess();

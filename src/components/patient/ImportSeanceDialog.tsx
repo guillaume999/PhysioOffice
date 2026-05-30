@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { Loader2, Search, ChevronDown, ChevronRight, Play } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -63,14 +63,13 @@ export function ImportSeanceDialog({
 
   const fetchSeances = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("seance_types")
-      .select("id, pathologie, pathologies, objectif_principal, objectifs_principaux, author_name, is_shared, is_validated, user_id")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setSeances(data);
-    }
+    try {
+      const data = await pb.collection("seance_types").getFullList({
+        sort: "-created",
+        fields: "id,pathologie,pathologies,objectif_principal,objectifs_principaux,author_name,is_shared,is_validated,user",
+      });
+      setSeances(data.map((r: any) => ({ ...r, user_id: r.user })));
+    } catch(e) { console.error(e); }
     setLoading(false);
   };
 
@@ -79,22 +78,14 @@ export function ImportSeanceDialog({
     
     setLoadingExercices(prev => new Set(prev).add(seanceId));
     
-    const { data, error } = await supabase
-      .from("seance_exercices")
-      .select(`
-        id,
-        ordre,
-        series,
-        repetitions,
-        duration_seconds,
-        exercice:exercices(id, title, thumbnail_url)
-      `)
-      .eq("seance_type_id", seanceId)
-      .order("ordre", { ascending: true });
-
-    if (!error && data) {
-      setExercicesMap(prev => ({ ...prev, [seanceId]: data }));
-    }
+    try {
+      const data = await pb.collection("seance_exercices").getFullList({
+        filter: `seance_type = "${seanceId}"`,
+        sort: "ordre",
+        expand: "exercice",
+      });
+      setExercicesMap(prev => ({ ...prev, [seanceId]: data.map((r: any) => ({ ...r, exercice: r.expand?.exercice })) }));
+    } catch(e) { console.error(e); }
     
     setLoadingExercices(prev => {
       const next = new Set(prev);

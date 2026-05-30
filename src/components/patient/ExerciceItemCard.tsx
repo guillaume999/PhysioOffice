@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2, MessageSquare, ChevronUp, ChevronDown, Library, Search } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { CommentDialog } from "./CommentDialog";
@@ -105,22 +105,13 @@ export function ExerciceItemCard({
     if (!isEditing || !user) return;
     let cancelled = false;
     (async () => {
-      const [{ data: exData }, { data: pathoData }] = await Promise.all([
-        supabase
-          .from("exercices")
-          .select("id, code, title, description, video_url, thumbnail_url, pathologie_tags")
-          .eq("user_id", user.id)
-          .order("title"),
-        supabase
-          .from("pathologies")
-          .select("name")
-          .eq("user_id", user.id),
+      const [exData, pathoData] = await Promise.all([
+        pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,pathologie_tags" }),
+        pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" }),
       ]);
       if (cancelled) return;
-      setAvailableExercices((exData as ExerciceOption[]) || []);
-      setAvailablePathologies([
-        ...new Set((((pathoData as any[]) ?? []).map((p: any) => p.name as string))),
-      ]);
+      setAvailableExercices(exData as unknown as ExerciceOption[]);
+      setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
       // Pre-load existing pathology tags from the linked exercise
       if (exercice.exercice_id) {
         const linked = (exData as Array<{ id: string; pathologie_tags?: string[] | null }> | null)?.find(
@@ -220,21 +211,11 @@ export function ExerciceItemCard({
       
       const objectName = `${user.id}/thumbnails/${Date.now()}.jpg`;
       
-      const { error: uploadError } = await supabase.storage
-        .from("exercice-videos")
-        .upload(objectName, blob, {
-          cacheControl: "3600",
-          contentType: "image/jpeg",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error("Thumbnail upload error:", uploadError);
-        return null;
-      }
-
-      const { data } = supabase.storage.from("exercice-videos").getPublicUrl(objectName);
-      return data.publicUrl;
+      const fd = new FormData();
+      fd.append("file", blob, "thumbnail.jpg");
+      fd.append("user", user.id);
+      const rec = await pb.collection("video_thumbnails").create(fd);
+      return pb.files.getURL(rec, rec.file as string);
     } catch (error) {
       console.error("Error uploading thumbnail:", error);
       return null;
@@ -257,24 +238,16 @@ export function ExerciceItemCard({
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("exercice-videos")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("exercice-videos").getPublicUrl(fileName);
+      const vfd = new FormData();
+      vfd.append("file", file);
+      vfd.append("user", user.id);
+      const vRec = await pb.collection("exercice_videos").create(vfd);
+      const publicUrl = pb.files.getURL(vRec, vRec.file as string);
 
       // Also add to video library for sync
-      const { error: videoError } = await supabase
-        .from("videos")
-        .insert({
-          user_id: user.id,
+      const videoError = null;
+      try { await pb.collection("videos").create({
+          user: user.id,
           title: editValues.name || file.name,
           video_url: publicUrl,
           name: file.name,
@@ -304,14 +277,8 @@ export function ExerciceItemCard({
     if (!user) return;
     setLibraryLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("id, title, video_url, thumbnail_url")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setLibraryVideos(data || []);
+      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      setLibraryVideos(data);
     } catch (error) {
       console.error("Error fetching library videos:", error);
       toast.error("Erreur lors du chargement de la vidéothèque");
@@ -349,9 +316,7 @@ export function ExerciceItemCard({
       const contentModified = nameChanged || descriptionChanged || videoChanged;
 
       // Update seance_exercices
-      const { error } = await supabase
-        .from("seance_exercices")
-        .update({
+      await pb.collection("seance_exercices").update(exercice.id, {
           series: editValues.series,
           repetitions: editValues.repetitions,
           duration_seconds: editValues.duration_seconds,
@@ -361,10 +326,7 @@ export function ExerciceItemCard({
           comment: editValues.comment || null,
           name: editValues.name,
           description: editValues.description,
-        })
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+        });
 
       // If there's a linked exercise and content was modified, update it
       if (exercice.exercice_id && (contentModified || pathologieTags.length >= 0)) {
@@ -384,23 +346,18 @@ export function ExerciceItemCard({
           updateData.status = "draft";
         }
         
-        const { error: exerciceError } = await supabase
-          .from("exercices")
-          .update(updateData)
-          .eq("id", exercice.exercice_id);
-
-        if (exerciceError) {
-          console.error("Error updating exercise:", exerciceError);
-        } else if (contentModified) {
-          // Update local visibility state
+        try {
+          await pb.collection("exercices").update(exercice.exercice_id!, updateData);
+          if (contentModified) {
           setIsVisible(false);
-        }
+          }
+        } catch(e) { console.error("Error updating exercise:", e); }
       }
 
       // Persist any newly-typed pathologies to the user's library
       for (const patho of pathologieTags) {
         if (!availablePathologies.includes(patho)) {
-          await supabase.from("pathologies").insert({ user_id: user!.id, name: patho });
+          await pb.collection("pathologies").create({ user: user!.id, name: patho });
         }
       }
       
@@ -444,12 +401,7 @@ export function ExerciceItemCard({
       // Toggle between "draft" (hidden) and "shared" (visible in list)
       const newStatus = newVisibility ? "shared" : "draft";
       
-      const { error } = await supabase
-        .from("exercices")
-        .update({ status: newStatus })
-        .eq("id", exercice.exercice_id);
-
-      if (error) throw error;
+      await pb.collection("exercices").update(exercice.exercice_id!, { status: newStatus });
       
       setIsVisible(newVisibility);
       toast.success(newVisibility ? "Exercice visible dans la liste" : "Exercice masqué de la liste");
@@ -464,12 +416,7 @@ export function ExerciceItemCard({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("seance_exercices")
-        .delete()
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+      await pb.collection("seance_exercices").delete(exercice.id);
 
       toast.success("Exercice supprimé");
       setDeleteDialogOpen(false);
@@ -485,12 +432,7 @@ export function ExerciceItemCard({
   const handleSaveExerciceComment = async (newComment: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("seance_exercices")
-        .update({ comment: newComment || null })
-        .eq("id", exercice.id);
-
-      if (error) throw error;
+      await pb.collection("seance_exercices").update(exercice.id, { comment: newComment || null });
 
       setEditValues({ ...editValues, comment: newComment });
       toast.success("Commentaire enregistré");

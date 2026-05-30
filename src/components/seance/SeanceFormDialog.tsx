@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableCreatableSelect } from "./SearchableCreatableSelect";
 import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil, Calendar } from "lucide-react";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -106,39 +106,27 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
     if (!user) return;
 
     // Fetch user pseudo
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("pseudo")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setUserPseudo(profileData?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || null);
 
     // Fetch pathologies
-    const { data: pathoData } = await supabase
-      .from("pathologies")
-      .select("name")
-      .eq("user_id", user.id);
-    setAvailablePathologies([...new Set(((pathoData as any[]) ?? []).map((p: any) => p.name as string))]);
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     // Fetch objectifs
-    const { data: objData } = await supabase
-      .from("objectifs")
-      .select("name, type")
-      .eq("user_id", user.id);
+    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name,type" });
     
-    const objArr = (objData as any[]) ?? [];
+    const objArr = objData as any[];
     const principaux = objArr.filter((o: any) => o.type === "principal").map((o: any) => o.name as string);
     const secondaires = objArr.filter((o: any) => o.type === "secondaire").map((o: any) => o.name as string);
     setAvailableObjectifsPrincipaux([...new Set(principaux)]);
     setAvailableObjectifsSecondaires([...new Set(secondaires)]);
 
     // Fetch exercices (only user's own exercices)
-    const { data: exData } = await supabase
-      .from("exercices")
-      .select("id, code, title, description, video_url, thumbnail_url")
-      .eq("user_id", user.id)
-      .order("title");
-    setAvailableExercices(exData || []);
+    const exData = await pb.collection("exercices").getFullList({
+      filter: `user = "${user.id}"`, sort: "title",
+      fields: "id,code,title,description,video_url,thumbnail_url",
+    });
+    setAvailableExercices(exData);
   };
 
   const resetForm = () => {
@@ -197,18 +185,11 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
       
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('videos')
-        .getPublicUrl(fileName);
+      const vfd = new FormData();
+      vfd.append("file", file);
+      vfd.append("user", user.id);
+      const vRec = await pb.collection("exercice_videos").create(vfd);
+      const publicUrl = pb.files.getURL(vRec, vRec.file as string);
       
       const updated = [...exercices];
       updated[index] = { ...updated[index], video_url: publicUrl, video_file: null };
@@ -266,43 +247,38 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       // Save new pathologies
       for (const patho of pathologies) {
         if (!availablePathologies.includes(patho)) {
-          await supabase.from("pathologies").insert({ user_id: user.id, name: patho });
+          await pb.collection("pathologies").create({ user: user.id, name: patho });
         }
       }
 
       // Save new objectifs principaux
       for (const obj of objectifsPrincipaux) {
         if (!availableObjectifsPrincipaux.includes(obj)) {
-          await supabase.from("objectifs").insert({ user_id: user.id, name: obj, type: "principal" });
+          await pb.collection("objectifs").create({ user: user.id, name: obj, type: "principal" });
         }
       }
 
       // Save new objectifs secondaires
       for (const obj of objectifsSecondaires) {
         if (!availableObjectifsSecondaires.includes(obj)) {
-          await supabase.from("objectifs").insert({ user_id: user.id, name: obj, type: "secondaire" });
+          await pb.collection("objectifs").create({ user: user.id, name: obj, type: "secondaire" });
         }
       }
 
       if (seance?.id) {
         // Update existing seance
-        const { error: updateError } = await supabase
-          .from("seance_types")
-          .update({
+        await pb.collection("seance_types").update(seance.id, {
             pathologies,
             objectifs_principaux: objectifsPrincipaux,
             objectifs_secondaires: objectifsSecondaires,
-            // Keep legacy fields for backward compatibility
             pathologie: pathologies[0] || "",
             objectif_principal: objectifsPrincipaux[0] || "",
-            objectif_secondaire: objectifsSecondaires[0] || null
-          })
-          .eq("id", seance.id);
-
-        if (updateError) throw updateError;
+            objectif_secondaire: objectifsSecondaires[0] || null,
+          });
 
         // Delete old exercices
-        await supabase.from("seance_exercices").delete().eq("seance_type_id", seance.id);
+        const oldEx = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${seance.id}"` });
+        for (const e of oldEx) await pb.collection("seance_exercices").delete(e.id);
 
         // Insert new exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
@@ -310,36 +286,29 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
           
           // If it's a custom exercice (no exercice_id) and has a name, create it in the exercices table
           if (!exerciceId && ex.name && ex.name.trim()) {
-            const { data: newExercice, error: exerciceError } = await supabase
-              .from("exercices")
-              .insert({
-                user_id: user.id,
+            try {
+              const newExercice = await pb.collection("exercices").create({
+                user: user.id,
                 title: ex.name.trim(),
                 description: ex.description?.trim() || null,
                 status: "draft",
                 pathologie_tags: [],
                 video_url: ex.video_url || null,
-                author_name: userPseudo
-              })
-              .select()
-              .single();
-            
-            if (exerciceError) {
-              console.error("Error creating exercice:", exerciceError);
-            } else if (newExercice) {
+                author_name: userPseudo,
+              });
               exerciceId = newExercice.id;
-            }
+            } catch(e) { console.error("Error creating exercice:", e); }
           }
           
-          await supabase.from("seance_exercices").insert({
-            seance_type_id: seance.id,
-            exercice_id: exerciceId,
+          await pb.collection("seance_exercices").create({
+            seance_type: seance.id,
+            exercice: exerciceId,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,
             duration_seconds: ex.duration_seconds,
             series: ex.series,
-            ordre: ex.ordre
+            ordre: ex.ordre,
           });
         }
 
@@ -347,14 +316,11 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       } else {
         // Create new seance
         var newSeance: { id: string } | null = null;
-        const { data: createdSeance, error: insertError } = await supabase
-          .from("seance_types")
-          .insert({
-            user_id: user.id,
+        newSeance = await pb.collection("seance_types").create({
+            user: user.id,
             pathologies,
             objectifs_principaux: objectifsPrincipaux,
             objectifs_secondaires: objectifsSecondaires,
-            // Legacy fields
             pathologie: pathologies[0] || "",
             objectif_principal: objectifsPrincipaux[0] || "",
             objectif_secondaire: objectifsSecondaires[0] || null,
@@ -362,12 +328,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
             is_shared: false,
             is_copy: false,
             is_hidden_from_list: hiddenFromListByDefault,
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        newSeance = createdSeance as { id: string } | null;
+          });
 
         // Insert exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
@@ -375,36 +336,29 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
           
           // If it's a custom exercice (no exercice_id) and has a name, create it in the exercices table
           if (!exerciceId && ex.name && ex.name.trim()) {
-            const { data: newExercice, error: exerciceError } = await supabase
-              .from("exercices")
-              .insert({
-                user_id: user.id,
+            try {
+              const newExercice = await pb.collection("exercices").create({
+                user: user.id,
                 title: ex.name.trim(),
                 description: ex.description?.trim() || null,
                 status: "draft",
                 pathologie_tags: [],
                 video_url: ex.video_url || null,
-                author_name: userPseudo
-              })
-              .select()
-              .single();
-            
-            if (exerciceError) {
-              console.error("Error creating exercice:", exerciceError);
-            } else if (newExercice) {
+                author_name: userPseudo,
+              });
               exerciceId = newExercice.id;
-            }
+            } catch(e) { console.error("Error creating exercice:", e); }
           }
           
-          await supabase.from("seance_exercices").insert({
-            seance_type_id: newSeance!.id,
-            exercice_id: exerciceId,
+          await pb.collection("seance_exercices").create({
+            seance_type: newSeance!.id,
+            exercice: exerciceId,
             name: ex.name,
             description: ex.description,
             repetitions: ex.repetitions,
             duration_seconds: ex.duration_seconds,
             series: ex.series,
-            ordre: ex.ordre
+            ordre: ex.ordre,
           });
         }
 

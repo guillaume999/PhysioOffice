@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Loader2, Printer, Plus, Trash2, X, Copy, Share2, Pencil } from "lucide-react";
@@ -92,13 +92,16 @@ export default function Planning() {
   }, [user, currentDate, viewMode]);
 
   const fetchPatients = async () => {
-    const { data, error } = await supabase
-      .from("patients")
-      .select("id, name, numero, status")
-      .neq("status", "inactive")
-      .order("name");
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else setPatients(data || []);
+    try {
+      const data = await pb.collection("patients").getFullList({
+        filter: `user = "${user!.id}" && status != "Inactif"`,
+        sort: "name",
+        fields: "id,name,numero,status",
+      });
+      setPatients(data as any[]);
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
   };
 
   const fetchAppointments = async () => {
@@ -111,29 +114,23 @@ export default function Planning() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("user_id", userId)
-      .gte("start_time", weekStart.toISOString())
-      .lte("start_time", weekEnd.toISOString())
-      .order("start_time");
-
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      // Fetch patient info for each appointment
-      const appointmentsWithPatients = await Promise.all(
-        (data || []).map(async (apt) => {
-          if (!apt.patient_id) return { ...apt, patient: undefined };
-          const patient = patients.find(p => p.id === apt.patient_id) ||
-            (await supabase.from("patients").select("id, name, numero, status").eq("id", apt.patient_id).single()).data;
-          return { ...apt, patient: patient || undefined };
-        })
-      );
+    try {
+      const data = await pb.collection("appointments").getFullList({
+        filter: `user = "${userId}" && start_time >= "${weekStart.toISOString()}" && start_time <= "${weekEnd.toISOString()}"`,
+        sort: "start_time",
+        expand: "patient",
+      });
+      const appointmentsWithPatients = data.map((apt: any) => ({
+        ...apt,
+        patient_id: apt.patient,
+        patient: apt.expand?.patient || patients.find(p => p.id === apt.patient) || undefined,
+      }));
       setAppointments(appointmentsWithPatients);
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getWeekDays = () => {
@@ -172,37 +169,34 @@ export default function Planning() {
     const endTime = new Date(startTime.getTime() + duration * 60000);
 
     if (editingAppointmentId) {
-      const { error } = await supabase
-        .from("appointments")
-        .update({
-          patient_id: selectedPatientId,
+      try {
+        await pb.collection("appointments").update(editingAppointmentId, {
+          patient: selectedPatientId,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           notes: appointmentNotes || null,
-        })
-        .eq("id", editingAppointmentId);
-      if (error) {
-        toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      } else {
+        });
         toast({ title: "Rendez-vous modifié" });
         setIsDialogOpen(false);
         setEditingAppointmentId(null);
         fetchAppointments();
+      } catch (e: any) {
+        toast({ title: "Erreur", description: e.message, variant: "destructive" });
       }
     } else {
-      const { error } = await supabase.from("appointments").insert({
-        user_id: user?.id,
-        patient_id: selectedPatientId,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        notes: appointmentNotes || null,
-      });
-      if (error) {
-        toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      } else {
+      try {
+        await pb.collection("appointments").create({
+          user: user?.id,
+          patient: selectedPatientId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          notes: appointmentNotes || null,
+        });
         toast({ title: "Rendez-vous créé" });
         setIsDialogOpen(false);
         fetchAppointments();
+      } catch (e: any) {
+        toast({ title: "Erreur", description: e.message, variant: "destructive" });
       }
     }
   };
@@ -210,12 +204,12 @@ export default function Planning() {
   const handleDeleteAppointment = async (appointmentId: string) => {
     if (!confirm("Supprimer ce rendez-vous ?")) return;
     
-    const { error } = await supabase.from("appointments").delete().eq("id", appointmentId);
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await pb.collection("appointments").delete(appointmentId);
       toast({ title: "Rendez-vous supprimé" });
       fetchAppointments();
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
   };
 
@@ -259,13 +253,9 @@ export default function Planning() {
         const sourceWeekEnd = endOfWeek(sourceDate, { weekStartsOn: 1 });
         const targetWeekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
         
-        const { data: sourceAppointments, error: fetchError } = await supabase
-          .from("appointments")
-          .select("*")
-          .gte("start_time", sourceWeekStart.toISOString())
-          .lte("start_time", sourceWeekEnd.toISOString());
-        
-        if (fetchError) throw fetchError;
+        const sourceAppointments = await pb.collection("appointments").getFullList({
+          filter: `user = "${user!.id}" && start_time >= "${sourceWeekStart.toISOString()}" && start_time <= "${sourceWeekEnd.toISOString()}"`,
+        });
         
         const appointmentsToDuplicate = (sourceAppointments || []).map(apt => {
           const originalStart = parseISO(apt.start_time);
@@ -277,8 +267,8 @@ export default function Planning() {
           const newEnd = setMinutes(setHours(newStartDate, originalEnd.getHours()), originalEnd.getMinutes());
           
           return {
-            user_id: user?.id,
-            patient_id: apt.patient_id,
+            user: user?.id,
+            patient: apt.patient,
             start_time: newStart.toISOString(),
             end_time: newEnd.toISOString(),
             notes: apt.notes,
@@ -286,8 +276,7 @@ export default function Planning() {
         });
         
         if (appointmentsToDuplicate.length > 0) {
-          const { error } = await supabase.from("appointments").insert(appointmentsToDuplicate);
-          if (error) throw error;
+          for (const a of appointmentsToDuplicate) await pb.collection("appointments").create(a);
         }
         
         toast({ title: "Semaine dupliquée", description: `${appointmentsToDuplicate.length} rendez-vous copiés vers la semaine du ${format(targetWeekStart, "d MMMM", { locale: fr })}` });
@@ -298,13 +287,9 @@ export default function Planning() {
         const sourceDayEnd = new Date(sourceDate);
         sourceDayEnd.setHours(23, 59, 59, 999);
         
-        const { data: sourceAppointments, error: fetchError } = await supabase
-          .from("appointments")
-          .select("*")
-          .gte("start_time", sourceDayStart.toISOString())
-          .lte("start_time", sourceDayEnd.toISOString());
-        
-        if (fetchError) throw fetchError;
+        const sourceAppointments = await pb.collection("appointments").getFullList({
+          filter: `user = "${user!.id}" && start_time >= "${sourceDayStart.toISOString()}" && start_time <= "${sourceDayEnd.toISOString()}"`,
+        });
         
         const appointmentsToDuplicate = (sourceAppointments || []).map(apt => {
           const originalStart = parseISO(apt.start_time);
@@ -314,8 +299,8 @@ export default function Planning() {
           const newEnd = setMinutes(setHours(targetDate, originalEnd.getHours()), originalEnd.getMinutes());
           
           return {
-            user_id: user?.id,
-            patient_id: apt.patient_id,
+            user: user?.id,
+            patient: apt.patient,
             start_time: newStart.toISOString(),
             end_time: newEnd.toISOString(),
             notes: apt.notes,
@@ -323,8 +308,7 @@ export default function Planning() {
         });
         
         if (appointmentsToDuplicate.length > 0) {
-          const { error } = await supabase.from("appointments").insert(appointmentsToDuplicate);
-          if (error) throw error;
+          for (const a of appointmentsToDuplicate) await pb.collection("appointments").create(a);
         }
         
         toast({ title: "Jour dupliqué", description: `${appointmentsToDuplicate.length} rendez-vous copiés vers le ${format(targetDate, "d MMMM", { locale: fr })}` });

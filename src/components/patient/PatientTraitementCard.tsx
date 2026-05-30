@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ClipboardList, Plus, FileDown, Calendar, FileText, ChevronDown, ChevronUp, X, Edit, Share2, Play, ClipboardCheck, AlertTriangle, Printer, MessageSquare, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -175,64 +175,47 @@ export function PatientTraitementCard({
     if (showLoader) setLoading(true);
 
     try {
-      const { data: traitementData } = await supabase
-        .from("traitement_types")
-        .select("id, pathologie, description, author_name, is_hidden_from_list")
-        .eq("id", activeTraitementId)
-        .maybeSingle();
+      let traitementData: any = null;
+      try { traitementData = await pb.collection("traitement_types").getOne(activeTraitementId, { fields: "id,pathologie,description,author_name,is_hidden_from_list" }); } catch {}
 
       if (traitementData) {
-        const { data: testsData } = await supabase
-          .from("traitement_tests")
-          .select("*, exercices(id, title, description, thumbnail_url)")
-          .eq("traitement_type_id", activeTraitementId)
-          .order("ordre", { ascending: true });
+        const testsData = await pb.collection("traitement_tests").getFullList({
+          filter: `traitement_type = "${activeTraitementId}"`, sort: "ordre", expand: "exercice",
+        }).then(d => d.map((r: any) => ({ ...r, exercices: r.expand?.exercice })));
 
-        const { data: seancesData } = await supabase
-          .from("traitement_seances")
-          .select("*, seance_types(id, pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, is_hidden_from_list, comment)")
-          .eq("traitement_type_id", activeTraitementId)
-          .order("ordre", { ascending: true });
+        const seancesData = await pb.collection("traitement_seances").getFullList({
+          filter: `traitement_type = "${activeTraitementId}"`, sort: "ordre", expand: "seance_type",
+        }).then(d => d.map((r: any) => ({ ...r, seance_types: r.expand?.seance_type })));
 
         // Fetch bilans for this patient and traitement
-        const { data: bilansData } = await supabase
-          .from("patient_bilans")
-          .select("id, position_after_seance, content, bilan_date")
-          .eq("patient_id", patientId)
-          .eq("traitement_id", activeTraitementId)
-          .order("position_after_seance", { ascending: true });
+        const bilansData = await pb.collection("patient_bilans").getFullList({
+          filter: `patient = "${patientId}" && traitement = "${activeTraitementId}"`, sort: "position_after_seance",
+          fields: "id,position_after_seance,content,bilan_date",
+        });
 
         // Fetch seance dates for this patient and traitement
-        const { data: seanceDatesData } = await supabase
-          .from("patient_traitement_seance_dates")
-          .select("id, seance_id, seance_ordre, seance_date")
-          .eq("patient_id", patientId)
-          .eq("traitement_id", activeTraitementId)
-          .order("seance_ordre", { ascending: true });
+        const seanceDatesData = await pb.collection("patient_traitement_seance_dates").getFullList({
+          filter: `patient = "${patientId}" && traitement = "${activeTraitementId}"`, sort: "seance_ordre",
+          fields: "id,seance,seance_ordre,seance_date",
+        }).then(d => d.map((r: any) => ({ ...r, seance_id: r.seance })));
 
         // Fetch traitement_start_date from patient_care_plans
-        const { data: carePlanData } = await supabase
-          .from("patient_care_plans")
-          .select("traitement_start_date, user")
-          .eq("patient_id", patientId)
-          .maybeSingle();
+        let carePlanData: any = null;
+        try {
+          const cp = await pb.collection("patient_care_plans").getList(1, 1, { filter: `patient = "${patientId}"` });
+          carePlanData = cp.items[0] ?? null;
+        } catch {}
         console.log('[debug-author] care plan record:', JSON.stringify(carePlanData));
 
         // Fetch exercices for each seance
         const seancesWithExercices = await Promise.all(
           (seancesData || []).map(async (seance) => {
-            const { data: exercicesData } = await supabase
-              .from("seance_exercices")
-              .select("*, exercices:exercice_id(id, title, video_url, thumbnail_url, status)")
-              .eq("seance_type_id", seance.seance_type_id)
-              .order("ordre", { ascending: true });
-            
+            const exercicesData = await pb.collection("seance_exercices").getFullList({
+              filter: `seance_type = "${seance.seance_type_id ?? seance.seance_type}"`, sort: "ordre", expand: "exercice",
+            });
             return {
               ...seance,
-              exercices: (exercicesData || []).map(ex => ({
-                ...ex,
-                exercice: ex.exercices
-              }))
+              exercices: exercicesData.map((ex: any) => ({ ...ex, exercice_id: ex.exercice, exercice: ex.expand?.exercice }))
             };
           })
         );
@@ -338,16 +321,8 @@ export function PatientTraitementCard({
     if (editingSeanceIndex !== null) {
       if (newSeanceId && traitement.seances[editingSeanceIndex]) {
         // Update the traitement_seances to point to the new seance
-        await supabase
-          .from("traitement_seances")
-          .update({ seance_type_id: newSeanceId })
-          .eq("id", traitement.seances[editingSeanceIndex].id);
-        
-        // Mark the new seance as hidden from list
-        await supabase
-          .from("seance_types")
-          .update({ is_hidden_from_list: true })
-          .eq("id", newSeanceId);
+        await pb.collection("traitement_seances").update(traitement.seances[editingSeanceIndex].id, { seance_type: newSeanceId });
+        await pb.collection("seance_types").update(newSeanceId, { is_hidden_from_list: true });
       }
     } else {
       // Adding a new seance to the treatment
@@ -356,41 +331,18 @@ export function PatientTraitementCard({
         const nextOrdre = (traitement.seances?.length || 0) + 1;
         
         // Add the seance to the treatment
-        await supabase
-          .from("traitement_seances")
-          .insert({
-            traitement_type_id: traitement.id,
-            seance_type_id: newSeanceId,
-            ordre: nextOrdre
-          });
-        
-        // Mark the seance as hidden from list
-        await supabase
-          .from("seance_types")
-          .update({ is_hidden_from_list: true })
-          .eq("id", newSeanceId);
+        await pb.collection("traitement_seances").create({ traitement_type: traitement.id, seance_type: newSeanceId, ordre: nextOrdre });
+        await pb.collection("seance_types").update(newSeanceId, { is_hidden_from_list: true });
         
         // Create the date entry for this seance
         if (seanceDate) {
           // Get the just-inserted traitement_seances row id so the date is bound to it
-          const { data: insertedTs } = await supabase
-            .from("traitement_seances")
-            .select("id")
-            .eq("traitement_type_id", traitement.id)
-            .eq("seance_type_id", newSeanceId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          await supabase
-            .from("patient_traitement_seance_dates")
-            .insert({
-              patient_id: patientId,
-              traitement_id: traitement.id,
-              seance_id: insertedTs?.id ?? null,
-              seance_ordre: nextOrdre,
-              seance_date: seanceDate,
-              user_id: user.id
-            });
+          const tsRes = await pb.collection("traitement_seances").getList(1, 1, { filter: `traitement_type = "${traitement.id}" && seance_type = "${newSeanceId}"`, sort: "-created" });
+          const insertedTs = tsRes.items[0] ?? null;
+          await pb.collection("patient_traitement_seance_dates").create({
+            patient: patientId, traitement: traitement.id, seance: insertedTs?.id ?? null,
+            seance_ordre: nextOrdre, seance_date: seanceDate, user: user.id,
+          });
         }
       }
     }
@@ -419,17 +371,8 @@ export function PatientTraitementCard({
 
     if (choice === 'modify_original') {
       // Toggle visibility on the original seance
-      const { error } = await supabase
-        .from("seance_types")
-        .update({ is_hidden_from_list: !selectedSeanceForVisibility.seance_types?.is_hidden_from_list })
-        .eq("id", selectedSeanceForVisibility.seance_type_id);
-      
-      if (error) {
-        toast.error("Erreur lors de la mise à jour");
-        setVisibilityChoiceDialogOpen(false);
-        setSelectedSeanceForVisibility(null);
-        return;
-      }
+      try { await pb.collection("seance_types").update(selectedSeanceForVisibility.seance_type_id, { is_hidden_from_list: !selectedSeanceForVisibility.seance_types?.is_hidden_from_list }); }
+      catch { toast.error("Erreur lors de la mise à jour"); setVisibilityChoiceDialogOpen(false); setSelectedSeanceForVisibility(null); return; }
       
       toast.success(selectedSeanceForVisibility.seance_types?.is_hidden_from_list ? "Séance visible dans la liste" : "Séance masquée de la liste");
       fetchTraitementDetails();
@@ -441,46 +384,23 @@ export function PatientTraitementCard({
         if (!seanceTypes) throw new Error("No seance type data");
 
         // Create new seance_type
-        const { data: newSeance, error: createError } = await supabase
-          .from("seance_types")
-          .insert({
-            user_id: user.id,
-            pathologie: seanceTypes.pathologie,
-            objectif_principal: seanceTypes.objectif_principal,
-            pathologies: seanceTypes.pathologies,
-            objectifs_principaux: seanceTypes.objectifs_principaux,
-            objectifs_secondaires: seanceTypes.objectifs_secondaires,
-            comment: seanceTypes.comment,
-            is_hidden_from_list: true, // New seance is hidden from "Séances" list by default
-            is_shared: false
-          })
-          .select("id")
-          .single();
-
-        if (createError) throw createError;
+        const newSeance = await pb.collection("seance_types").create({
+            user: user.id, pathologie: seanceTypes.pathologie, objectif_principal: seanceTypes.objectif_principal,
+            pathologies: seanceTypes.pathologies, objectifs_principaux: seanceTypes.objectifs_principaux,
+            objectifs_secondaires: seanceTypes.objectifs_secondaires, comment: seanceTypes.comment,
+            is_hidden_from_list: true, is_shared: false,
+          });
 
         // Copy exercises to new seance
         if (seance.exercices && seance.exercices.length > 0) {
-          const exercisesToInsert = seance.exercices.map(ex => ({
-            seance_type_id: newSeance.id,
-            exercice_id: ex.exercice_id,
-            name: ex.name,
-            description: ex.description,
-            repetitions: ex.repetitions,
-            duration_seconds: ex.duration_seconds,
-            series: ex.series,
-            force_1: ex.force_1,
-            duration_seconds_2: ex.duration_seconds_2,
-            force_2: ex.force_2,
-            comment: ex.comment,
-            ordre: ex.ordre
-          }));
-
-          const { error: exercicesError } = await supabase
-            .from("seance_exercices")
-            .insert(exercisesToInsert);
-
-          if (exercicesError) throw exercicesError;
+          for (const ex of seance.exercices) {
+            await pb.collection("seance_exercices").create({
+              seance_type: newSeance.id, exercice: ex.exercice_id, name: ex.name, description: ex.description,
+              repetitions: ex.repetitions, duration_seconds: ex.duration_seconds, series: ex.series,
+              force_1: ex.force_1, duration_seconds_2: ex.duration_seconds_2, force_2: ex.force_2,
+              comment: ex.comment, ordre: ex.ordre,
+            });
+          }
         }
 
         toast.success("Nouvelle séance créée et visible dans la liste");
@@ -500,15 +420,7 @@ export function PatientTraitementCard({
     
     const newValue = !traitement.is_hidden_from_list;
     
-    const { error } = await supabase
-      .from("traitement_types")
-      .update({ is_hidden_from_list: newValue })
-      .eq("id", traitement.id);
-    
-    if (error) {
-      toast.error("Erreur lors de la mise à jour");
-      return;
-    }
+    try { await pb.collection("traitement_types").update(traitement.id, { is_hidden_from_list: newValue }); } catch { toast.error("Erreur lors de la mise à jour"); return; }
     
     setTraitement({ ...traitement, is_hidden_from_list: newValue });
     toast.success(newValue ? "Traitement masqué de la liste" : "Traitement visible dans la liste");
@@ -517,15 +429,10 @@ export function PatientTraitementCard({
   const handleTraitementDateChange = async (date: string) => {
     if (!traitement) return;
     
-    const { error } = await supabase
-      .from("patient_care_plans")
-      .update({ traitement_start_date: date || null })
-      .eq("patient_id", patientId);
-    
-    if (error) {
-      toast.error("Erreur lors de la mise à jour de la date");
-      return;
-    }
+    const cpRes = await pb.collection("patient_care_plans").getList(1,1,{filter:`patient="${patientId}"`});
+    if (!cpRes.items[0]) { toast.error("Plan non trouvé"); return; }
+    try { await pb.collection("patient_care_plans").update(cpRes.items[0].id, { traitement_start_date: date || null }); }
+    catch { toast.error("Erreur lors de la mise à jour de la date"); return; }
     
     setTraitement({ ...traitement, traitement_start_date: date || null });
   };
@@ -538,15 +445,7 @@ export function PatientTraitementCard({
     );
     
     if (existingDate) {
-      const { error } = await supabase
-        .from("patient_traitement_seance_dates")
-        .update({ seance_date: date || null, seance_id: seanceId })
-        .eq("id", existingDate.id);
-      
-      if (error) {
-        toast.error("Erreur lors de la mise à jour de la date");
-        return;
-      }
+      try { await pb.collection("patient_traitement_seance_dates").update(existingDate.id, { seance_date: date || null, seance: seanceId }); } catch { toast.error("Erreur lors de la mise à jour de la date"); return; }
       
       setTraitement({
         ...traitement,
@@ -555,43 +454,20 @@ export function PatientTraitementCard({
         )
       });
     } else {
-      const { data: newDate, error } = await supabase
-        .from("patient_traitement_seance_dates")
-        .insert({
-          patient_id: patientId,
-          traitement_id: traitement.id,
-          seance_id: seanceId,
-          seance_ordre: seanceOrdre,
-          seance_date: date || null,
-          user_id: user.id
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        toast.error("Erreur lors de l'enregistrement de la date");
-        return;
-      }
-      
-      setTraitement({
-        ...traitement,
-        seanceDates: [...traitement.seanceDates, { id: newDate.id, seance_id: seanceId, seance_ordre: seanceOrdre, seance_date: date }]
-      });
+      try {
+        const newDate = await pb.collection("patient_traitement_seance_dates").create({
+          patient: patientId, traitement: traitement.id, seance: seanceId, seance_ordre: seanceOrdre,
+          seance_date: date || null, user: user.id,
+        });
+        setTraitement({ ...traitement, seanceDates: [...traitement.seanceDates, { id: newDate.id, seance_id: seanceId, seance_ordre: seanceOrdre, seance_date: date }] });
+      } catch { toast.error("Erreur lors de l'enregistrement de la date"); return; }
     }
   };
 
   const handleBilanDateChange = async (bilanId: string, date: string) => {
     if (!traitement) return;
     
-    const { error } = await supabase
-      .from("patient_bilans")
-      .update({ bilan_date: date || null })
-      .eq("id", bilanId);
-    
-    if (error) {
-      toast.error("Erreur lors de la mise à jour de la date");
-      return;
-    }
+try { await pb.collection("patient_bilans").update(bilanId, { bilan_date: date || null }); } catch { toast.error("Erreur lors de la mise à jour de la date"); return; }
     
     setTraitement({
       ...traitement,
@@ -606,12 +482,7 @@ export function PatientTraitementCard({
     
     setSavingSeanceComment(true);
     try {
-      const { error } = await supabase
-        .from("seance_types")
-        .update({ comment: comment || null })
-        .eq("id", selectedSeanceForComment.id);
-
-      if (error) throw error;
+      await pb.collection("seance_types").update(selectedSeanceForComment.id, { comment: comment || null });
 
       // Update local state
       if (traitement) {
@@ -641,31 +512,10 @@ export function PatientTraitementCard({
     setDeletingSeance(true);
     try {
       // 1. Delete all exercises from the seance
-      const { error: exercicesError } = await supabase
-        .from("seance_exercices")
-        .delete()
-        .eq("seance_type_id", selectedSeanceForDelete.id);
-      
-      if (exercicesError) throw exercicesError;
-
-      // 2. Delete the traitement_seance entry
-      const { error: traitementSeanceError } = await supabase
-        .from("traitement_seances")
-        .delete()
-        .eq("id", selectedSeanceForDelete.traitementSeanceId);
-      
-      if (traitementSeanceError) throw traitementSeanceError;
-
-      // 3. Delete the seance_type itself (since it's hidden from list and specific to this treatment)
-      const { error: seanceTypeError } = await supabase
-        .from("seance_types")
-        .delete()
-        .eq("id", selectedSeanceForDelete.id);
-      
-      if (seanceTypeError) {
-        console.error("Error deleting seance_type:", seanceTypeError);
-        // Don't throw - the seance_type might be used elsewhere
-      }
+      const exs = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${selectedSeanceForDelete.id}"` });
+      for (const e of exs) await pb.collection("seance_exercices").delete(e.id);
+      await pb.collection("traitement_seances").delete(selectedSeanceForDelete.traitementSeanceId);
+      try { await pb.collection("seance_types").delete(selectedSeanceForDelete.id); } catch(e) { console.error("Error deleting seance_type:", e); }
 
       toast.success("Séance supprimée");
       setDeleteSeanceDialogOpen(false);
@@ -684,12 +534,7 @@ export function PatientTraitementCard({
     setDeletingBilan(true);
     
     try {
-      const { error } = await supabase
-        .from("patient_bilans")
-        .delete()
-        .eq("id", selectedBilanForDelete.id);
-
-      if (error) throw error;
+      await pb.collection("patient_bilans").delete(selectedBilanForDelete.id);
 
       toast.success("Bilan supprimé");
       setDeleteBilanDialogOpen(false);
@@ -713,14 +558,8 @@ export function PatientTraitementCard({
 
       // Swap the ordre values
       await Promise.all([
-        supabase
-          .from("seance_exercices")
-          .update({ ordre: newIndex + 1 })
-          .eq("id", currentExercice.id),
-        supabase
-          .from("seance_exercices")
-          .update({ ordre: currentIndex + 1 })
-          .eq("id", swapExercice.id)
+        pb.collection("seance_exercices").update(currentExercice.id, { ordre: newIndex + 1 }),
+        pb.collection("seance_exercices").update(swapExercice.id, { ordre: currentIndex + 1 }),
       ]);
 
       fetchTraitementDetails();

@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { CalendarPlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -106,23 +106,22 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
     setSaving(true);
 
     // 1) Find a template seance_type from existing traitement_seances
-    const { data: existing } = await supabase
-      .from("traitement_seances")
-      .select("seance_type_id, ordre")
-      .eq("traitement_type_id", traitementId)
-      .order("ordre", { ascending: false });
+    const existing = await pb.collection("traitement_seances").getFullList({
+      filter: `traitement_type = "${traitementId}"`,
+      sort: "-ordre",
+      fields: "seance_type,ordre",
+    });
 
-    const templateSeanceTypeId = existing && existing.length > 0 ? existing[0].seance_type_id : null;
+    const templateSeanceTypeId = existing && existing.length > 0 ? existing[0].seance_type : null;
     const maxTraitementOrdre = existing && existing.length > 0 ? existing[0].ordre : 0;
 
     // Also check existing date rows so we don't collide with the unique (patient_id, traitement_id, seance_ordre) constraint
-    const { data: existingDates } = await supabase
-      .from("patient_traitement_seance_dates")
-      .select("seance_ordre")
-      .eq("patient_id", patientId)
-      .eq("traitement_id", traitementId)
-      .order("seance_ordre", { ascending: false })
-      .limit(1);
+    const existingDatesRes = await pb.collection("patient_traitement_seance_dates").getList(1, 1, {
+      filter: `patient = "${patientId}" && traitement = "${traitementId}"`,
+      sort: "-seance_ordre",
+      fields: "seance_ordre",
+    });
+    const existingDates = existingDatesRes.items;
 
     const maxDateOrdre = existingDates && existingDates.length > 0 ? existingDates[0].seance_ordre : 0;
     const currentMaxOrdre = Math.max(maxTraitementOrdre, maxDateOrdre);
@@ -138,32 +137,31 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
     }
 
     // Fetch the template seance_type data + its exercices so we can clone an independent copy per date
-    const { data: templateSeance, error: errTemplate } = await supabase
-      .from("seance_types")
-      .select("pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires, comment")
-      .eq("id", templateSeanceTypeId)
-      .maybeSingle();
-
-    if (errTemplate || !templateSeance) {
+    let templateSeance: any = null;
+    try {
+      templateSeance = await pb.collection("seance_types").getOne(templateSeanceTypeId as string, {
+        fields: "pathologie,objectif_principal,pathologies,objectifs_principaux,objectifs_secondaires,comment",
+      });
+    } catch {
       setSaving(false);
-      toast({ title: "Erreur", description: errTemplate?.message || "Modèle introuvable", variant: "destructive" });
+      toast({ title: "Erreur", description: "Modèle introuvable", variant: "destructive" });
       return;
     }
 
-    const { data: templateExercices } = await supabase
-      .from("seance_exercices")
-      .select("exercice_id, name, description, repetitions, duration_seconds, series, force_1, duration_seconds_2, force_2, comment, ordre")
-      .eq("seance_type_id", templateSeanceTypeId)
-      .order("ordre", { ascending: true });
+    const templateExercices = await pb.collection("seance_exercices").getFullList({
+      filter: `seance_type = "${templateSeanceTypeId}"`,
+      sort: "ordre",
+      fields: "exercice,name,description,repetitions,duration_seconds,series,force_1,duration_seconds_2,force_2,comment,ordre",
+    });
 
     // 2) For each date, create an INDEPENDENT clone of the seance_type so editing one
     //    does not affect the others.
     const newSeanceTypeIds: string[] = [];
     for (let i = 0; i < dates.length; i++) {
-      const { data: cloned, error: errClone } = await supabase
-        .from("seance_types")
-        .insert({
-          user_id: user.id,
+      let cloned: any;
+      try {
+        cloned = await pb.collection("seance_types").create({
+          user: user.id,
           pathologie: templateSeance.pathologie,
           objectif_principal: templateSeance.objectif_principal,
           pathologies: templateSeance.pathologies,
@@ -173,67 +171,61 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
           is_hidden_from_list: false,
           is_shared: false,
           is_copy: true,
-        })
-        .select("id")
-        .single();
-
-      if (errClone || !cloned) {
+        });
+      } catch (e: any) {
         setSaving(false);
-        toast({ title: "Erreur", description: errClone?.message || "Clonage échoué", variant: "destructive" });
+        toast({ title: "Erreur", description: e.message || "Clonage échoué", variant: "destructive" });
         return;
       }
 
       newSeanceTypeIds.push(cloned.id);
 
       if (templateExercices && templateExercices.length > 0) {
-        const exRows = templateExercices.map((ex) => ({ ...ex, seance_type_id: cloned.id }));
-        await supabase.from("seance_exercices").insert(exRows);
+        for (const ex of templateExercices) {
+          await pb.collection("seance_exercices").create({ ...ex, seance_type: cloned.id, exercice: ex.exercice, id: undefined });
+        }
       }
     }
 
     // 3) Insert one traitement_seances row per date, each pointing to its own clone
-    const seancesRows = dates.map((_, i) => ({
-      traitement_type_id: traitementId,
-      seance_type_id: newSeanceTypeIds[i],
-      ordre: currentMaxOrdre + i + 1,
-    }));
-
-    const { data: insertedSeances, error: errSeances } = await supabase
-      .from("traitement_seances")
-      .insert(seancesRows)
-      .select("id, seance_type_id, ordre");
-    if (errSeances) {
-      setSaving(false);
-      toast({ title: "Erreur", description: errSeances.message, variant: "destructive" });
-      return;
+    const insertedSeances: any[] = [];
+    for (let i = 0; i < dates.length; i++) {
+      try {
+        const rec = await pb.collection("traitement_seances").create({
+          traitement_type: traitementId,
+          seance_type: newSeanceTypeIds[i],
+          ordre: currentMaxOrdre + i + 1,
+        });
+        insertedSeances.push(rec);
+      } catch (e: any) {
+        setSaving(false);
+        toast({ title: "Erreur", description: e.message, variant: "destructive" });
+        return;
+      }
     }
 
-    // Map clone id -> inserted traitement_seances id
     const seanceIdByClone = new Map<string, string>();
-    (insertedSeances || []).forEach((r) => {
-      seanceIdByClone.set(r.seance_type_id, r.id);
-    });
+    insertedSeances.forEach((r) => { seanceIdByClone.set(r.seance_type, r.id); });
 
     // 4) Insert patient_traitement_seance_dates entries, each bound to its own seance
-    const dateRows = dates.map((d, i) => ({
-      patient_id: patientId,
-      traitement_id: traitementId,
-      seance_id: seanceIdByClone.get(newSeanceTypeIds[i]) ?? null,
-      seance_ordre: currentMaxOrdre + i + 1,
-      seance_date: format(d, "yyyy-MM-dd"),
-      user_id: user.id,
-    }));
-
-    const { error: errDates } = await supabase
-      .from("patient_traitement_seance_dates")
-      .insert(dateRows);
-
-    setSaving(false);
-
-    if (errDates) {
-      toast({ title: "Erreur", description: errDates.message, variant: "destructive" });
+    try {
+      for (let i = 0; i < dates.length; i++) {
+        await pb.collection("patient_traitement_seance_dates").create({
+          patient: patientId,
+          traitement: traitementId,
+          seance: seanceIdByClone.get(newSeanceTypeIds[i]) ?? null,
+          seance_ordre: currentMaxOrdre + i + 1,
+          seance_date: format(dates[i], "yyyy-MM-dd"),
+          user: user.id,
+        });
+      }
+    } catch (e: any) {
+      setSaving(false);
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
       return;
     }
+
+    setSaving(false);
 
     toast({ title: `${dates.length} séance${dates.length > 1 ? "s" : ""} ajoutée${dates.length > 1 ? "s" : ""}` });
     setSelectedDates([]);

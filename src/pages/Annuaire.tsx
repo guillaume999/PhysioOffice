@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Search, MapPin, ExternalLink, Facebook, Instagram, Linkedin, Globe, Settings, Phone, Mail } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { FRENCH_REGIONS } from "@/lib/french-regions";
 import { useAuth } from "@/lib/auth";
 import { Link } from "react-router-dom";
@@ -47,11 +47,10 @@ export default function Annuaire() {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["annuaire"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_public_directory");
-      if (error) throw error;
-      return (data || []).map((d: any) => ({
+      const rows = await pb.collection("practitioner_directory").getFullList({ filter: "is_public = true" });
+      return rows.map((d: any) => ({
         id: d.id,
-        user_id: d.user_id,
+        user_id: d.user,
         city: d.city,
         region: d.region,
         departement: d.departement,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,13 +64,7 @@ export function PopupsManagement() {
 
   const fetchPopups = async () => {
     try {
-      const { data, error } = await supabase
-        .from("admin_popups")
-        .select("*")
-        .order("page_key");
-
-      if (error) throw error;
-      setPopups(data || []);
+      setPopups(await pb.collection("admin_popups").getFullList({ sort: "page_key" }));
     } catch (err) {
       console.error("Error fetching popups:", err);
       toast.error("Erreur lors du chargement des pop-ups");
@@ -97,16 +91,7 @@ export function PopupsManagement() {
     if (!editingPopup) return;
 
     try {
-      const { error } = await supabase
-        .from("admin_popups")
-        .update({
-          title: formData.title,
-          content: formData.content,
-          is_active: formData.is_active,
-        })
-        .eq("id", editingPopup.id);
-
-      if (error) throw error;
+      await pb.collection("admin_popups").update(editingPopup.id, { title: formData.title, content: formData.content, is_active: formData.is_active });
 
       toast.success("Pop-up mis à jour avec succès");
       setIsDialogOpen(false);
@@ -120,12 +105,7 @@ export function PopupsManagement() {
 
   const handleToggleActive = async (popup: Popup) => {
     try {
-      const { error } = await supabase
-        .from("admin_popups")
-        .update({ is_active: !popup.is_active })
-        .eq("id", popup.id);
-
-      if (error) throw error;
+      await pb.collection("admin_popups").update(popup.id, { is_active: !popup.is_active });
 
       toast.success(
         popup.is_active ? "Pop-up désactivé" : "Pop-up activé"

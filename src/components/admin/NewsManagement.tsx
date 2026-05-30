@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,13 +89,7 @@ export function NewsManagement() {
 
   const fetchNews = async () => {
     try {
-      const { data, error } = await supabase
-        .from("news")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setNews(data || []);
+      setNews(await pb.collection("news").getFullList({ sort: "-created" }));
     } catch (error) {
       console.error("Error fetching news:", error);
       toast({
@@ -115,21 +109,11 @@ export function NewsManagement() {
     if (!categoryToUse) return;
 
     try {
-      const { data, error } = await supabase
-        .from("news")
-        .insert({
-          title: newTitle,
-          description: newDescription,
-          category: categoryToUse,
-          is_new: newIsNew,
-          created_by: user.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNews([data, ...news]);
+      const data = await pb.collection("news").create({
+          title: newTitle, description: newDescription, category: categoryToUse,
+          is_new: newIsNew, created_by: user.id,
+        });
+      setNews([data as any, ...news]);
       setNewTitle("");
       setNewDescription("");
       setNewCategory("Nouveauté");
@@ -184,17 +168,7 @@ export function NewsManagement() {
     if (!categoryToUse) return;
 
     try {
-      const { error } = await supabase
-        .from("news")
-        .update({
-          title: editTitle,
-          description: editDescription,
-          category: categoryToUse,
-          is_new: editIsNew,
-        })
-        .eq("id", editingId);
-
-      if (error) throw error;
+      await pb.collection("news").update(editingId, { title: editTitle, description: editDescription, category: categoryToUse, is_new: editIsNew });
 
       setNews(news.map((n) =>
         n.id === editingId
@@ -217,12 +191,7 @@ export function NewsManagement() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette actualité ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("news")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      await pb.collection("news").delete(id);
 
       setNews(news.filter((n) => n.id !== id));
       toast({ title: "Actualité supprimée" });

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Copy, Loader2, Clock, ExternalLink, Check } from "lucide-react";
@@ -50,23 +50,19 @@ export function GenerateAccessCodeDialog({
       const expires = new Date();
       expires.setHours(expires.getHours() + 4);
 
-      const { error } = await supabase
-        .from("patient_session_access")
-        .insert({
-          seance_type_id: seanceTypeId,
-          patient_id: patientId,
+      try {
+        await pb.collection("patient_session_access").create({
+          seance_type: seanceTypeId,
+          patient: patientId,
           access_code: code,
           expires_at: expires.toISOString(),
-          user_id: user.id,
+          user: user.id,
         });
-
-      if (error) {
-        if (error.code === "23505") {
-          // Duplicate code, retry
-          handleGenerate();
-          return;
+      } catch(e: any) {
+        if (e?.status === 400 && JSON.stringify(e).includes("unique")) {
+          handleGenerate(); return;
         }
-        throw error;
+        throw e;
       }
 
       setGeneratedCode(code);
