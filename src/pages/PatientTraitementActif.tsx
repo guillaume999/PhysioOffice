@@ -2,26 +2,25 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
+import { ArrowLeft, Loader2, CalendarPlus, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
+import { PatientTraitementInstanceCard } from "@/components/patient/PatientTraitementInstanceCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { QuickAppointmentsDialog } from "@/components/patient/QuickAppointmentsDialog";
+import { instantiateTraitementForPatient } from "@/lib/patientTraitement";
 
 export default function PatientTraitementActif() {
   const { id } = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [patientName, setPatientName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [carePlanId, setCarePlanId] = useState<string | null>(null);
   const [activeTraitementId, setActiveTraitementId] = useState<string | null>(null);
-  const [activeTraitementName, setActiveTraitementName] = useState<string | null>(null);
   const [selectTraitementDialogOpen, setSelectTraitementDialogOpen] = useState(false);
   const [createTraitementDialogOpen, setCreateTraitementDialogOpen] = useState(false);
   const [quickApptOpen, setQuickApptOpen] = useState(false);
@@ -32,15 +31,12 @@ export default function PatientTraitementActif() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user && id) {
-      fetchData();
-    }
+    if (user && id) fetchData();
   }, [user, id]);
 
   const fetchData = async () => {
     setLoading(true);
-    
-    // Fetch patient
+
     let patient: any = null;
     try {
       patient = await pb.collection("patients").getOne(id!, { fields: "id,name" });
@@ -51,60 +47,33 @@ export default function PatientTraitementActif() {
       navigate("/patients");
       return;
     }
-
     setPatientName(patient.name);
 
-    // Fetch care plan
-    let carePlan: any = null;
+    // Load the patient's active treatment instance (most recent active one)
     try {
-      carePlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
-    } catch { /* none yet */ }
-
-    if (carePlan) {
-      const activeTraitement = carePlan.active_traitement ?? carePlan.active_traitement_id ?? null;
-      setCarePlanId(carePlan.id);
-      setActiveTraitementId(activeTraitement);
-
-      if (activeTraitement) {
-        try {
-          const traitement = await pb.collection("traitement_types").getOne(activeTraitement, { fields: "pathologie" });
-          if (traitement) setActiveTraitementName(traitement.pathologie);
-        } catch { /* ignore */ }
-      }
+      const res = await pb.collection("patient_traitements").getList(1, 1, {
+        filter: `patient = "${id}" && statut = "actif"`,
+        sort: "-created",
+      });
+      setActiveTraitementId(res.items[0]?.id ?? null);
+    } catch {
+      setActiveTraitementId(null);
     }
 
     setLoading(false);
   };
 
-  const handleSelectTraitement = async (traitementId: string) => {
+  // Assign an existing template: instantiate it as an independent patient instance
+  const handleSelectTraitement = async (templateId: string) => {
     if (!user || !id) return;
-    
-    // Set the treatment visibility to hidden by default when assigned to a patient
     try {
-      await pb.collection("traitement_types").update(traitementId, { is_hidden_from_list: true });
-    } catch { /* ignore */ }
-
-    try {
-      const traitement = await pb.collection("traitement_types").getOne(traitementId, { fields: "pathologie" });
-      if (traitement) setActiveTraitementName(traitement.pathologie);
-    } catch { /* ignore */ }
-
-    // Auto-save the care plan with the new treatment
-    if (carePlanId) {
-      await pb.collection("patient_care_plans").update(carePlanId, { active_traitement: traitementId });
-    } else {
-      const newPlan = await pb.collection("patient_care_plans").create({
-        patient: id,
-        user: user.id,
-        active_traitement: traitementId,
-      });
-      if (newPlan) {
-        setCarePlanId(newPlan.id);
-      }
+      const pt = await instantiateTraitementForPatient(templateId, id, user.id);
+      setActiveTraitementId(pt.id);
+      toast({ title: "Traitement enregistré" });
+    } catch (e) {
+      console.error("Error instantiating traitement:", e);
+      toast({ title: "Erreur lors de l'enregistrement", variant: "destructive" });
     }
-    
-    setActiveTraitementId(traitementId);
-    toast({ title: "Traitement enregistré" });
   };
 
   const handleCreateTraitement = () => {
@@ -112,31 +81,24 @@ export default function PatientTraitementActif() {
     setCreateTraitementDialogOpen(true);
   };
 
+  // After creating a blank/custom instance via the form dialog, pick it up
   const handleCreateTraitementSuccess = async () => {
-    if (!user) return;
-    
-    let latestTraitement: any = null;
+    if (!user || !id) return;
     try {
-      const res = await pb.collection("traitement_types").getList(1, 1, {
-        filter: `user = "${user.id}"`,
-        sort: "-created",
+      const res = await pb.collection("patient_traitements").getList(1, 1, {
+        filter: `patient = "${id}"`, sort: "-created",
       });
-      latestTraitement = res.items[0] ?? null;
+      if (res.items[0]) setActiveTraitementId(res.items[0].id);
     } catch { /* ignore */ }
-
-    if (latestTraitement) {
-      await handleSelectTraitement(latestTraitement.id);
-    }
   };
 
   const handleRemoveTraitement = async () => {
+    if (!activeTraitementId) return;
+    try {
+      await pb.collection("patient_traitements").delete(activeTraitementId);
+    } catch { /* ignore */ }
     setActiveTraitementId(null);
-    setActiveTraitementName(null);
-    
-    if (carePlanId) {
-      await pb.collection("patient_care_plans").update(carePlanId, { active_traitement: null });
-      toast({ title: "Traitement retiré" });
-    }
+    toast({ title: "Traitement retiré" });
   };
 
   if (authLoading || loading) {
@@ -166,15 +128,21 @@ export default function PatientTraitementActif() {
           </Button>
         </div>
 
-        <PatientTraitementCard
-          key={refreshKey}
-          activeTraitementId={activeTraitementId}
-          activeTraitementName={activeTraitementName}
+        {!activeTraitementId && (
+          <div className="flex items-center justify-end mb-3">
+            <Button variant="outline" size="sm" onClick={() => setSelectTraitementDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter
+            </Button>
+          </div>
+        )}
+
+        <PatientTraitementInstanceCard
+          key={`${activeTraitementId}-${refreshKey}`}
+          traitementId={activeTraitementId}
           patientId={id || ""}
-          patientName={patientName}
-          onSelectTraitement={() => setSelectTraitementDialogOpen(true)}
-          onRemoveTraitement={handleRemoveTraitement}
-          onTraitementChanged={handleSelectTraitement}
+          praticienId={user?.id || ""}
+          onRemove={handleRemoveTraitement}
         />
 
         <SelectTraitementDialog
@@ -188,6 +156,7 @@ export default function PatientTraitementActif() {
           open={createTraitementDialogOpen}
           onOpenChange={setCreateTraitementDialogOpen}
           onSuccess={handleCreateTraitementSuccess}
+          patientId={id}
         />
 
         <QuickAppointmentsDialog
@@ -196,9 +165,4 @@ export default function PatientTraitementActif() {
           patientId={id || ""}
           patientName={patientName}
           traitementId={activeTraitementId}
-          onCreated={() => setRefreshKey((k) => k + 1)}
-        />
-      </div>
-    </Layout>
-  );
-}
+          onCreated={() => setR

@@ -30,6 +30,7 @@ export default function PatientBilanIntermediaire() {
   const { user } = useAuth();
 
   const traitementId = searchParams.get("traitement");
+  const patientTraitementId = searchParams.get("pt");
   const bilanId = searchParams.get("bilan");
 
   const [patientName, setPatientName] = useState("");
@@ -122,7 +123,8 @@ export default function PatientBilanIntermediaire() {
         const todayDate = format(new Date(), "yyyy-MM-dd");
         const data = await pb.collection("patient_bilans").create({
           patient: patientId,
-          traitement: traitementId,
+          traitement: traitementId || null,
+          patient_traitement: patientTraitementId || null,
           user: user.id,
           position_after_seance: 0,
           content: bilanJson,
@@ -286,12 +288,4 @@ export default function PatientBilanIntermediaire() {
                 placeholder="Évolution depuis le dernier bilan, progrès, difficultés..."
                 value={bilan.observations}
                 onChange={(e) => handleChange("observations", e.target.value)}
-                className="min-h-[120px]"
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </Layout>
-  );
-}
+                className="min-h-[120px

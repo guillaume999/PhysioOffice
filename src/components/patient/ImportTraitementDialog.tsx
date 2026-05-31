@@ -190,6 +190,7 @@ export function ImportTraitementDialog({
     try {
       const newTraitement = await pb.collection("traitement_types").create({
           user: user.id,
+          nom: traitement.nom || traitement.pathologie,
           pathologie: traitement.pathologie,
           description: traitement.description,
           author_name: userPseudo || traitement.author_name,

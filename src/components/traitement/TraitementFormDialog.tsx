@@ -76,9 +76,15 @@ interface TraitementFormDialogProps {
   traitement?: TraitementFormData | null;
   onSuccess: () => void;
   isHiddenFromList?: boolean;
+  /**
+   * When provided, the dialog creates a *patient instance* (patient_traitements
+   * + patient_seances + patient_seance_exercices + patient_traitement_tests),
+   * fully independent from the template, instead of a traitement_types model.
+   */
+  patientId?: string;
 }
 
-export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess, isHiddenFromList = false }: TraitementFormDialogProps) {
+export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess, isHiddenFromList = false, patientId }: TraitementFormDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
@@ -276,9 +282,69 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         await pb.collection("pathologies").create({ user: user.id, name: newPathologie });
       }
 
-      if (traitement?.id) {
+      if (patientId) {
+        // ── Patient instance mode ───────────────────────────────────────────
+        // Create a patient_traitements record fully independent from any model,
+        // copying chosen tests and séances (+ their exercises) into the
+        // patient_* instance tables. `source` is optional provenance only.
+        const pt = await pb.collection("patient_traitements").create({
+          patient: patientId,
+          praticien: user.id,
+          nom: finalPathologie,
+          pathologie: finalPathologie,
+          description,
+          statut: "actif",
+          date_debut: new Date().toISOString(),
+        });
+
+        // Copy tests -> patient_traitement_tests
+        for (const test of tests) {
+          await pb.collection("patient_traitement_tests").create({
+            patient_traitement: pt.id,
+            source: test.exercice_id || null,
+            nom: test.exercice?.title || "",
+            description: test.exercice?.description || "",
+            video_url: "",
+            ordre: test.ordre,
+          });
+        }
+
+        // Copy séances -> patient_seances (+ their exercises -> patient_seance_exercices)
+        for (const seance of selectedSeances) {
+          const ps = await pb.collection("patient_seances").create({
+            patient_traitement: pt.id,
+            patient: patientId,
+            praticien: user.id,
+            source: seance.seance_type_id || null,
+            nom: seance.seance?.objectif_principal || seance.seance?.pathologie || "",
+            objectif: seance.seance?.objectif_principal || "",
+            statut: "planifiée",
+          });
+
+          // Pull the model séance's exercises and copy each one
+          const modelExs = await pb.collection("seance_exercices").getFullList({
+            filter: `seance_type = "${seance.seance_type_id}"`, sort: "ordre", expand: "exercice",
+          });
+          for (const ex of modelExs as any[]) {
+            await pb.collection("patient_seance_exercices").create({
+              patient_seance: ps.id,
+              source: ex.exercice || null,
+              nom: ex.name || ex.expand?.exercice?.title || "",
+              description: ex.description || "",
+              video_url: ex.expand?.exercice?.video_url || "",
+              ordre: ex.ordre,
+              series: ex.series,
+              repetitions: ex.repetitions,
+              duree: ex.duration_seconds,
+              realise: false,
+            });
+          }
+        }
+
+        toast.success("Traitement créé pour le patient");
+      } else if (traitement?.id) {
         // Update existing traitement
-        await pb.collection("traitement_types").update(traitement.id, { pathologie: finalPathologie, description });
+        await pb.collection("traitement_types").update(traitement.id, { nom: finalPathologie, pathologie: finalPathologie, description });
 
         // Delete old tests
         const oldTests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${traitement.id}"` });
@@ -312,6 +378,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         // Create new traitement
         const newTraitement = await pb.collection("traitement_types").create({
             user: user.id,
+            nom: finalPathologie,
             pathologie: finalPathologie,
             description,
             author_name: userPseudo,
