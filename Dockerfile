@@ -6,9 +6,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies with npm
+# Install dependencies with a clean, deterministic install (npm ci).
+# Fall back to a fresh install if the lockfile is out of sync. This avoids the
+# broken/partial dependency trees (e.g. missing rollup/esbuild platform binaries
+# or ts-interface-checker) that can make `npm run build` fail in the container.
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci || (rm -rf node_modules package-lock.json && npm install)
 
 # Copy source
 COPY . .
@@ -18,16 +21,4 @@ ARG VITE_PB_URL
 ENV VITE_PB_URL=${VITE_PB_URL}
 RUN npm run build
 
-# ── Stage 2: Serve with nginx ────────────────────────────────────
-FROM nginx:alpine
-
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built static files from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Expose port 8081 inside the container
-EXPOSE 8081
-
-CMD ["nginx", "-g", "daemon off;"]
+# ── Stage 2: Serve with nginx ─────────────────────
