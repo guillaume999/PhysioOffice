@@ -21,6 +21,7 @@ import { PatientCareObjectivesCard } from "@/components/patient/PatientCareObjec
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+import { instantiateTraitementForPatient } from "@/lib/patientTraitement";
 
 interface PatientData {
   id: string;
@@ -161,53 +162,42 @@ export default function PatientDetail() {
         setBilanInitialData(null);
       }
       
-      if (data.active_traitement_id) {
-        try {
-          const traitement = await pb.collection("traitement_types").getOne(data.active_traitement ?? data.active_traitement_id, { fields: "pathologie" });
-          setActiveTraitementName(traitement.pathologie);
-        } catch {}
+      // Treatment summary is loaded from the patient instance below (independent of care_plan).
+    } else {
+      setBilanInitialData(null);
+    }
 
-        // Fetch seances of the treatment with their dates
-        const traitementSeancesData = await pb.collection("traitement_seances").getFullList({
-          filter: `traitement_type = "${data.active_traitement ?? data.active_traitement_id}"`,
-          sort: "ordre", expand: "seance_type",
-        }).then(d => d.map((r: any) => ({ ...r, seance_type_id: r.seance_type, seance_types: r.expand?.seance_type })));
-
-        // Fetch seance dates for this patient and treatment
-        const seanceDatesData = await pb.collection("patient_traitement_seance_dates").getFullList({
-          filter: `patient = "${id}" && traitement = "${data.active_traitement ?? data.active_traitement_id}"`,
-          fields: "seance_ordre,seance_date",
+    // Load the patient's active treatment INSTANCE (patient_traitements), independent of care_plan
+    try {
+      const ptRes = await pb.collection("patient_traitements").getList(1, 1, {
+        filter: `patient = "${id}" && statut = "actif"`, sort: "-created",
+      });
+      const pt: any = ptRes.items[0] ?? null;
+      if (pt) {
+        setActiveTraitementName(pt.pathologie || pt.nom || null);
+        const ps = await pb.collection("patient_seances").getFullList({
+          filter: `patient_traitement = "${pt.id}"`, sort: "created",
         });
-
-        const datesMap = new Map<number, string | null>();
-        seanceDatesData?.forEach((d) => {
-          datesMap.set(d.seance_ordre, d.seance_date);
-        });
-
-        if (traitementSeancesData) {
-          const seances = traitementSeancesData.map((ts: any) => ({
-            ordre: ts.ordre,
-            seance_date: datesMap.get(ts.ordre) || null,
-            objectifs_principaux: ts.seance_types?.objectifs_principaux || [],
-            objectifs_secondaires: ts.seance_types?.objectifs_secondaires || [],
-            pathologies: ts.seance_types?.pathologies || [],
-          }));
-          setTraitementSeances(seances);
-        }
-
-        // Fetch bilans intermediaires
+        setTraitementSeances(ps.map((s: any, i: number) => ({
+          ordre: i + 1,
+          seance_date: s.date_prevue || null,
+          objectifs_principaux: s.objectif ? [s.objectif] : [],
+          objectifs_secondaires: [],
+          pathologies: [],
+        })));
         const bilansData = await pb.collection("patient_bilans").getFullList({
-          filter: `patient = "${id}" && traitement = "${data.active_traitement ?? data.active_traitement_id}"`,
-          sort: "position_after_seance", fields: "id,position_after_seance,bilan_date,content",
+          filter: `patient_traitement = "${pt.id}"`, sort: "position_after_seance",
+          fields: "id,position_after_seance,bilan_date,content",
         });
         setBilansIntermediaires(bilansData as any[]);
       } else {
+        setActiveTraitementName(null);
         setTraitementSeances([]);
         setBilansIntermediaires([]);
       }
-    } else {
+    } catch {
+      setActiveTraitementName(null);
       setTraitementSeances([]);
-      setBilanInitialData(null);
       setBilansIntermediaires([]);
     }
   };
@@ -347,60 +337,40 @@ export default function PatientDetail() {
     }
   };
 
+  // Assign an existing template: instantiate it as an independent patient instance
   const handleSelectTraitement = async (traitementId: string) => {
-    const newCarePlan = { ...carePlan, active_traitement_id: traitementId };
-    setCarePlan(newCarePlan);
-    
-    // Set the treatment visibility to hidden by default when assigned to a patient
-    try { await pb.collection("traitement_types").update(traitementId, { is_hidden_from_list: true }); } catch {}
+    if (!user || !id) return;
     try {
-      const traitement = await pb.collection("traitement_types").getOne(traitementId, { fields: "pathologie" });
-      setActiveTraitementName(traitement.pathologie);
-    } catch {}
-
-    if (newCarePlan.id) {
-      try { await pb.collection("patient_care_plans").update(newCarePlan.id, { active_traitement: traitementId }); } catch {}
-    } else if (user && id) {
-      try {
-        const newPlan = await pb.collection("patient_care_plans").create({
-          patient: id, user: user.id, comments: newCarePlan.comments,
-          motif_consultation: newCarePlan.motif_consultation, bilan_kine: newCarePlan.bilan_kine,
-          objectifs_prise_en_charge: newCarePlan.objectifs_prise_en_charge, active_traitement: traitementId,
-        });
-        if (newPlan) setCarePlan({ ...newCarePlan, id: newPlan.id });
-      } catch {}
+      await instantiateTraitementForPatient(traitementId, id, user.id);
+      toast({ title: "Traitement enregistré" });
+      fetchPatient();
+    } catch {
+      toast({ title: "Erreur lors de l'enregistrement", variant: "destructive" });
     }
-    
-    toast({ title: "Traitement enregistré" });
   };
-
 
   const handleCreateTraitement = () => {
     setSelectTraitementDialogOpen(false);
     setCreateTraitementDialogOpen(true);
   };
 
+  // The form dialog (patientId mode) creates the instance; just refresh.
   const handleCreateTraitementSuccess = async () => {
-    // Fetch the latest traitement created by this user to set as active
-    if (!user) return;
-    
-    try {
-      const res = await pb.collection("traitement_types").getList(1, 1, {
-        filter: `user = "${user.id}"`, sort: "-created", fields: "id,pathologie",
-      });
-      if (res.items[0]) await handleSelectTraitement(res.items[0].id);
-    } catch {}
+    fetchPatient();
   };
 
   const handleRemoveTraitement = async () => {
-    setCarePlan({ ...carePlan, active_traitement_id: null });
+    if (!id) return;
+    try {
+      const ptRes = await pb.collection("patient_traitements").getList(1, 1, {
+        filter: `patient = "${id}" && statut = "actif"`, sort: "-created",
+      });
+      if (ptRes.items[0]) await pb.collection("patient_traitements").delete(ptRes.items[0].id);
+    } catch {}
     setActiveTraitementName(null);
-    
-    // Auto-save the removal
-    if (carePlan.id) {
-      try { await pb.collection("patient_care_plans").update(carePlan.id, { active_traitement: null }); } catch {}
-      toast({ title: "Traitement retiré" });
-    }
+    setTraitementSeances([]);
+    setBilansIntermediaires([]);
+    toast({ title: "Traitement retiré" });
   };
 
   if (authLoading || loading) {
@@ -647,7 +617,7 @@ export default function PatientDetail() {
           onOpenChange={setCreateTraitementDialogOpen}
           traitement={null}
           onSuccess={handleCreateTraitementSuccess}
-          isHiddenFromList={true}
+          patientId={id}
         />
 
 

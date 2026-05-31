@@ -110,12 +110,15 @@ Règles :
   affichage des bilans dans la carte, et accès patient (`PatientSessionView` /
   `GenerateAccessCodeDialog`) qui lisent encore les modèles.
 
-### Reste à faire (prochains incréments)
-- Ajout de séance/exercice **depuis un modèle** à une instance existante (actuellement : ajout vierge).
-- Phase 4 complète (bilans + accès patient sur l'instance).
-- `QuickAppointmentsDialog` : interroge encore `traitement_seances` par modèle → adapter aux `patient_seances`.
-- Page `PatientDetail` : encore sur l'ancien modèle `traitement_types`.
+### Fait depuis (incrément 2)
+- ✅ Ajout de séance/exercice **depuis un modèle** (ou vierge) sur une instance existante (`AddFromLibraryDialog`).
+- ✅ `QuickAppointmentsDialog` migré : clone la dernière `patient_seances` de l'instance par date (date sur `date_prevue`).
+- ✅ `PatientDetail` migré : lecture du traitement actif via `patient_traitements`, création (mode `patientId`), sélection (instanciation), retrait (suppression de l'instance).
+
+### Reste à faire
+- **Accès patient par code** (`PatientSessionView` / `GenerateAccessCodeDialog`) : lisent encore les `seance_types`. À faire passer sur `patient_seances` (+ bouton de partage à remettre dans la carte d'instance). Surface importante — à traiter avec vérification de build.
 - `npm run build` à lancer en local (non vérifiable dans le sandbox).
+- Nettoyer la collection orpheline `exercice_types` si confirmée inutile, et l'ancienne table `patient_traitement_seance_dates` (remplacée par `patient_seances.date_prevue`).
 
 ## 5. Points à valider avant de coder
 1. OK pour repointer `source` (instances) vers `exercices` et abandonner `exercice_types` ?

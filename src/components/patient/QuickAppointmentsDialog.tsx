@@ -105,28 +105,16 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
 
     setSaving(true);
 
-    // 1) Find a template seance_type from existing traitement_seances
-    const existing = await pb.collection("traitement_seances").getFullList({
-      filter: `traitement_type = "${traitementId}"`,
-      sort: "-ordre",
-      fields: "seance_type,ordre",
+    // traitementId is a patient_traitements (instance) id. Use the last patient_seances
+    // of this instance as the template, and clone an independent copy per date.
+    const existing = await pb.collection("patient_seances").getFullList({
+      filter: `patient_traitement = "${traitementId}"`,
+      sort: "-created",
     });
 
-    const templateSeanceTypeId = existing && existing.length > 0 ? existing[0].seance_type : null;
-    const maxTraitementOrdre = existing && existing.length > 0 ? existing[0].ordre : 0;
+    const template = existing && existing.length > 0 ? existing[0] : null;
 
-    // Also check existing date rows so we don't collide with the unique (patient_id, traitement_id, seance_ordre) constraint
-    const existingDatesRes = await pb.collection("patient_traitement_seance_dates").getList(1, 1, {
-      filter: `patient = "${patientId}" && traitement = "${traitementId}"`,
-      sort: "-seance_ordre",
-      fields: "seance_ordre",
-    });
-    const existingDates = existingDatesRes.items;
-
-    const maxDateOrdre = existingDates && existingDates.length > 0 ? existingDates[0].seance_ordre : 0;
-    const currentMaxOrdre = Math.max(maxTraitementOrdre, maxDateOrdre);
-
-    if (!templateSeanceTypeId) {
+    if (!template) {
       setSaving(false);
       toast({
         title: "Ajoutez d'abord une séance",
@@ -136,88 +124,32 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
       return;
     }
 
-    // Fetch the template seance_type data + its exercices so we can clone an independent copy per date
-    let templateSeance: any = null;
-    try {
-      templateSeance = await pb.collection("seance_types").getOne(templateSeanceTypeId as string, {
-        fields: "pathologie,objectif_principal,pathologies,objectifs_principaux,objectifs_secondaires,comment",
-      });
-    } catch {
-      setSaving(false);
-      toast({ title: "Erreur", description: "Modèle introuvable", variant: "destructive" });
-      return;
-    }
-
-    const templateExercices = await pb.collection("seance_exercices").getFullList({
-      filter: `seance_type = "${templateSeanceTypeId}"`,
+    const templateExercices = await pb.collection("patient_seance_exercices").getFullList({
+      filter: `patient_seance = "${template.id}"`,
       sort: "ordre",
-      fields: "exercice,name,description,repetitions,duration_seconds,series,force_1,duration_seconds_2,force_2,comment,ordre",
+      fields: "source,nom,description,video_url,ordre,series,repetitions,duree,repos,notes",
     });
 
-    // 2) For each date, create an INDEPENDENT clone of the seance_type so editing one
-    //    does not affect the others.
-    const newSeanceTypeIds: string[] = [];
-    for (let i = 0; i < dates.length; i++) {
-      let cloned: any;
-      try {
-        cloned = await pb.collection("seance_types").create({
-          user: user.id,
-          pathologie: templateSeance.pathologie,
-          objectif_principal: templateSeance.objectif_principal,
-          pathologies: templateSeance.pathologies,
-          objectifs_principaux: templateSeance.objectifs_principaux,
-          objectifs_secondaires: templateSeance.objectifs_secondaires,
-          comment: templateSeance.comment,
-          is_hidden_from_list: false,
-          is_shared: false,
-          is_copy: true,
-        });
-      } catch (e: any) {
-        setSaving(false);
-        toast({ title: "Erreur", description: e.message || "Clonage échoué", variant: "destructive" });
-        return;
-      }
-
-      newSeanceTypeIds.push(cloned.id);
-
-      if (templateExercices && templateExercices.length > 0) {
-        for (const ex of templateExercices) {
-          await pb.collection("seance_exercices").create({ ...ex, seance_type: cloned.id, exercice: ex.exercice, id: undefined });
-        }
-      }
-    }
-
-    // 3) Insert one traitement_seances row per date, each pointing to its own clone
-    const insertedSeances: any[] = [];
-    for (let i = 0; i < dates.length; i++) {
-      try {
-        const rec = await pb.collection("traitement_seances").create({
-          traitement_type: traitementId,
-          seance_type: newSeanceTypeIds[i],
-          ordre: currentMaxOrdre + i + 1,
-        });
-        insertedSeances.push(rec);
-      } catch (e: any) {
-        setSaving(false);
-        toast({ title: "Erreur", description: e.message, variant: "destructive" });
-        return;
-      }
-    }
-
-    const seanceIdByClone = new Map<string, string>();
-    insertedSeances.forEach((r) => { seanceIdByClone.set(r.seance_type, r.id); });
-
-    // 4) Insert patient_traitement_seance_dates entries, each bound to its own seance
+    // For each date, create an independent patient_seances clone (date on date_prevue)
     try {
       for (let i = 0; i < dates.length; i++) {
-        await pb.collection("patient_traitement_seance_dates").create({
+        const ps = await pb.collection("patient_seances").create({
+          patient_traitement: traitementId,
           patient: patientId,
-          traitement: traitementId,
-          seance: seanceIdByClone.get(newSeanceTypeIds[i]) ?? null,
-          seance_ordre: currentMaxOrdre + i + 1,
-          seance_date: format(dates[i], "yyyy-MM-dd"),
-          user: user.id,
+          praticien: user.id,
+          source: (template as any).source || null,
+          nom: (template as any).nom || "",
+          objectif: (template as any).objectif || "",
+          statut: "planifiée",
+          date_prevue: format(dates[i], "yyyy-MM-dd"),
         });
+        for (const ex of templateExercices as any[]) {
+          await pb.collection("patient_seance_exercices").create({
+            patient_seance: ps.id, source: ex.source || null, nom: ex.nom, description: ex.description,
+            video_url: ex.video_url, ordre: ex.ordre, series: ex.series, repetitions: ex.repetitions,
+            duree: ex.duree, repos: ex.repos, realise: false, notes: ex.notes,
+          });
+        }
       }
     } catch (e: any) {
       setSaving(false);
