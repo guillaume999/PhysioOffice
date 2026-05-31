@@ -1,7 +1,9 @@
 import PocketBase from "pocketbase";
 
-// Use || instead of ?? so empty string also falls back to default
-const PB_URL = import.meta.env.VITE_PB_URL || "https://pocketbase-dev.physiooffice.com";
+// VITE_PB_URL from build args, falls back to production PocketBase URL
+const PB_URL = (import.meta.env.VITE_PB_URL && import.meta.env.VITE_PB_URL !== "http://localhost:8090")
+  ? import.meta.env.VITE_PB_URL
+  : "https://pocketbase-dev.physiooffice.com";
 
 export const pb = new PocketBase(PB_URL);
 
@@ -10,7 +12,6 @@ pb.autoCancellation(false);
 
 /**
  * Get a public file URL from a PocketBase record.
- * Usage: getFileUrl(record, "video_file") or getFileUrl(record, "video_file", { thumb: "100x100" })
  */
 export function getFileUrl(
   record: { id: string; collectionId?: string; collectionName?: string } & Record<string, any>,
