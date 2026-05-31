@@ -2,7 +2,9 @@
 # Multi-stage Dockerfile for React + Vite app served by nginx
 
 # ── Stage 1: Build ──────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# Debian-based (glibc) image: avoids Alpine/musl native binary issues with
+# Rollup/esbuild that made `npm run build` fail in the container.
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -21,4 +23,4 @@ ARG VITE_PB_URL
 ENV VITE_PB_URL=${VITE_PB_URL}
 RUN npm run build
 
-# ── Stage 2: Serve with nginx ────────────────────────────────────
+# �
