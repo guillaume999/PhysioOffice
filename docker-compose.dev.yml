@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: patient-hub-frontend-physiooffice:dev
-    # Build the image locally instead of pulling it from a registry.
-    # This stack has no registry image, so `docker compose pull` would fail
-    # with "pull access denied for patient-hub-frontend-physiooffi
+    # No `image:` on purpose: this service is built locally from `build:` above.
+    # With an image name, Portainer's `docker compose pull` step tries to fetch it
+    # from a registry and fails ("pull access denied"). Build-only services are
+    # skipped by
