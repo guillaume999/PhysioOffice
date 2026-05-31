@@ -29,6 +29,7 @@ interface Patient {
 const prescriptionLabels: Record<string, string> = {
   oui: "Oui",
   none: "Non",
+  non: "Non",
   renouv_kine: "Renouv. kiné",
 };
 
@@ -79,8 +80,8 @@ export default function Patients() {
     try {
       const data = await pb.collection("patients").getFullList({
         filter: `user = "${user!.id}"`,
-        sort: "-created",
-        fields: "id,name,numero,status,mutuelle,seances_restantes,prescription",
+        sort: "-id",
+        fields: "id,name,numero,status,mutuelle,seances_restantes,ordonnance",
       });
       setPatients(data.map((r: any) => ({
         id: r.id,
@@ -89,7 +90,7 @@ export default function Patients() {
         status: r.status,
         has_mutual: r.mutuelle,
         remaining_sessions: r.seances_restantes,
-        prescription: r.prescription,
+        prescription: r.ordonnance === "non" ? "none" : (r.ordonnance ?? null),
       })));
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -116,8 +117,11 @@ export default function Patients() {
         status: formData.status,
         mutuelle: formData.has_mutual,
         seances_restantes: formData.remaining_sessions,
-        prescription: formData.prescription,
+        ordonnance: formData.prescription === "none" ? "non" : formData.prescription,
         user: user?.id,
+        praticien: user?.id,
+        prenom: formData.name,
+        nom: formData.name,
       });
       toast({ title: "Patient ajouté" });
       setIsDialogOpen(false);
