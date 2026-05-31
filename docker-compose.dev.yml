@@ -7,4 +7,12 @@ services:
     # No `image:` on purpose: this service is built locally from `build:` above.
     # With an image name, Portainer's `docker compose pull` step tries to fetch it
     # from a registry and fails ("pull access denied"). Build-only services are
-    # skipped by
+    # skipped by `compose pull`, so the redeploy can build instead.
+    pull_policy: build
+    container_name: physiooffice-dev
+    ports:
+      - "8082:8081"
+    restart: unless-stopped
+    environment:
+      - NGINX_ENTRYPOINT_QUIET_LOGS=1
+      - PB_URL=https://pocketbase-dev.physiooffice.com

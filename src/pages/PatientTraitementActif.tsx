@@ -165,4 +165,9 @@ export default function PatientTraitementActif() {
           patientId={id || ""}
           patientName={patientName}
           traitementId={activeTraitementId}
-          onCreated={() => setR
+          onCreated={() => setRefreshKey((k) => k + 1)}
+        />
+      </div>
+    </Layout>
+  );
+}

@@ -276,4 +276,189 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       <CardContent className="p-2 sm:p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge va
+            <Badge variant="outline" className="text-sm">{traitement.pathologie || traitement.nom}</Badge>
+            <Select value={traitement.statut || "actif"} onValueChange={(v) => updateTraitement({ statut: v })}>
+              <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TRAITEMENT_STATUTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onRemove} className="text-destructive h-8 w-8" title="Retirer le traitement">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="mt-2 text-xs text-muted-foreground">
+          {traitement.date_debut && <span>Début {new Date(traitement.date_debut).toLocaleDateString("fr-FR")} • </span>}
+          {traitement.tests.length} tests • {traitement.seances.length} séances
+        </div>
+
+        <div className="mt-4 pt-4 border-t space-y-4">
+          {traitement.description && <p className="text-sm text-muted-foreground">{traitement.description}</p>}
+
+          {/* Tests */}
+          <Collapsible open={testsExpanded} onOpenChange={setTestsExpanded}>
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border cursor-pointer hover:bg-muted/70"
+              onClick={() => setTestsExpanded((v) => !v)}>
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">Tests ({traitement.tests.length})</span>
+              </div>
+              {testsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+            <CollapsibleContent className="mt-2 space-y-2">
+              {traitement.tests.map((t, i) => (
+                <div key={t.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl border">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-primary">{i + 1}</span>
+                  </div>
+                  <div className="w-16 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    {t.thumbnail_url ? <img src={t.thumbnail_url} alt={t.nom || ""} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><FileText className="w-5 h-5" /></div>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{t.nom || `Test ${i + 1}`}</p>
+                    {t.description && <p className="text-xs text-muted-foreground line-clamp-2">{t.description}</p>}
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTest(t.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={addTest}>
+                <Plus className="w-4 h-4" /> Ajouter un test
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Séances */}
+          <div className="space-y-3">
+            <p className="text-sm font-semibold">Séances ({traitement.seances.length})</p>
+            {traitement.seances.map((s) => {
+              const isExpanded = expandedSeances.has(s.id);
+              return (
+                <Collapsible key={s.id} open={isExpanded} onOpenChange={() => toggleSeance(s.id)}>
+                  <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-lg border border-emerald-300 dark:border-emerald-700/50 overflow-hidden">
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleSeance(s.id)}>
+                          <p className="font-medium text-sm">{s.nom || s.objectif || "Séance"}</p>
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            {s.exercices.length} exercice{s.exercices.length > 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSeance(s.id)} title="Supprimer la séance">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleSeance(s.id)}>
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DatePickerInline
+                          value={toDateInput(s.date_prevue)}
+                          onChange={(v) => updateSeance(s.id, { date_prevue: v || null })}
+                          className="h-8 text-xs"
+                          title="Date prévue"
+                        />
+                        <Select value={s.statut || "planifiée"} onValueChange={(v) => updateSeance(s.id, { statut: v })}>
+                          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {SEANCE_STATUTS.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <CollapsibleContent>
+                      <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
+                        {s.exercices.map((ex) => (
+                          <div key={ex.id} className="flex items-center gap-2 p-2 bg-background/60 rounded border">
+                            <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" />
+                            <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                              {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Play className="w-4 h-4" /></div>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <Input
+                                defaultValue={ex.nom || ""}
+                                onBlur={(e) => { if (e.target.value !== (ex.nom || "")) updateExercice(s.id, ex.id, { nom: e.target.value }); }}
+                                className="h-7 text-sm font-medium"
+                              />
+                              <div className="flex gap-1 mt-1">
+                                <NumberField label="séries" value={ex.series} onSave={(n) => updateExercice(s.id, ex.id, { series: n })} />
+                                <NumberField label="rép." value={ex.repetitions} onSave={(n) => updateExercice(s.id, ex.id, { repetitions: n })} />
+                                <NumberField label="s" value={ex.duree} onSave={(n) => updateExercice(s.id, ex.id, { duree: n })} />
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteExercice(ex.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={() => openExercicePicker(s.id)}>
+                          <Plus className="w-4 h-4" /> Ajouter un exercice
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            })}
+            <Button variant="outline" className="w-full justify-start gap-2" onClick={openSeancePicker}>
+              <Plus className="w-4 h-4" /> Ajouter une séance
+            </Button>
+          </div>
+
+          {/* Bilans intermédiaires */}
+          <div className="space-y-3 pt-4 border-t">
+            <p className="text-sm font-semibold">Bilans intermédiaires ({traitement.bilans.length})</p>
+            {traitement.bilans.map((b) => (
+              <div key={b.id} className="flex items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <ClipboardCheck className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="font-medium text-sm text-primary">
+                    Bilan {b.bilan_date ? `du ${new Date(b.bilan_date).toLocaleDateString("fr-FR")}` : "intermédiaire"}
+                  </p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8"
+                  onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
+                  title="Modifier le bilan">
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            <Button variant="outline" className="w-full justify-start gap-2"
+              onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`)}>
+              <FileText className="w-4 h-4" /> Ajouter un bilan intermédiaire
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+
+      <AddFromLibraryDialog open={pickerOpen} onOpenChange={setPickerOpen} mode={pickerMode} onPick={handlePick} />
+    </Card>
+  );
+}
+
+function NumberField({ label, value, onSave }: { label: string; value: number | null; onSave: (n: number | null) => void }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <Input
+        type="number"
+        defaultValue={value ?? ""}
+        onBlur={(e) => {
+          const raw = e.target.value;
+          const n = raw === "" ? null : Number(raw);
+          if (n !== value) onSave(n);
+        }}
+        className="h-6 w-12 text-xs px-1"
+      />
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+    </div>
+  );
+}

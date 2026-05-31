@@ -37,6 +37,7 @@ interface TraitementSeance {
 
 interface TraitementType {
   id: string;
+  nom?: string | null;
   pathologie: string;
   description: string | null;
   author_name: string | null;

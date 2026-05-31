@@ -288,4 +288,12 @@ export default function PatientBilanIntermediaire() {
                 placeholder="Évolution depuis le dernier bilan, progrès, difficultés..."
                 value={bilan.observations}
                 onChange={(e) => handleChange("observations", e.target.value)}
-                className="min-h-[120px
+                className="min-h-[120px]"
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Layout>
+  );
+}

@@ -62,6 +62,7 @@ interface TraitementSeance {
 interface TraitementType {
   id: string;
   code: string;
+  nom?: string | null;
   pathologie: string;
   description: string | null;
   author_name: string | null;
@@ -868,6 +869,9 @@ export default function TraitementType() {
           </DialogContent>
         </Dialog>
       </div>
+    </Layout>
+  );
+}
     </Layout>
   );
 }
