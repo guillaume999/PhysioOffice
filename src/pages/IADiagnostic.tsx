@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Brain, Send, Loader2, Bot, User } from "lucide-react";
 import { PagePopup } from "@/components/popup/PagePopup";
@@ -41,9 +42,15 @@ export default function IADiagnostic() {
     };
 
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
+      // AI chat backend. Configure VITE_AI_CHAT_URL to your endpoint; defaults to a
+      // PocketBase custom route (`/api/ai-chat`). The PB auth token is forwarded.
+      const aiChatUrl = import.meta.env.VITE_AI_CHAT_URL || `${pb.baseURL}/api/ai-chat`;
+      const resp = await fetch(aiChatUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: {
+          "Content-Type": "application/json",
+          ...(pb.authStore.token ? { Authorization: pb.authStore.token } : {}),
+        },
         body: JSON.stringify({ messages: [...messages, userMsg] }),
       });
 

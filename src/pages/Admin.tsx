@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
+import { pb } from "@/integrations/pocketbase/client";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPasswordConfirmDialog } from "@/components/admin/AdminPasswordConfirmDialog";
@@ -220,82 +221,56 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch users - explicitly select only non-sensitive fields
-      // SECURITY: Never select stripe_customer_id or stripe_subscription_id
-      const { data: usersData, error: usersError } = await supabase
-        .from("profiles")
-        .select("user_id, email, first_name, last_name, pseudo, trial_end_date, is_premium, is_banned, can_share, created_at, subscription_tier, subscription_end_date, has_stripe_account")
-        .order("created_at", { ascending: false });
+      // Fetch users (the PocketBase `users` collection holds the former `profiles` data).
+      // The auth record id replaces the old profiles.user_id; `created` replaces created_at.
+      const usersRecords = await pb.collection("users").getFullList({ sort: "-created" });
+      const usersData = usersRecords.map((r: any) => ({ ...r, user_id: r.id, created_at: r.created }));
+      setUsers(usersData as any);
 
-      if (usersError) throw usersError;
-      setUsers(usersData || []);
-
-      // Fetch admin roles
-      const { data: adminRolesData } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
-      
-      setAdminUserIds(new Set(adminRolesData?.map(r => r.user_id) || []));
+      // Admin role now lives on the user record (subscription_tier === "admin")
+      setAdminUserIds(
+        new Set(usersData.filter((u: any) => u.subscription_tier === "admin").map((u: any) => u.user_id))
+      );
 
       // Fetch seances
-      const { data: seancesData, error: seancesError } = await supabase
-        .from("seance_types")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (seancesError) throw seancesError;
-      setSeances(seancesData || []);
+      const seancesData = (await pb.collection("seance_types").getFullList({ sort: "-created" }))
+        .map((r: any) => ({ ...r, created_at: r.created }));
+      setSeances(seancesData as any);
 
       // Fetch traitements
-      const { data: traitementsData, error: traitementsError } = await supabase
-        .from("traitement_types")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (traitementsError) throw traitementsError;
-      setTraitements(traitementsData || []);
+      const traitementsData = (await pb.collection("traitement_types").getFullList({ sort: "-created" }))
+        .map((r: any) => ({ ...r, created_at: r.created }));
+      setTraitements(traitementsData as any);
 
       // Fetch exercices
-      const { data: exercicesData, error: exercicesError } = await supabase
-        .from("exercices")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const exercicesData = (await pb.collection("exercices").getFullList({ sort: "-created" }))
+        .map((r: any) => ({ ...r, created_at: r.created }));
+      setExercices(exercicesData as any);
 
-      if (exercicesError) throw exercicesError;
-      setExercices(exercicesData || []);
-
-      // Fetch featured exercices
-      const { data: featuredData } = await supabase
-        .from("featured_exercices")
-        .select("exercice_id");
-      
-      setFeaturedExerciceIds(new Set(featuredData?.map(f => f.exercice_id) || []));
+      // Fetch featured exercices (relation field is `exercice`)
+      const featuredData = await pb.collection("featured_exercices").getFullList({ fields: "exercice" });
+      setFeaturedExerciceIds(new Set(featuredData.map((f: any) => f.exercice)));
 
       // Fetch consulted exercices for current admin
-      const { data: consultedData } = await supabase
-        .from("exercice_consultations")
-        .select("exercice_id")
-        .eq("is_consulted", true);
-      
-      setConsultedExerciceIds(new Set(consultedData?.map(c => c.exercice_id) || []));
+      const consultedData = user
+        ? await pb.collection("exercice_consultations").getFullList({
+            filter: `user = "${user.id}" && is_consulted = true`,
+            fields: "exercice",
+          })
+        : [];
+      setConsultedExerciceIds(new Set(consultedData.map((c: any) => c.exercice)));
 
       // Fetch platform certificat models
-      const { data: modelsData } = await supabase
-        .from("certificat_models")
-        .select("*")
-        .eq("is_platform", true)
-        .order("created_at", { ascending: false });
-      
-      setCertificatModels(modelsData || []);
+      const modelsData = (await pb.collection("certificat_models").getFullList({
+        filter: "is_platform = true",
+        sort: "-created",
+      })).map((r: any) => ({ ...r, created_at: r.created }));
+      setCertificatModels(modelsData as any);
 
       // Fetch subscription limits
-      const { data: limitsData } = await supabase
-        .from("subscription_limits")
-        .select("*")
-        .order("tier");
-      
-      setSubscriptionLimits(limitsData || []);
+      const limitsData = await pb.collection("subscription_limits").getFullList({ sort: "tier" });
+
+      setSubscriptionLimits(limitsData as any);
 
       // Calculate stats
       const now = new Date();
@@ -311,9 +286,7 @@ export default function Admin() {
       const pendingExercicesCount = exercicesData?.filter(e => e.status === 'pending').length || 0;
 
       // Fetch patients count
-      const { count: patientsCount } = await supabase
-        .from("patients")
-        .select("*", { count: "exact", head: true });
+      const patientsCount = (await pb.collection("patients").getList(1, 1)).totalItems;
 
       setStats({
         totalUsers: usersData?.length || 0,
@@ -342,17 +315,12 @@ export default function Admin() {
 
   const updateSubscriptionTier = async (userId: string, newTier: "free" | "basic" | "premium") => {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          subscription_tier: newTier,
-          is_premium: newTier !== "free",
-        })
-        .eq("user_id", userId);
+      await pb.collection("users").update(userId, {
+        subscription_tier: newTier,
+        is_premium: newTier !== "free",
+      });
 
-      if (error) throw error;
-
-      setUsers(users.map(u => 
+      setUsers(users.map(u =>
         u.user_id === userId ? { ...u, subscription_tier: newTier, is_premium: newTier !== "free" } : u
       ));
 
@@ -373,16 +341,11 @@ export default function Admin() {
 
   const updateSubscriptionEndDate = async (userId: string, newDate: string | null) => {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          subscription_end_date: newDate ? new Date(newDate).toISOString() : null,
-        })
-        .eq("user_id", userId);
+      await pb.collection("users").update(userId, {
+        subscription_end_date: newDate ? new Date(newDate).toISOString() : null,
+      });
 
-      if (error) throw error;
-
-      setUsers(users.map(u => 
+      setUsers(users.map(u =>
         u.user_id === userId ? { ...u, subscription_end_date: newDate ? new Date(newDate).toISOString() : null } : u
       ));
 
@@ -402,14 +365,9 @@ export default function Admin() {
 
   const toggleBan = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_banned: !currentStatus })
-        .eq("user_id", userId);
+      await pb.collection("users").update(userId, { is_banned: !currentStatus });
 
-      if (error) throw error;
-
-      setUsers(users.map(u => 
+      setUsers(users.map(u =>
         u.user_id === userId ? { ...u, is_banned: !currentStatus } : u
       ));
 
@@ -429,14 +387,9 @@ export default function Admin() {
 
   const toggleCanShare = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ can_share: !currentStatus })
-        .eq("user_id", userId);
+      await pb.collection("users").update(userId, { can_share: !currentStatus });
 
-      if (error) throw error;
-
-      setUsers(users.map(u => 
+      setUsers(users.map(u =>
         u.user_id === userId ? { ...u, can_share: !currentStatus } : u
       ));
 
@@ -455,31 +408,16 @@ export default function Admin() {
   };
 
   const openAdminConfirmDialog = async (userId: string, userEmail: string | null) => {
-    try {
-      const { data: existingRole } = await supabase
-        .from("user_roles")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("role", "admin")
-        .maybeSingle();
+    // Admin status is derived from the user's subscription_tier
+    const targetUser = users.find(u => u.user_id === userId);
+    const isAdmin = targetUser?.subscription_tier === "admin";
 
-      const user = users.find(u => u.user_id === userId);
-      const isAdmin = !!existingRole || user?.subscription_tier === "admin";
-
-      setAdminConfirmDialog({
-        open: true,
-        userId,
-        userEmail,
-        action: isAdmin ? "remove" : "add",
-      });
-    } catch (error) {
-      console.error("Error checking admin status:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de vérifier le statut admin.",
-        variant: "destructive",
-      });
-    }
+    setAdminConfirmDialog({
+      open: true,
+      userId,
+      userEmail,
+      action: isAdmin ? "remove" : "add",
+    });
   };
 
   const confirmToggleAdmin = async () => {
@@ -487,18 +425,11 @@ export default function Admin() {
     
     try {
       if (action === "remove") {
-        await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", userId)
-          .eq("role", "admin");
-        
+        // Demote: revert the admin tier back to free
+        await pb.collection("users").update(userId, { subscription_tier: "free" });
         toast({ title: "Rôle admin retiré" });
       } else {
-        await supabase
-          .from("user_roles")
-          .insert({ user_id: userId, role: "admin" });
-        
+        await pb.collection("users").update(userId, { subscription_tier: "admin" });
         toast({ title: "Rôle admin ajouté" });
       }
 
@@ -529,12 +460,7 @@ export default function Admin() {
       for (const limit of subscriptionLimits) {
         const edits = editingLimits[limit.tier];
         if (edits && Object.keys(edits).length > 0) {
-          const { error } = await supabase
-            .from("subscription_limits")
-            .update(edits)
-            .eq("id", limit.id);
-          
-          if (error) throw error;
+          await pb.collection("subscription_limits").update(limit.id, edits);
         }
       }
 
@@ -572,14 +498,9 @@ export default function Admin() {
 
   const toggleTraitementValidation = async (traitementId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from("traitement_types")
-        .update({ is_validated: !currentStatus })
-        .eq("id", traitementId);
+      await pb.collection("traitement_types").update(traitementId, { is_validated: !currentStatus });
 
-      if (error) throw error;
-
-      setTraitements(traitements.map(t => 
+      setTraitements(traitements.map(t =>
         t.id === traitementId ? { ...t, is_validated: !currentStatus } : t
       ));
 
@@ -601,12 +522,7 @@ export default function Admin() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette séance ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("seance_types")
-        .delete()
-        .eq("id", seanceId);
-
-      if (error) throw error;
+      await pb.collection("seance_types").delete(seanceId);
 
       setSeances(seances.filter(s => s.id !== seanceId));
       toast({ title: "Séance supprimée" });
@@ -624,12 +540,7 @@ export default function Admin() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce traitement ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("traitement_types")
-        .delete()
-        .eq("id", traitementId);
-
-      if (error) throw error;
+      await pb.collection("traitement_types").delete(traitementId);
 
       setTraitements(traitements.filter(t => t.id !== traitementId));
       toast({ title: "Traitement supprimé" });
@@ -646,14 +557,9 @@ export default function Admin() {
   const toggleExerciceValidation = async (exerciceId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'shared' ? 'pending' : 'shared';
     try {
-      const { error } = await supabase
-        .from("exercices")
-        .update({ status: newStatus })
-        .eq("id", exerciceId);
+      await pb.collection("exercices").update(exerciceId, { status: newStatus });
 
-      if (error) throw error;
-
-      setExercices(exercices.map(e => 
+      setExercices(exercices.map(e =>
         e.id === exerciceId ? { ...e, status: newStatus } : e
       ));
 
@@ -675,12 +581,7 @@ export default function Admin() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cet exercice ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("exercices")
-        .delete()
-        .eq("id", exerciceId);
-
-      if (error) throw error;
+      await pb.collection("exercices").delete(exerciceId);
 
       setExercices(exercices.filter(e => e.id !== exerciceId));
       toast({ title: "Exercice supprimé" });
@@ -698,30 +599,35 @@ export default function Admin() {
     if (!user) return;
     
     try {
+      const existing = await pb.collection("exercice_consultations").getFullList({
+        filter: `exercice = "${exerciceId}" && user = "${user.id}"`,
+      });
+
       if (isCurrentlyConsulted) {
-        // Remove consultation record
-        await supabase
-          .from("exercice_consultations")
-          .delete()
-          .eq("exercice_id", exerciceId)
-          .eq("user_id", user.id);
-        
+        // Remove consultation record(s)
+        await Promise.all(
+          existing.map((rec: any) => pb.collection("exercice_consultations").delete(rec.id))
+        );
+
         setConsultedExerciceIds(prev => {
           const newSet = new Set(prev);
           newSet.delete(exerciceId);
           return newSet;
         });
       } else {
-        // Upsert consultation record
-        await supabase
-          .from("exercice_consultations")
-          .upsert({
-            exercice_id: exerciceId,
-            user_id: user.id,
-            is_consulted: true,
-            consulted_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,exercice_id' });
-        
+        // Upsert consultation record (PocketBase has no upsert: update if present, else create)
+        const payload = {
+          exercice: exerciceId,
+          user: user.id,
+          is_consulted: true,
+          consulted_at: new Date().toISOString(),
+        };
+        if (existing.length > 0) {
+          await pb.collection("exercice_consultations").update(existing[0].id, payload);
+        } else {
+          await pb.collection("exercice_consultations").create(payload);
+        }
+
         setConsultedExerciceIds(prev => {
           const newSet = new Set(prev);
           newSet.add(exerciceId);
@@ -743,20 +649,14 @@ export default function Admin() {
     if (!newModelTitle.trim() || !newModelContent.trim() || !user) return;
 
     try {
-      const { data, error } = await supabase
-        .from("certificat_models")
-        .insert({
-          user_id: user.id,
-          title: newModelTitle,
-          content: newModelContent,
-          is_platform: true,
-        })
-        .select()
-        .single();
+      const data = await pb.collection("certificat_models").create({
+        user: user.id,
+        title: newModelTitle,
+        content: newModelContent,
+        is_platform: true,
+      });
 
-      if (error) throw error;
-
-      setCertificatModels([data, ...certificatModels]);
+      setCertificatModels([data as any, ...certificatModels]);
       setNewModelTitle("");
       setNewModelContent("");
       toast({ title: "Modèle ajouté" });
@@ -786,15 +686,10 @@ export default function Admin() {
     if (!editingModelId || !editModelTitle.trim()) return;
 
     try {
-      const { error } = await supabase
-        .from("certificat_models")
-        .update({
-          title: editModelTitle,
-          content: editModelContent,
-        })
-        .eq("id", editingModelId);
-
-      if (error) throw error;
+      await pb.collection("certificat_models").update(editingModelId, {
+        title: editModelTitle,
+        content: editModelContent,
+      });
 
       setCertificatModels(
         certificatModels.map((m) =>
@@ -821,12 +716,7 @@ export default function Admin() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce modèle ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("certificat_models")
-        .delete()
-        .eq("id", modelId);
-
-      if (error) throw error;
+      await pb.collection("certificat_models").delete(modelId);
 
       setCertificatModels(certificatModels.filter((m) => m.id !== modelId));
       toast({ title: "Modèle supprimé" });

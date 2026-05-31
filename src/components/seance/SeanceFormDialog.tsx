@@ -126,7 +126,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       filter: `user = "${user.id}"`, sort: "title",
       fields: "id,code,title,description,video_url,thumbnail_url",
     });
-    setAvailableExercices(exData);
+    setAvailableExercices(exData as unknown as Exercice[]);
   };
 
   const resetForm = () => {

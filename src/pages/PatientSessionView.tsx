@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Loader2, Calendar, FileText, Clock, AlertCircle, CheckCircle, Play, X, ChevronDown, ChevronUp, Repeat, Timer } from "lucide-react";
+import { pb } from "@/integrations/pocketbase/client";
 
 interface SeanceType {
   id: string;
@@ -74,32 +75,40 @@ export default function PatientSessionView() {
     setError(null);
 
     try {
-      // Validate the access code
-      const { data: accessResult, error: accessError } = await supabase
-        .rpc("get_session_by_access_code", { _code: accessCode.trim().toUpperCase() })
-        .maybeSingle();
-
-      if (accessError) throw accessError;
-
-      if (!accessResult) {
+      // Validate the access code (must exist and not be expired).
+      // NOTE: the `patient_session_access` collection must allow public (guest)
+      // read for this to work without an account.
+      let accessRecord: any;
+      try {
+        accessRecord = await pb
+          .collection("patient_session_access")
+          .getFirstListItem(
+            `access_code = "${accessCode.trim().toUpperCase()}" && expires_at > "${new Date().toISOString()}"`
+          );
+      } catch {
         setError("Code d'accès invalide ou expiré");
         setLoading(false);
         return;
       }
 
-      // Fetch seance details
-      const { data: seanceData } = await supabase
-        .from("seance_types")
-        .select("id, pathologie, objectif_principal, pathologies, objectifs_principaux, objectifs_secondaires")
-        .eq("id", accessResult.seance_type_id)
-        .maybeSingle();
+      // Normalize relation fields to the *_id shape the component expects
+      const accessResult = {
+        ...accessRecord,
+        seance_type_id: accessRecord.seance_type,
+        patient_id: accessRecord.patient,
+      };
 
-      // Fetch patient name
-      const { data: patientData } = await supabase
-        .from("patients")
-        .select("name")
-        .eq("id", accessResult.patient_id)
-        .maybeSingle();
+      // Fetch seance details
+      let seanceData: any = undefined;
+      try {
+        seanceData = await pb.collection("seance_types").getOne(accessResult.seance_type_id);
+      } catch { /* ignore */ }
+
+      // Fetch patient name (limit fields to avoid exposing the full record)
+      let patientData: any = undefined;
+      try {
+        patientData = await pb.collection("patients").getOne(accessResult.patient_id, { fields: "id,name" });
+      } catch { /* ignore */ }
 
       setAccessData({
         ...accessResult,
@@ -107,24 +116,15 @@ export default function PatientSessionView() {
         patient: patientData || undefined,
       });
 
-      // Fetch exercices for this seance
-      const { data: exercicesData } = await supabase
-        .from("seance_exercices")
-        .select(`
-          id,
-          name,
-          description,
-          duration_seconds,
-          repetitions,
-          series,
-          ordre,
-          exercice_id,
-          exercices(id, title, description, thumbnail_url, video_url)
-        `)
-        .eq("seance_type_id", accessResult.seance_type_id)
-        .order("ordre", { ascending: true });
-
-      setSeanceExercices(exercicesData || []);
+      // Fetch exercices for this seance (relation `exercice` expanded into `exercices`)
+      const exercicesData = await pb.collection("seance_exercices").getFullList({
+        filter: `seance_type = "${accessResult.seance_type_id}"`,
+        sort: "ordre",
+        expand: "exercice",
+      });
+      setSeanceExercices(
+        exercicesData.map((ex: any) => ({ ...ex, exercices: ex.expand?.exercice })) as any
+      );
 
     } catch (err) {
       console.error("Error validating code:", err);

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, ClipboardList, Loader2, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 
 interface BilanData {
@@ -56,11 +57,10 @@ export default function PatientBilanIntermediaire() {
   const fetchData = async () => {
     try {
       // Fetch patient name
-      const { data: patient } = await supabase
-        .from("patients")
-        .select("name")
-        .eq("id", patientId)
-        .single();
+      let patient: any = null;
+      try {
+        patient = await pb.collection("patients").getOne(patientId!, { fields: "id,name" });
+      } catch { /* ignore */ }
 
       if (patient) {
         setPatientName(patient.name);
@@ -68,11 +68,10 @@ export default function PatientBilanIntermediaire() {
 
       // Fetch existing bilan if we have an id
       if (bilanId) {
-        const { data: bilanData } = await supabase
-          .from("patient_bilans")
-          .select("*")
-          .eq("id", bilanId)
-          .single();
+        let bilanData: any = null;
+        try {
+          bilanData = await pb.collection("patient_bilans").getOne(bilanId);
+        } catch { /* ignore */ }
 
         if (bilanData) {
           setExistingBilanId(bilanData.id);
@@ -117,29 +116,18 @@ export default function PatientBilanIntermediaire() {
     try {
       if (existingBilanId) {
         // Update existing bilan
-        const { error } = await supabase
-          .from("patient_bilans")
-          .update({ content: bilanJson })
-          .eq("id", existingBilanId);
-
-        if (error) throw error;
+        await pb.collection("patient_bilans").update(existingBilanId, { content: bilanJson });
       } else {
         // Create new bilan with today's date
         const todayDate = format(new Date(), "yyyy-MM-dd");
-        const { data, error } = await supabase
-          .from("patient_bilans")
-          .insert({
-            patient_id: patientId,
-            traitement_id: traitementId,
-            user_id: user.id,
-            position_after_seance: 0,
-            content: bilanJson,
-            bilan_date: todayDate,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
+        const data = await pb.collection("patient_bilans").create({
+          patient: patientId,
+          traitement: traitementId,
+          user: user.id,
+          position_after_seance: 0,
+          content: bilanJson,
+          bilan_date: todayDate,
+        });
         setExistingBilanId(data.id);
       }
 

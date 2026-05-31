@@ -1,33 +1,73 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { pb } from "@/integrations/pocketbase/client";
 
+export type UserRole = "admin" | "user";
+
 export type User = {
   id: string;
   email?: string;
+  subscription_tier?: string;
   [key: string]: any;
 };
 
 interface AuthContextType {
   user: User | null;
+  /** true while the initial session is being restored/refreshed */
   loading: boolean;
+  /** derived role from the auth record */
+  role: UserRole;
+  isAdmin: boolean;
   signUp: (email: string, password: string, firstName?: string, lastName?: string, pseudo?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  /** force a token + record refresh against PocketBase */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(
-    pb.authStore.isValid ? (pb.authStore.record as User) : null
-  );
-  const [loading, setLoading] = useState(false);
+function readUser(): User | null {
+  return pb.authStore.isValid ? (pb.authStore.record as User) : null;
+}
 
+function deriveRole(u: User | null): UserRole {
+  return u?.subscription_tier === "admin" ? "admin" : "user";
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(readUser());
+  // start in loading state only if we have a token to validate
+  const [loading, setLoading] = useState<boolean>(pb.authStore.isValid);
+
+  // keep React state in sync with the PocketBase auth store (login, logout, refresh)
   useEffect(() => {
-    const unsubscribe = pb.authStore.onChange(() => {
-      setUser(pb.authStore.isValid ? (pb.authStore.record as User) : null);
-    });
+    const unsubscribe = pb.authStore.onChange(() => setUser(readUser()));
     return () => unsubscribe();
+  }, []);
+
+  // on mount: if a token exists, validate & refresh it server-side.
+  // an invalid/expired token clears the session instead of leaving a stale user.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!pb.authStore.isValid) {
+        setLoading(false);
+        return;
+      }
+      try {
+        await pb.collection("users").authRefresh();
+      } catch {
+        pb.authStore.clear();
+      } finally {
+        if (!cancelled) {
+          setUser(readUser());
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
@@ -77,8 +117,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pb.authStore.clear();
   };
 
+  const refresh = async () => {
+    if (!pb.authStore.isValid) return;
+    try {
+      await pb.collection("users").authRefresh();
+    } catch {
+      pb.authStore.clear();
+    } finally {
+      setUser(readUser());
+    }
+  };
+
+  const role = deriveRole(user);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, loading, role, isAdmin: role === "admin", signIn, signUp, signOut, refresh }}
+    >
       {children}
     </AuthContext.Provider>
   );

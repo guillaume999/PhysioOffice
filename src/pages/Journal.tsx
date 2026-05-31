@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { pb } from "@/integrations/pocketbase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ interface ActivityLog {
   details: string | null;
   resource_id: string | null;
   resource_type: string | null;
-  created_at: string;
+  created: string;
 }
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
@@ -143,15 +144,11 @@ export default function Journal() {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from("user_activity_logs")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(500);
-
-      if (error) throw error;
-      setLogs(data || []);
+      const data = await pb.collection("user_activity_logs").getList(1, 500, {
+        filter: `user = "${user.id}"`,
+        sort: "-created",
+      });
+      setLogs(data.items as unknown as ActivityLog[]);
     } catch (error) {
       console.error("Error fetching logs:", error);
       toast.error("Erreur lors du chargement du journal");
@@ -189,13 +186,14 @@ export default function Journal() {
     setClearing(true);
     
     try {
-      const { error } = await supabase
-        .from("user_activity_logs")
-        .delete()
-        .eq("user_id", user.id);
+      const toDelete = await pb.collection("user_activity_logs").getFullList({
+        filter: `user = "${user.id}"`,
+        fields: "id",
+      });
+      await Promise.all(
+        toDelete.map((log) => pb.collection("user_activity_logs").delete(log.id))
+      );
 
-      if (error) throw error;
-      
       setLogs([]);
       setClearDialogOpen(false);
       toast.success("Journal effacé");
@@ -221,7 +219,7 @@ export default function Journal() {
     const groups: Record<string, ActivityLog[]> = {};
     
     filteredLogs.forEach((log) => {
-      const date = format(new Date(log.created_at), "yyyy-MM-dd");
+      const date = format(new Date(log.created), "yyyy-MM-dd");
       if (!groups[date]) {
         groups[date] = [];
       }
@@ -392,7 +390,7 @@ export default function Journal() {
                                 </p>
                               )}
                               <p className="text-xs text-muted-foreground mt-1">
-                                {format(new Date(log.created_at), "HH:mm", { locale: fr })}
+                                {format(new Date(log.created), "HH:mm", { locale: fr })}
                               </p>
                             </div>
                           </div>

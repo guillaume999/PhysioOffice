@@ -88,8 +88,8 @@ export function SelectTraitementDialog({
         })
       );
 
-      setPersonalTraitements(personalWithCounts);
-      setPlatformTraitements(platformWithCounts);
+      setPersonalTraitements(personalWithCounts as unknown as Traitement[]);
+      setPlatformTraitements(platformWithCounts as unknown as Traitement[]);
     } catch (error) {
       console.error("Error fetching traitements:", error);
     } finally {

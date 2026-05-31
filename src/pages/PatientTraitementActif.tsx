@@ -4,6 +4,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
@@ -40,44 +41,38 @@ export default function PatientTraitementActif() {
     setLoading(true);
     
     // Fetch patient
-    const { data: patient, error: patientError } = await supabase
-      .from("patients")
-      .select("name")
-      .eq("id", id)
-      .maybeSingle();
-    
-    if (patientError || !patient) {
+    let patient: any = null;
+    try {
+      patient = await pb.collection("patients").getOne(id!, { fields: "id,name" });
+    } catch { /* ignore */ }
+
+    if (!patient) {
       toast({ title: "Patient non trouvé", variant: "destructive" });
       navigate("/patients");
       return;
     }
-    
+
     setPatientName(patient.name);
-    
+
     // Fetch care plan
-    const { data: carePlan } = await supabase
-      .from("patient_care_plans")
-      .select("id, active_traitement_id")
-      .eq("patient_id", id)
-      .maybeSingle();
-    
+    let carePlan: any = null;
+    try {
+      carePlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
+    } catch { /* none yet */ }
+
     if (carePlan) {
+      const activeTraitement = carePlan.active_traitement ?? carePlan.active_traitement_id ?? null;
       setCarePlanId(carePlan.id);
-      setActiveTraitementId(carePlan.active_traitement_id);
-      
-      if (carePlan.active_traitement_id) {
-        const { data: traitement } = await supabase
-          .from("traitement_types")
-          .select("pathologie")
-          .eq("id", carePlan.active_traitement_id)
-          .maybeSingle();
-        
-        if (traitement) {
-          setActiveTraitementName(traitement.pathologie);
-        }
+      setActiveTraitementId(activeTraitement);
+
+      if (activeTraitement) {
+        try {
+          const traitement = await pb.collection("traitement_types").getOne(activeTraitement, { fields: "pathologie" });
+          if (traitement) setActiveTraitementName(traitement.pathologie);
+        } catch { /* ignore */ }
       }
     }
-    
+
     setLoading(false);
   };
 
@@ -85,38 +80,24 @@ export default function PatientTraitementActif() {
     if (!user || !id) return;
     
     // Set the treatment visibility to hidden by default when assigned to a patient
-    await supabase
-      .from("traitement_types")
-      .update({ is_hidden_from_list: true })
-      .eq("id", traitementId);
-    
-    const { data: traitement } = await supabase
-      .from("traitement_types")
-      .select("pathologie")
-      .eq("id", traitementId)
-      .maybeSingle();
-    
-    if (traitement) {
-      setActiveTraitementName(traitement.pathologie);
-    }
+    try {
+      await pb.collection("traitement_types").update(traitementId, { is_hidden_from_list: true });
+    } catch { /* ignore */ }
+
+    try {
+      const traitement = await pb.collection("traitement_types").getOne(traitementId, { fields: "pathologie" });
+      if (traitement) setActiveTraitementName(traitement.pathologie);
+    } catch { /* ignore */ }
 
     // Auto-save the care plan with the new treatment
     if (carePlanId) {
-      await supabase
-        .from("patient_care_plans")
-        .update({ active_traitement_id: traitementId })
-        .eq("id", carePlanId);
+      await pb.collection("patient_care_plans").update(carePlanId, { active_traitement: traitementId });
     } else {
-      const { data: newPlan } = await supabase
-        .from("patient_care_plans")
-        .insert({
-          patient_id: id,
-          user_id: user.id,
-          active_traitement_id: traitementId,
-        })
-        .select()
-        .single();
-      
+      const newPlan = await pb.collection("patient_care_plans").create({
+        patient: id,
+        user: user.id,
+        active_traitement: traitementId,
+      });
       if (newPlan) {
         setCarePlanId(newPlan.id);
       }
@@ -134,14 +115,15 @@ export default function PatientTraitementActif() {
   const handleCreateTraitementSuccess = async () => {
     if (!user) return;
     
-    const { data: latestTraitement } = await supabase
-      .from("traitement_types")
-      .select("id, pathologie")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
+    let latestTraitement: any = null;
+    try {
+      const res = await pb.collection("traitement_types").getList(1, 1, {
+        filter: `user = "${user.id}"`,
+        sort: "-created",
+      });
+      latestTraitement = res.items[0] ?? null;
+    } catch { /* ignore */ }
+
     if (latestTraitement) {
       await handleSelectTraitement(latestTraitement.id);
     }
@@ -152,10 +134,7 @@ export default function PatientTraitementActif() {
     setActiveTraitementName(null);
     
     if (carePlanId) {
-      await supabase
-        .from("patient_care_plans")
-        .update({ active_traitement_id: null })
-        .eq("id", carePlanId);
+      await pb.collection("patient_care_plans").update(carePlanId, { active_traitement: null });
       toast({ title: "Traitement retiré" });
     }
   };

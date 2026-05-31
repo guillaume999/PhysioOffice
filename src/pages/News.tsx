@@ -8,6 +8,7 @@ import { Newspaper, Calendar, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { pb } from "@/integrations/pocketbase/client";
 
 interface NewsItem {
   id: string;
@@ -15,7 +16,7 @@ interface NewsItem {
   description: string;
   category: string;
   is_new: boolean;
-  created_at: string;
+  created: string;
 }
 
 const getCategoryColor = (category: string) => {
@@ -42,13 +43,8 @@ export default function News() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const { data, error } = await supabase
-          .from("news")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        setNewsItems(data || []);
+        const data = await pb.collection("news").getFullList({ sort: "-created" });
+        setNewsItems(data as unknown as NewsItem[]);
       } catch (error) {
         console.error("Error fetching news:", error);
       } finally {
@@ -195,7 +191,7 @@ export default function News() {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      {format(new Date(news.created_at), "d MMMM yyyy", { locale: fr })}
+                      {format(new Date(news.created), "d MMMM yyyy", { locale: fr })}
                     </div>
                   </div>
                   <CardTitle className="text-lg">{news.title}</CardTitle>

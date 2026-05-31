@@ -99,7 +99,7 @@ export function AddExerciceToSeanceDialog({
 
     // Fetch exercices (user's own exercices)
     const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url" });
-    setAvailableExercices(exData);
+    setAvailableExercices(exData as unknown as Exercice[]);
 
     // Fetch pathologies for search
     const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
@@ -249,9 +249,6 @@ export function AddExerciceToSeanceDialog({
         });
       } catch(e) { console.error("Video library error:", e); }
 
-      if (videoError) {
-        console.error("Error adding to video library:", videoError);
-      }
 
       setVideoUrl(publicUrl);
       setThumbnailUrl(generatedThumbnailUrl);
@@ -275,7 +272,7 @@ export function AddExerciceToSeanceDialog({
     setLibraryLoading(true);
     try {
       const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
-      setLibraryVideos(data);
+      setLibraryVideos(data as unknown as VideoLibraryItem[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);
       toast.error("Erreur lors du chargement de la vidéothèque");

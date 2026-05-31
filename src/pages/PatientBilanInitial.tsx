@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
+import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
 
@@ -142,21 +143,19 @@ export default function PatientBilanInitial() {
   }, [user, id]);
 
   const fetchPatientData = async () => {
-    const { data: patient } = await supabase
-      .from("patients")
-      .select("name")
-      .eq("id", id)
-      .maybeSingle();
+    let patient: any = null;
+    try {
+      patient = await pb.collection("patients").getOne(id!, { fields: "id,name" });
+    } catch { /* ignore */ }
 
     if (patient) {
       setPatientName(patient.name);
     }
 
-    const { data: carePlan } = await supabase
-      .from("patient_care_plans")
-      .select("bilan_initial_data")
-      .eq("patient_id", id)
-      .maybeSingle();
+    let carePlan: any = null;
+    try {
+      carePlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
+    } catch { /* none yet */ }
 
     if (carePlan?.bilan_initial_data) {
       try {
@@ -178,25 +177,19 @@ export default function PatientBilanInitial() {
 
     const bilanJson = JSON.stringify(bilan);
 
-    const { data: existingPlan } = await supabase
-      .from("patient_care_plans")
-      .select("id")
-      .eq("patient_id", id)
-      .maybeSingle();
+    let existingPlan: any = null;
+    try {
+      existingPlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
+    } catch { /* none yet */ }
 
     if (existingPlan) {
-      await supabase
-        .from("patient_care_plans")
-        .update({ bilan_initial_data: bilanJson })
-        .eq("id", existingPlan.id);
+      await pb.collection("patient_care_plans").update(existingPlan.id, { bilan_initial_data: bilanJson });
     } else {
-      await supabase
-        .from("patient_care_plans")
-        .insert({
-          patient_id: id,
-          user_id: user.id,
-          bilan_initial_data: bilanJson,
-        });
+      await pb.collection("patient_care_plans").create({
+        patient: id,
+        user: user.id,
+        bilan_initial_data: bilanJson,
+      });
     }
 
     toast({ title: "Bilan initial enregistré" });
