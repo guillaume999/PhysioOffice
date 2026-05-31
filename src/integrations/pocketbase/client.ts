@@ -1,7 +1,7 @@
 import PocketBase from "pocketbase";
 
-const PB_URL =
-  (import.meta.env.VITE_PB_URL as string | undefined) ?? "http://localhost:8090";
+// Use || instead of ?? so empty string also falls back to default
+const PB_URL = import.meta.env.VITE_PB_URL || "https://pocketbase-dev.physiooffice.com";
 
 export const pb = new PocketBase(PB_URL);
 
