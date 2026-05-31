@@ -88,7 +88,7 @@ export default function Patients() {
         name: r.name,
         numero: r.numero,
         status: r.status,
-        has_mutual: r.mutuelle,
+        has_mutual: r.mutuelle === true || r.mutuelle === "true" || r.mutuelle === "oui" || r.mutuelle === "1",
         remaining_sessions: r.seances_restantes,
         prescription: r.ordonnance === "non" ? "none" : (r.ordonnance ?? null),
       })));
@@ -115,7 +115,7 @@ export default function Patients() {
       await pb.collection("patients").create({
         name: formData.name,
         status: formData.status,
-        mutuelle: formData.has_mutual,
+        mutuelle: formData.has_mutual ? "true" : "false",
         seances_restantes: formData.remaining_sessions,
         ordonnance: formData.prescription === "none" ? "non" : formData.prescription,
         user: user?.id,
