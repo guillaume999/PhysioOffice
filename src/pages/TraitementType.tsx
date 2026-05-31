@@ -222,7 +222,7 @@ export default function TraitementType() {
       setTraitements(traitementsWithDetails);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Erreur lors du chargement des données");
+      toast.error("Erreur lors du chargement des donnÃ©es");
     } finally {
       setLoading(false);
     }
@@ -268,7 +268,7 @@ export default function TraitementType() {
 
   const toggleShare = async (traitementId: string, currentlyShared: boolean, isCopy: boolean, isValidated: boolean) => {
     if (isCopy) {
-      toast.error("Les copies ne peuvent pas être partagées");
+      toast.error("Les copies ne peuvent pas Ãªtre partagÃ©es");
       return;
     }
     if (!userCanShare) {
@@ -276,13 +276,13 @@ export default function TraitementType() {
       return;
     }
     if (isValidated && currentlyShared) {
-      toast.error("Ce traitement a été validé et ne peut plus être modifié");
+      toast.error("Ce traitement a Ã©tÃ© validÃ© et ne peut plus Ãªtre modifiÃ©");
       return;
     }
     try {
       await pb.collection("traitement_types").update(traitementId, { is_shared: !currentlyShared, is_validated: false });
 
-      toast.success(currentlyShared ? "Traitement non partagé" : "Traitement partagé (en attente de validation)");
+      toast.success(currentlyShared ? "Traitement non partagÃ©" : "Traitement partagÃ© (en attente de validation)");
       fetchData();
     } catch (error) {
       console.error("Error toggling share:", error);
@@ -292,7 +292,7 @@ export default function TraitementType() {
 
   const deleteTraitement = async (id: string, isUsedByPatient: boolean) => {
     if (isUsedByPatient) {
-      toast.error("Ce traitement est utilisé par un patient et ne peut pas être supprimé");
+      toast.error("Ce traitement est utilisÃ© par un patient et ne peut pas Ãªtre supprimÃ©");
       return;
     }
     
@@ -303,7 +303,7 @@ export default function TraitementType() {
       const seances = await pb.collection("traitement_seances").getFullList({ filter: `traitement_type = "${id}"` });
       for (const s of seances) await pb.collection("traitement_seances").delete(s.id);
       await pb.collection("traitement_types").delete(id);
-      toast.success("Traitement supprimé");
+      toast.success("Traitement supprimÃ©");
       fetchData();
     } catch (error) {
       console.error("Error deleting traitement:", error);
@@ -349,7 +349,7 @@ export default function TraitementType() {
         }
       }
 
-      toast.success(traitement.user_id !== user.id ? "Traitement copié dans votre bibliothèque" : "Traitement dupliqué");
+      toast.success(traitement.user_id !== user.id ? "Traitement copiÃ© dans votre bibliothÃ¨que" : "Traitement dupliquÃ©");
       fetchData();
     } catch (error) {
       console.error("Error duplicating traitement:", error);
@@ -358,7 +358,7 @@ export default function TraitementType() {
   };
 
   const getSeanceDisplay = (seance: TraitementSeance) => {
-    if (!seance.seance_types) return "Séance";
+    if (!seance.seance_types) return "SÃ©ance";
     const pathologies = seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie];
     const objectifs = seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal];
     return `${pathologies[0]} - ${objectifs[0]}`;
@@ -404,7 +404,7 @@ export default function TraitementType() {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-8">
-          <p className="text-muted-foreground">Connectez-vous pour accéder à cette page.</p>
+          <p className="text-muted-foreground">Connectez-vous pour accÃ©der Ã  cette page.</p>
         </div>
       </Layout>
     );
@@ -421,7 +421,7 @@ export default function TraitementType() {
             </div>
             <div>
               <h1 className="text-3xl font-display font-bold">Traitement Type</h1>
-              <p className="text-muted-foreground">Gérez vos modèles de traitements standardisés</p>
+              <p className="text-muted-foreground">GÃ©rez vos modÃ¨les de traitements standardisÃ©s</p>
             </div>
           </div>
           <Button onClick={openCreateDialog} className="gap-2">
@@ -461,7 +461,7 @@ export default function TraitementType() {
                   className="gap-2"
                 >
                   <Users className="w-4 h-4" />
-                  Partagés ({filterCounts.shared})
+                  PartagÃ©s ({filterCounts.shared})
                 </Button>
               </div>
 
@@ -481,18 +481,18 @@ export default function TraitementType() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Modèles de traitements ({filteredTraitements.length})</CardTitle>
+            <CardTitle>ModÃ¨les de traitements ({filteredTraitements.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-muted-foreground">Chargement...</p>
             ) : filteredTraitements.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">Aucun traitement type trouvé.</p>
+                <p className="text-muted-foreground mb-4">Aucun traitement type trouvÃ©.</p>
                 {filter === "mine" && (
                   <Button onClick={openCreateDialog} variant="outline" className="gap-2">
                     <Plus className="w-4 h-4" />
-                    Créer votre premier traitement
+                    CrÃ©er votre premier traitement
                   </Button>
                 )}
               </div>
@@ -520,7 +520,7 @@ export default function TraitementType() {
                               par {traitement.author_name || "Anonyme"}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
+                              â¢ {traitement.tests?.length || 0} tests â¢ {traitement.seances?.length || 0} sÃ©ances
                             </span>
                           </div>
                           <Button
@@ -532,12 +532,12 @@ export default function TraitementType() {
                             {isExpanded ? (
                               <>
                                 <ChevronUp className="w-4 h-4" />
-                                Réduire
+                                RÃ©duire
                               </>
                             ) : (
                               <>
                                 <ChevronDown className="w-4 h-4" />
-                                Détails
+                                DÃ©tails
                               </>
                             )}
                           </Button>
@@ -562,7 +562,7 @@ export default function TraitementType() {
                                       <table className="w-full">
                                         <thead className="bg-muted/50">
                                           <tr className="text-left text-xs text-muted-foreground">
-                                            <th className="p-2 w-20">Vidéo</th>
+                                            <th className="p-2 w-20">VidÃ©o</th>
                                             <th className="p-2">Titre</th>
                                             <th className="p-2 hidden md:table-cell">Description</th>
                                           </tr>
@@ -623,9 +623,9 @@ export default function TraitementType() {
                                   )}
                                 </div>
 
-                                {/* Séances */}
+                                {/* SÃ©ances */}
                                 <div className="space-y-2">
-                                  <p className="text-sm font-semibold">Séances ({traitement.seances?.length || 0})</p>
+                                  <p className="text-sm font-semibold">SÃ©ances ({traitement.seances?.length || 0})</p>
                                   {traitement.seances && traitement.seances.length > 0 ? (
                                     <div className="space-y-2">
                                       {traitement.seances.map((seance, i) => {
@@ -691,12 +691,12 @@ export default function TraitementType() {
                                                       </p>
                                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                         {exercice.series && exercice.series > 1 && (
-                                                          <span>{exercice.series} séries</span>
+                                                          <span>{exercice.series} sÃ©ries</span>
                                                         )}
                                                         {exercice.repetitions && (
                                                           <span className="flex items-center gap-1">
                                                             <RotateCcw className="w-3 h-3" />
-                                                            {exercice.repetitions} rép.
+                                                            {exercice.repetitions} rÃ©p.
                                                           </span>
                                                         )}
                                                         {exercice.duration_seconds && (
@@ -716,7 +716,7 @@ export default function TraitementType() {
                                             )}
                                             {isSeanceExpanded && (!seance.exercices || seance.exercices.length === 0) && (
                                               <div className="p-3 bg-background text-xs text-muted-foreground text-center border-t border-border/50">
-                                                Aucun exercice dans cette séance
+                                                Aucun exercice dans cette sÃ©ance
                                               </div>
                                             )}
                                           </div>
@@ -724,7 +724,7 @@ export default function TraitementType() {
                                       })}
                                     </div>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground">Aucune séance</p>
+                                    <p className="text-xs text-muted-foreground">Aucune sÃ©ance</p>
                                   )}
                                 </div>
                               </div>
@@ -741,7 +741,7 @@ export default function TraitementType() {
                                     />
                                     <span className="text-xs">Partager</span>
                                     {traitement.is_shared && traitement.is_validated && (
-                                      <Badge className="text-xs bg-green-500">Validé</Badge>
+                                      <Badge className="text-xs bg-green-500">ValidÃ©</Badge>
                                     )}
                                     {traitement.is_shared && !traitement.is_validated && (
                                       <Badge variant="secondary" className="text-xs">En attente</Badge>
@@ -753,7 +753,7 @@ export default function TraitementType() {
                                 <div className="flex gap-1 flex-wrap items-center">
                                   {traitement.is_used_by_patient && (
                                     <Badge variant="outline" className="text-xs text-amber-600 border-amber-600">
-                                      Utilisé par un patient
+                                      UtilisÃ© par un patient
                                     </Badge>
                                   )}
                                   {isOwner && !traitement.is_used_by_patient && (
@@ -813,7 +813,7 @@ export default function TraitementType() {
         <Dialog open={!!testDetailDialog} onOpenChange={() => setTestDetailDialog(null)}>
           <DialogContent className="max-w-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Détail du test</h3>
+              <h3 className="font-semibold">DÃ©tail du test</h3>
             </div>
             {testDetailDialog && (
               <div className="space-y-4">
@@ -871,7 +871,4 @@ export default function TraitementType() {
       </div>
     </Layout>
   );
-}
-    </Layout>
-  );
-}
+}
