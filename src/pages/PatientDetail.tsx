@@ -136,9 +136,9 @@ export default function PatientDetail() {
   const fetchCarePlan = async () => {
     const cpRes = await pb.collection("patient_care_plans").getList(1, 1, { filter: `patient = "${id}"` });
     const data: any = cpRes.items[0] ?? null;
-    {
-    
-    if (data) { setCarePlan({
+
+    if (data) {
+      setCarePlan({
         id: data.id,
         comments: data.comments || "",
         motif_consultation: data.motif_consultation || "",

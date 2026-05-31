@@ -4,7 +4,6 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PatientTraitementCard } from "@/components/patient/PatientTraitementCard";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";

@@ -166,7 +166,7 @@ export default function Annonces() {
     try {
       const expiresAt = addDays(new Date(), settings.free_duration_days);
 
-      try { await pb.collection("annonces").create({
+      await pb.collection("annonces").create({
         user: user.id,
         title: formTitle.trim(),
         description: formDescription.trim(),
@@ -177,8 +177,6 @@ export default function Annonces() {
         contact_email: formContactEmail.trim() || null,
         contact_phone: formContactPhone.trim() || null,
       });
-
-      if (error) throw error;
 
       toast({
         title: "Annonce publiée",

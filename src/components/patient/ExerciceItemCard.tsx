@@ -245,18 +245,13 @@ export function ExerciceItemCard({
       const publicUrl = pb.files.getURL(vRec, vRec.file as string);
 
       // Also add to video library for sync
-      const videoError = null;
       try { await pb.collection("videos").create({
           user: user.id,
           title: editValues.name || file.name,
           video_url: publicUrl,
           name: file.name,
-          thumbnail_url: generatedThumbnailUrl
-        });
-
-      if (videoError) {
-        console.error("Error adding to video library:", videoError);
-      }
+          thumbnail_url: generatedThumbnailUrl,
+        }); } catch(e) { console.error("Error adding to video library:", e); }
 
       setEditValues({ ...editValues, video_url: publicUrl, thumbnail_url: generatedThumbnailUrl });
       toast.success("Vidéo uploadée avec succès");

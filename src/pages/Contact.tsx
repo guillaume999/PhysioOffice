@@ -17,9 +17,13 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try { await pb.collection("contact_messages").create(form);
-    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); return; }
-    else { toast({ title: "Message envoyé !" }); setForm({ name: "", email: "", subject: "", message: "" }); }
+    try {
+      await pb.collection("contact_messages").create(form);
+      toast({ title: "Message envoyé !" });
+      setForm({ name: "", email: "", subject: "", message: "" });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
     setLoading(false);
   };
 
