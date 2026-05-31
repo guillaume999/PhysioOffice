@@ -6,12 +6,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies with a clean, deterministic install (npm ci).
-# Fall back to a fresh install if the lockfile is out of sync. This avoids the
-# broken/partial dependency trees (e.g. missing rollup/esbuild platform binaries
-# or ts-interface-checker) that can make `npm run build` fail in the container.
-COPY package.json package-lock.json* ./
-RUN npm ci || (rm -rf node_modules package-lock.json && npm install)
+# Install dependencies. The lockfile is generated on Windows and therefore lacks
+# the Linux/musl platform binaries that Rollup needs (@rollup/rollup-linux-x64-musl).
+# `npm ci` would follow that lockfile and miss them, so `vite build` would fail.
+# Removing the lockfile lets npm resolve the correct Linux binaries on this platform.
+COPY package.json ./
+RUN npm install
 
 # Copy source
 COPY . .
@@ -21,4 +21,4 @@ ARG VITE_PB_URL
 ENV VITE_PB_URL=${VITE_PB_URL}
 RUN npm run build
 
-# ── Stage 2: Serve with nginx ─────────────────────
+# ── Stage 2: Serve with nginx ────────────────────────────────────
