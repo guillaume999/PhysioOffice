@@ -299,6 +299,7 @@ export default function SeanceType() {
       // Create the seance copy
       const newSeance = await pb.collection("seance_types").create({
           user: user.id,
+          nom: seance.pathologie || seance.objectif_principal || "Séance",
           pathologie: seance.pathologie,
           pathologies: seance.pathologies || [],
           objectif_principal: seance.objectif_principal,

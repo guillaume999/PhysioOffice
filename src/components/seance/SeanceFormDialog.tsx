@@ -268,6 +268,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       if (seance?.id) {
         // Update existing seance
         await pb.collection("seance_types").update(seance.id, {
+            nom: pathologies[0] || objectifsPrincipaux[0] || "Séance",
             pathologies,
             objectifs_principaux: objectifsPrincipaux,
             objectifs_secondaires: objectifsSecondaires,
@@ -318,6 +319,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         var newSeance: { id: string } | null = null;
         newSeance = await pb.collection("seance_types").create({
             user: user.id,
+            nom: pathologies[0] || objectifsPrincipaux[0] || "Séance",
             pathologies,
             objectifs_principaux: objectifsPrincipaux,
             objectifs_secondaires: objectifsSecondaires,
