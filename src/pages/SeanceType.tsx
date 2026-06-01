@@ -183,6 +183,12 @@ export default function SeanceType() {
 
           return {
             ...seance,
+            // PocketBase exposes the relation fields as `user`/`original` (not the
+            // legacy Supabase column names `user_id`/`original_id`). Normalize them
+            // so the ownership filters and duplication logic below work correctly.
+            user_id: seance.user,
+            original_id: seance.original ?? null,
+            created_at: seance.created,
             pathologies: seance.pathologies || [],
             objectifs_principaux: seance.objectifs_principaux || [],
             objectifs_secondaires: seance.objectifs_secondaires || [],
