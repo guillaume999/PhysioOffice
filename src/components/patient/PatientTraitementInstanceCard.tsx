@@ -70,6 +70,7 @@ const SEANCE_STATUTS = ["planifiée", "réalisée", "annulée"];
 const TRAITEMENT_STATUTS = ["actif", "terminé", "suspendu"];
 
 const toDateInput = (v: string | null) => (v ? v.slice(0, 10) : "");
+// timeline: séances + bilans triés par date (sans date à la fin)
 
 /**
  * Editable display of a patient treatment *instance*. All edits write to the
