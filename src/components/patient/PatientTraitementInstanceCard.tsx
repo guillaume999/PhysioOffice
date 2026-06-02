@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronDown, ChevronUp, X, ClipboardCheck, Play, FileText, Plus, Trash2, Edit } from "lucide-react";
@@ -21,6 +22,8 @@ interface InstanceExercice {
   series: number | null;
   repetitions: number | null;
   duree: number | null;
+  minutes: number | null;
+  commentaires: string | null;
   realise: boolean;
   thumbnail_url?: string | null;
 }
@@ -119,6 +122,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
             exercices: exs.map((e: any) => ({
               id: e.id, nom: e.nom, description: e.description, ordre: e.ordre,
               series: e.series, repetitions: e.repetitions, duree: e.duree,
+              minutes: e.minutes ?? null, commentaires: e.commentaires ?? null,
               realise: !!e.realise, thumbnail_url: e.expand?.source?.thumbnail_url || null,
             })),
           };
@@ -449,25 +453,40 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                     <CollapsibleContent>
                       <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
                         {s.exercices.map((ex) => (
-                          <div key={ex.id} className="flex items-center gap-2 p-2 bg-background/60 rounded border">
-                            <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" />
+                          <div key={ex.id} className="flex items-start gap-2 p-2 bg-background/60 rounded border">
+                            <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" className="mt-1" />
                             <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                               {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
                                 : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Play className="w-4 h-4" /></div>}
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 space-y-1">
                               <Input
                                 defaultValue={ex.nom || ""}
                                 onBlur={(e) => { if (e.target.value !== (ex.nom || "")) updateExercice(s.id, ex.id, { nom: e.target.value }); }}
                                 className="h-7 text-sm font-medium"
                               />
-                              <div className="flex gap-1 mt-1">
+                              <div className="flex flex-wrap gap-1">
                                 <NumberField label="séries" value={ex.series} onSave={(n) => updateExercice(s.id, ex.id, { series: n })} />
                                 <NumberField label="rép." value={ex.repetitions} onSave={(n) => updateExercice(s.id, ex.id, { repetitions: n })} />
                                 <NumberField label="s" value={ex.duree} onSave={(n) => updateExercice(s.id, ex.id, { duree: n })} />
+                                <NumberField label="min" value={ex.minutes} onSave={(n) => updateExercice(s.id, ex.id, { minutes: n })} />
                               </div>
+                              <Textarea
+                                defaultValue={ex.description || ""}
+                                onBlur={(e) => { if (e.target.value !== (ex.description || "")) updateExercice(s.id, ex.id, { description: e.target.value }); }}
+                                placeholder="Description"
+                                rows={2}
+                                className="text-xs min-h-0"
+                              />
+                              <Textarea
+                                defaultValue={ex.commentaires || ""}
+                                onBlur={(e) => { if (e.target.value !== (ex.commentaires || "")) updateExercice(s.id, ex.id, { commentaires: e.target.value }); }}
+                                placeholder="Commentaires"
+                                rows={2}
+                                className="text-xs min-h-0"
+                              />
                             </div>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteExercice(ex.id)}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive mt-1" onClick={() => deleteExercice(ex.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
