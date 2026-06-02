@@ -721,9 +721,9 @@ export default function Exercices() {
                   <TableRow>
                     <TableHead className="w-28">Vidéo</TableHead>
                     <TableHead>Titre</TableHead>
-                    <TableHead>Tags pathologie</TableHead>
-                    <TableHead>Auteur</TableHead>
-                    <TableHead>Statut</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Commentaires</TableHead>
+                    <TableHead>Auteur / Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -738,7 +738,7 @@ export default function Exercices() {
                         />
                       </TableCell>
 
-                      {/* Title & Description */}
+                      {/* Title & Tags */}
                       <TableCell>
                         <div>
                           <div className="flex items-center gap-2">
@@ -747,40 +747,48 @@ export default function Exercices() {
                             </Badge>
                             <p className="font-medium">{exercice.title}</p>
                           </div>
-                          {exercice.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                              {exercice.description}
-                            </p>
-                          )}
-                          {exercice.commentaire && (
-                            <p className="text-xs text-muted-foreground/80 italic line-clamp-1 mt-0.5">
-                              {exercice.commentaire}
-                            </p>
+                          {exercice.pathologie_tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {exercice.pathologie_tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </TableCell>
 
-                      {/* Tags */}
+                      {/* Description */}
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {exercice.pathologie_tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
+                        {exercice.description ? (
+                          <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">
+                            {exercice.description}
+                          </p>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      {/* Commentaires */}
+                      <TableCell>
+                        {exercice.commentaire ? (
+                          <p className="text-sm text-muted-foreground italic line-clamp-2 max-w-xs">
+                            {exercice.commentaire}
+                          </p>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+
+                      {/* Author / Status */}
+                      <TableCell>
+                        <div className="flex flex-col items-start gap-1">
+                          {getStatusBadge(exercice)}
+                          <span className="text-xs text-muted-foreground">
+                            {exercice.author_name || "-"}
+                          </span>
                         </div>
-                      </TableCell>
-
-                      {/* Author */}
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {exercice.author_name || "-"}
-                        </span>
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell>
-                        {getStatusBadge(exercice)}
                       </TableCell>
 
                       {/* Actions */}
