@@ -181,7 +181,18 @@ export default function Exercices() {
         pb.collection("pathologies").getFullList({ fields: "name" }),
       ]);
       setFeaturedExerciceIds(featuredData.map((f: any) => f.exercice));
-      setExercices(exercicesData as any[]);
+      // PocketBase renvoie les champs relation/système bruts (user, original, video, created).
+      // On les mappe vers les noms attendus par le composant (user_id, original_id, video_id, created_at)
+      // sinon le filtre "Mes exercices" (e.user_id !== user.id) écarte tous les exercices de l'utilisateur.
+      const mappedExercices = (exercicesData as any[]).map((r: any) => ({
+        ...r,
+        user_id: r.user,
+        original_id: r.original ?? null,
+        video_id: r.video ?? null,
+        created_at: r.created,
+        updated_at: r.updated,
+      }));
+      setExercices(mappedExercices as any[]);
       setPathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
     } catch (error) {
       console.error("Error fetching data:", error);

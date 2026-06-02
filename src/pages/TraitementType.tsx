@@ -211,7 +211,7 @@ export default function TraitementType() {
           );
 
           return {
-            ...traitement, user_id: traitement.user,
+            ...traitement, user_id: traitement.user, original_id: traitement.original ?? null,
             tests: testsData.map((t: any) => ({ ...t, exercices: t.expand?.exercice })),
             seances: seancesWithExercices,
             is_used_by_patient: usedTraitementIds.has(traitement.id),
