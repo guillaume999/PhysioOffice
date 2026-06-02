@@ -455,7 +455,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
               <Button variant="outline" className="flex-1 justify-start gap-2"
                 onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`)}>
                 <FileText className="w-4 h-4" /> Ajouter un bilan intermédiaire
-            </Button>
+              </Button>
+            </div>
           </div>
         </div>
       </CardContent>
