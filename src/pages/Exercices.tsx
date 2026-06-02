@@ -29,6 +29,7 @@ interface Exercice {
   code: string;
   title: string;
   description: string | null;
+  commentaire: string | null;
   pathologie_tags: string[];
   status: string;
   video_url: string | null;
@@ -67,6 +68,7 @@ export default function Exercices() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
+    commentaire: "",
     pathologie_tags: [] as string[],
     newPathologie: "",
     videoFile: null as File | null,
@@ -269,6 +271,7 @@ export default function Exercices() {
       await pb.collection("exercices").create({
           user: user.id, title: formData.title.trim(),
           description: formData.description.trim() || null,
+          commentaire: formData.commentaire.trim() || null,
           pathologie_tags: tags, video: videoId,
           video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
           author_name: userPseudo, status: "draft",
@@ -324,6 +327,7 @@ export default function Exercices() {
 
       await pb.collection("exercices").update(selectedExercice.id, {
           title: formData.title.trim(), description: formData.description.trim() || null,
+          commentaire: formData.commentaire.trim() || null,
           pathologie_tags: tags, video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
         });
 
@@ -343,6 +347,7 @@ export default function Exercices() {
     setFormData({
       title: "",
       description: "",
+      commentaire: "",
       pathologie_tags: [],
       newPathologie: "",
       videoFile: null,
@@ -359,6 +364,7 @@ export default function Exercices() {
     setFormData({
       title: exercice.title,
       description: exercice.description || "",
+      commentaire: exercice.commentaire || "",
       pathologie_tags: exercice.pathologie_tags || [],
       newPathologie: "",
       videoFile: null,
@@ -1038,6 +1044,7 @@ interface ExerciceFormProps {
   formData: {
     title: string;
     description: string;
+    commentaire: string;
     pathologie_tags: string[];
     newPathologie: string;
     videoFile: File | null;
@@ -1049,6 +1056,7 @@ interface ExerciceFormProps {
   setFormData: React.Dispatch<React.SetStateAction<{
     title: string;
     description: string;
+    commentaire: string;
     pathologie_tags: string[];
     newPathologie: string;
     videoFile: File | null;
@@ -1199,6 +1207,17 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Description de l'exercice"
+          rows={3}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="commentaire">Commentaire</Label>
+        <Textarea
+          id="commentaire"
+          value={formData.commentaire}
+          onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
+          placeholder="Commentaire (notes internes, précisions...)"
           rows={3}
         />
       </div>
