@@ -271,6 +271,23 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
     return <p className="text-muted-foreground text-sm">Aucun traitement actif. Importez-en un ou créez-en un nouveau.</p>;
   }
 
+  // Flux chronologique : séances + bilans triés par date, éléments sans date à la fin.
+  type TimelineItem =
+    | { kind: "seance"; date: string | null; seance: InstanceSeance }
+    | { kind: "bilan"; date: string | null; bilan: InstanceBilan };
+
+  const timeline: TimelineItem[] = [
+    ...traitement.seances.map((s): TimelineItem => ({ kind: "seance", date: s.date_prevue, seance: s })),
+    ...traitement.bilans.map((b): TimelineItem => ({ kind: "bilan", date: b.bilan_date, bilan: b })),
+  ].sort((a, b) => {
+    const da = a.date ? a.date.slice(0, 10) : "";
+    const db = b.date ? b.date.slice(0, 10) : "";
+    if (da && db) return da.localeCompare(db);
+    if (da) return -1; // les éléments datés passent avant les non datés
+    if (db) return 1;
+    return 0;
+  });
+
   return (
     <Card className="overflow-hidden border-primary/20">
       <CardContent className="p-2 sm:p-3">
@@ -332,10 +349,33 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Séances */}
+          {/* Flux chronologique : séances & bilans intermédiaires */}
           <div className="space-y-3">
-            <p className="text-sm font-semibold">Séances ({traitement.seances.length})</p>
-            {traitement.seances.map((s) => {
+            <p className="text-sm font-semibold">
+              Séances & bilans ({traitement.seances.length} séance{traitement.seances.length > 1 ? "s" : ""}, {traitement.bilans.length} bilan{traitement.bilans.length > 1 ? "s" : ""})
+            </p>
+            {timeline.map((item) => {
+              if (item.kind === "bilan") {
+                const b = item.bilan;
+                return (
+                  <div key={`bilan-${b.id}`} className="flex items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <ClipboardCheck className="w-4 h-4 text-primary" />
+                      </div>
+                      <p className="font-medium text-sm text-primary">
+                        Bilan {b.bilan_date ? `du ${new Date(b.bilan_date).toLocaleDateString("fr-FR")}` : "intermédiaire (sans date)"}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8"
+                      onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
+                      title="Modifier le bilan">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              }
+              const s = item.seance;
               const isExpanded = expandedSeances.has(s.id);
               return (
                 <Collapsible key={s.id} open={isExpanded} onOpenChange={() => toggleSeance(s.id)}>
@@ -407,34 +447,13 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                 </Collapsible>
               );
             })}
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={openSeancePicker}>
-              <Plus className="w-4 h-4" /> Ajouter une séance
-            </Button>
-          </div>
-
-          {/* Bilans intermédiaires */}
-          <div className="space-y-3 pt-4 border-t">
-            <p className="text-sm font-semibold">Bilans intermédiaires ({traitement.bilans.length})</p>
-            {traitement.bilans.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <ClipboardCheck className="w-4 h-4 text-primary" />
-                  </div>
-                  <p className="font-medium text-sm text-primary">
-                    Bilan {b.bilan_date ? `du ${new Date(b.bilan_date).toLocaleDateString("fr-FR")}` : "intermédiaire"}
-                  </p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8"
-                  onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
-                  title="Modifier le bilan">
-                  <Edit className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
-            <Button variant="outline" className="w-full justify-start gap-2"
-              onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`)}>
-              <FileText className="w-4 h-4" /> Ajouter un bilan intermédiaire
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" className="flex-1 justify-start gap-2" onClick={openSeancePicker}>
+                <Plus className="w-4 h-4" /> Ajouter une séance
+              </Button>
+              <Button variant="outline" className="flex-1 justify-start gap-2"
+                onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`)}>
+                <FileText className="w-4 h-4" /> Ajouter un bilan intermédiaire
             </Button>
           </div>
         </div>
