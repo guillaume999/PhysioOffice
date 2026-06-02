@@ -163,6 +163,13 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
     catch { toast.error("Erreur lors de la mise à jour"); fetchDetails(); }
   };
 
+  const updateBilan = async (bilanId: string, patch: Record<string, any>) => {
+    if (!traitement) return;
+    setTraitement({ ...traitement, bilans: traitement.bilans.map((b) => b.id === bilanId ? { ...b, ...patch } : b) });
+    try { await pb.collection("patient_bilans").update(bilanId, patch); }
+    catch { toast.error("Erreur lors de la mise à jour"); fetchDetails(); }
+  };
+
   // Add a séance, blank (sourceId null) or copied from a seance_types model
   const addSeanceFromLibrary = async (sourceId: string | null) => {
     if (!traitement) return;
@@ -359,20 +366,26 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
               if (item.kind === "bilan") {
                 const b = item.bilan;
                 return (
-                  <div key={`bilan-${b.id}`} className="flex items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div key={`bilan-${b.id}`} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                         <ClipboardCheck className="w-4 h-4 text-primary" />
                       </div>
-                      <p className="font-medium text-sm text-primary">
-                        Bilan {b.bilan_date ? `du ${new Date(b.bilan_date).toLocaleDateString("fr-FR")}` : "intermédiaire (sans date)"}
-                      </p>
+                      <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"
-                      onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
-                      title="Modifier le bilan">
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <DatePickerInline
+                        value={toDateInput(b.bilan_date)}
+                        onChange={(v) => updateBilan(b.id, { bilan_date: v || null })}
+                        className="h-8 text-xs"
+                        title="Date du bilan"
+                      />
+                      <Button variant="ghost" size="icon" className="h-8 w-8"
+                        onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
+                        title="Modifier le bilan">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
               }
