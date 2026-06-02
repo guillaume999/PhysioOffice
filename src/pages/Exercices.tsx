@@ -752,6 +752,11 @@ export default function Exercices() {
                               {exercice.description}
                             </p>
                           )}
+                          {exercice.commentaire && (
+                            <p className="text-xs text-muted-foreground/80 italic line-clamp-1 mt-0.5">
+                              {exercice.commentaire}
+                            </p>
+                          )}
                         </div>
                       </TableCell>
 
