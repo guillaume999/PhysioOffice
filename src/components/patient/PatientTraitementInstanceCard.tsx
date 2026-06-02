@@ -85,6 +85,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<"seance" | "exercice">("seance");
   const [pickerSeanceId, setPickerSeanceId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (traitementId) fetchDetails();
@@ -396,13 +397,32 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                   <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-lg border border-emerald-300 dark:border-emerald-700/50 overflow-hidden">
                     <div className="p-3 space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleSeance(s.id)}>
-                          <p className="font-medium text-sm">{s.nom || s.objectif || "Séance"}</p>
+                        <div className="min-w-0 flex-1">
+                          {editingTitleId === s.id ? (
+                            <Input
+                              autoFocus
+                              defaultValue={s.nom || ""}
+                              onBlur={(e) => {
+                                if (e.target.value !== (s.nom || "")) updateSeance(s.id, { nom: e.target.value });
+                                setEditingTitleId(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                if (e.key === "Escape") setEditingTitleId(null);
+                              }}
+                              className="h-7 text-sm font-medium"
+                            />
+                          ) : (
+                            <p className="font-medium text-sm cursor-pointer" onClick={() => toggleSeance(s.id)}>{s.nom || s.objectif || "Séance"}</p>
+                          )}
                           <Badge variant="secondary" className="text-xs mt-1">
                             {s.exercices.length} exercice{s.exercices.length > 1 ? "s" : ""}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTitleId(s.id)} title="Modifier le titre">
+                            <Edit className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSeance(s.id)} title="Supprimer la séance">
                             <Trash2 className="w-4 h-4" />
                           </Button>
