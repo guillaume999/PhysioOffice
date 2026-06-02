@@ -720,7 +720,12 @@ export default function Exercices() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-28">Vidéo</TableHead>
-                    <TableHead>Titre</TableHead>
+                    <TableHead>
+                      <div className="flex flex-col leading-tight">
+                        <span>Titre</span>
+                        <span className="text-xs font-normal text-muted-foreground">Pathologie</span>
+                      </div>
+                    </TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Commentaires</TableHead>
                     <TableHead>Auteur / Statut</TableHead>
