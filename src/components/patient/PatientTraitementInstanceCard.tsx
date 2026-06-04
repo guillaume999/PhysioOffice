@@ -175,6 +175,12 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
     catch { toast.error("Erreur lors de la mise à jour"); fetchDetails(); }
   };
 
+  const deleteBilan = async (bilanId: string) => {
+    if (!window.confirm("Supprimer ce bilan intermédiaire ? Cette action est irréversible.")) return;
+    try { await pb.collection("patient_bilans").delete(bilanId); toast.success("Bilan supprimé"); fetchDetails(); }
+    catch { toast.error("Erreur lors de la suppression"); }
+  };
+
   // Add a séance, blank (sourceId null) or copied from a seance_types model
   const addSeanceFromLibrary = async (sourceId: string | null) => {
     if (!traitement) return;
@@ -389,6 +395,11 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                         onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
                         title="Modifier le bilan">
                         <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => deleteBilan(b.id)}
+                        title="Supprimer le bilan">
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
