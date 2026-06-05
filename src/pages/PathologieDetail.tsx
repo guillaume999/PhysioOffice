@@ -21,7 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { SearchableCreatableSelect } from "@/components/seance/SearchableCreatableSelect";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown, Search } from "lucide-react";
 
 interface TraitementOption {
   id: string;
@@ -44,6 +46,7 @@ export default function PathologieDetail() {
   // Liaisons traitement_types
   const [linkedIds, setLinkedIds] = useState<string[]>([]);
   const [availableTraitements, setAvailableTraitements] = useState<TraitementOption[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (id && user) load();
@@ -149,20 +152,12 @@ export default function PathologieDetail() {
     .map((tid) => traitementsById.get(tid))
     .filter((t): t is TraitementOption => !!t);
 
-  const pickerOptions = availableTraitements
-    .filter((t) => !linkedIds.includes(t.id))
-    .map((t) => `${t.nom}${t.pathologie ? ` (${t.pathologie})` : ""}${t.is_platform ? " · Plateforme" : ""}`);
-
-  const addLink = (label: string) => {
-    // Reconstitue l'ID à partir du libellé affiché
-    const match = availableTraitements.find((t) => {
-      const lbl = `${t.nom}${t.pathologie ? ` (${t.pathologie})` : ""}${t.is_platform ? " · Plateforme" : ""}`;
-      return lbl === label;
-    });
-    if (match && !linkedIds.includes(match.id)) {
-      setLinkedIds([...linkedIds, match.id]);
-    }
+  const addLinkById = (tid: string) => {
+    if (!linkedIds.includes(tid)) setLinkedIds([...linkedIds, tid]);
   };
+
+  const minePicker = availableTraitements.filter((t) => !t.is_platform && !linkedIds.includes(t.id));
+  const platformPicker = availableTraitements.filter((t) => t.is_platform && !linkedIds.includes(t.id));
 
   const removeLink = (tid: string) => {
     setLinkedIds(linkedIds.filter((x) => x !== tid));
@@ -244,12 +239,47 @@ export default function PathologieDetail() {
                     ))
                   )}
                 </div>
-                <SearchableCreatableSelect
-                  options={pickerOptions}
-                  onSelect={addLink}
-                  placeholder="Lier un traitement type…"
-                  className="w-full"
-                />
+                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal text-muted-foreground"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Search className="w-3 h-3" />
+                        Lier un traitement type…
+                      </span>
+                      <ChevronsUpDown className="w-3 h-3 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher un traitement…" />
+                      <CommandList>
+                        <CommandEmpty>Aucun traitement disponible.</CommandEmpty>
+                        {minePicker.length > 0 && (
+                          <CommandGroup heading="Mes traitements">
+                            {minePicker.map((t) => (
+                              <CommandItem
+                                key={t.id}
+                                value={`mine-${t.id}`}
+                                onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
+                              >
+                                <UserIcon className="w-3 h-3 mr-2 text-muted-foreground" />
+                                <span className="flex-1">{t.nom}</span>
+                                {t.pathologie && (
+                                  <Badge variant="outline" className="ml-2 text-xs">{t.pathologie}</Badge>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="flex justify-between gap-2 pt-2">
