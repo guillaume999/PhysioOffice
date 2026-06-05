@@ -80,25 +80,24 @@ export default function PathologieDetail() {
           })
         : [];
 
-      const merged: TraitementOption[] = [
-        ...(mine as any[]).map((t) => ({
-          id: t.id,
-          nom: t.nom || "Sans nom",
-          pathologie: t.pathologie || null,
-          user_id: t.user,
-          is_platform: false,
-        })),
-        ...(platformRecords as any[])
-          .filter((t) => !(mine as any[]).some((m) => m.id === t.id))
-          .map((t) => ({
-            id: t.id,
-            nom: t.nom || "Sans nom",
-            pathologie: t.pathologie || null,
-            user_id: t.user,
-            is_platform: true,
-          })),
-      ];
-      setAvailableTraitements(merged);
+      // Construit la liste finale (ID réels conservés) :
+      // - perso = traitements possédés par l'utilisateur
+      // - plateforme = traitements présents dans featured_traitements (même s'ils appartiennent à l'utilisateur)
+      const mineOpts: TraitementOption[] = (mine as any[]).map((t) => ({
+        id: t.id,
+        nom: t.nom || "Sans nom",
+        pathologie: t.pathologie || null,
+        user_id: t.user,
+        is_platform: false,
+      }));
+      const platformOpts: TraitementOption[] = (platformRecords as any[]).map((t) => ({
+        id: t.id,
+        nom: t.nom || "Sans nom",
+        pathologie: t.pathologie || null,
+        user_id: t.user,
+        is_platform: true,
+      }));
+      setAvailableTraitements([...mineOpts, ...platformOpts]);
     } catch (e) {
       console.error(e);
       toast.error("Pathologie introuvable");
