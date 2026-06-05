@@ -116,13 +116,13 @@ export default function SeanceType() {
       const query = searchQuery.toLowerCase();
       result = result.filter((s) => {
         const pathos = s.pathologies?.length > 0 ? s.pathologies : [s.pathologie];
-        const objPrincipaux = s.objectifs_principaux?.length > 0 ? s.objectifs_principaux : [s.objectif_principal];
-        
+        const objs = getDisplayObjectifs(s);
+
         return (
           s.code?.toLowerCase().includes(query) ||
           s.author_name?.toLowerCase().includes(query) ||
           pathos.some(p => p.toLowerCase().includes(query)) ||
-          objPrincipaux.some(o => o.toLowerCase().includes(query))
+          objs.some(o => o.toLowerCase().includes(query))
         );
       });
     }
@@ -215,11 +215,13 @@ export default function SeanceType() {
   };
 
   const openEditDialog = (seance: SeanceType) => {
+    const principaux = seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : (seance.objectif_principal ? [seance.objectif_principal] : []);
+    const secondaires = seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []);
     setEditingSeance({
       id: seance.id,
       pathologies: seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie],
-      objectifs_principaux: seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : [seance.objectif_principal],
-      objectifs_secondaires: seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []),
+      objectifs_principaux: [...new Set([...principaux, ...secondaires].filter(Boolean))],
+      objectifs_secondaires: [],
       exercices: (seance.exercices || []).map(ex => ({
         id: ex.id,
         exercice_id: ex.exercice_id,
@@ -340,14 +342,10 @@ export default function SeanceType() {
     return seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie];
   };
 
-  const getDisplayObjectifsPrincipaux = (seance: SeanceType) => {
-    return seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : [seance.objectif_principal];
-  };
-
-  const getDisplayObjectifsSecondaires = (seance: SeanceType) => {
-    if (seance.objectifs_secondaires?.length > 0) return seance.objectifs_secondaires;
-    if (seance.objectif_secondaire) return [seance.objectif_secondaire];
-    return [];
+  const getDisplayObjectifs = (seance: SeanceType) => {
+    const principaux = seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : (seance.objectif_principal ? [seance.objectif_principal] : []);
+    const secondaires = seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []);
+    return [...new Set([...principaux, ...secondaires].filter(Boolean))];
   };
 
   const toggleExpand = (id: string) => {
@@ -464,8 +462,7 @@ export default function SeanceType() {
                   const isOwner = seance.user_id === user?.id;
                   const canShare = isOwner && !seance.is_copy;
                   const pathologies = getDisplayPathologies(seance);
-                  const objectifsPrincipaux = getDisplayObjectifsPrincipaux(seance);
-                  const objectifsSecondaires = getDisplayObjectifsSecondaires(seance);
+                  const objectifs = getDisplayObjectifs(seance);
 
                   return (
                     <Card key={seance.id} className="overflow-hidden">
@@ -480,7 +477,7 @@ export default function SeanceType() {
                               <Badge key={i} variant="outline" className="text-xs flex-shrink-0">{p}</Badge>
                             ))}
                             <span className="text-muted-foreground">-</span>
-                            {objectifsPrincipaux.map((o, i) => (
+                            {objectifs.map((o, i) => (
                               <Badge key={i} variant="default" className="text-xs flex-shrink-0">{o}</Badge>
                             ))}
                             {seance.is_copy && (
@@ -519,16 +516,6 @@ export default function SeanceType() {
                             <div className="flex flex-col lg:flex-row gap-4">
                               {/* Main content */}
                               <div className="flex-1 space-y-3">
-                                {/* Objectifs Secondaires */}
-                                {objectifsSecondaires.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    <span className="text-xs text-muted-foreground mr-2">Objectifs secondaires:</span>
-                                    {objectifsSecondaires.map((o, i) => (
-                                      <Badge key={i} variant="secondary" className="text-xs">{o}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-
                                 {/* Exercices */}
                                 <div className="space-y-3">
                                   <p className="text-sm font-semibold">

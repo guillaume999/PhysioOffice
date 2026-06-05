@@ -39,7 +39,7 @@ interface SeanceFormData {
   id?: string;
   pathologies: string[];
   objectifs_principaux: string[];
-  objectifs_secondaires: string[];
+  objectifs_secondaires?: string[];
   exercices: SeanceExerciceItem[];
   author_name: string | null;
 }
@@ -64,29 +64,30 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
   
   // Available options
   const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
-  const [availableObjectifsPrincipaux, setAvailableObjectifsPrincipaux] = useState<string[]>([]);
-  const [availableObjectifsSecondaires, setAvailableObjectifsSecondaires] = useState<string[]>([]);
+  const [availableObjectifs, setAvailableObjectifs] = useState<string[]>([]);
   const [availableExercices, setAvailableExercices] = useState<Exercice[]>([]);
-  
+
   // Form state
   const [pathologies, setPathologies] = useState<string[]>([]);
-  const [objectifsPrincipaux, setObjectifsPrincipaux] = useState<string[]>([]);
-  const [objectifsSecondaires, setObjectifsSecondaires] = useState<string[]>([]);
+  const [objectifs, setObjectifs] = useState<string[]>([]);
   const [exercices, setExercices] = useState<SeanceExerciceItem[]>([]);
   const [seanceDate, setSeanceDate] = useState<string>("");
-  
+
   // New item inputs
   const [newPathologie, setNewPathologie] = useState("");
-  const [newObjectifPrincipal, setNewObjectifPrincipal] = useState("");
-  const [newObjectifSecondaire, setNewObjectifSecondaire] = useState("");
+  const [newObjectif, setNewObjectif] = useState("");
 
   useEffect(() => {
     if (open && user) {
       fetchOptions();
       if (seance) {
         setPathologies(seance.pathologies || []);
-        setObjectifsPrincipaux(seance.objectifs_principaux || []);
-        setObjectifsSecondaires(seance.objectifs_secondaires || []);
+        // Fusionne principaux + secondaires en une seule liste (dédupliquée)
+        const merged = [
+          ...(seance.objectifs_principaux || []),
+          ...(seance.objectifs_secondaires || []),
+        ];
+        setObjectifs([...new Set(merged.filter(Boolean))]);
         setExercices(seance.exercices || []);
       } else {
         resetForm();
@@ -112,14 +113,10 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
     const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
     setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
-    // Fetch objectifs
-    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name,type" });
-    
-    const objArr = objData as any[];
-    const principaux = objArr.filter((o: any) => o.type === "principal").map((o: any) => o.name as string);
-    const secondaires = objArr.filter((o: any) => o.type === "secondaire").map((o: any) => o.name as string);
-    setAvailableObjectifsPrincipaux([...new Set(principaux)]);
-    setAvailableObjectifsSecondaires([...new Set(secondaires)]);
+    // Fetch objectifs (tous types confondus)
+    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const objNames = (objData as any[]).map((o: any) => o.name as string).filter(Boolean);
+    setAvailableObjectifs([...new Set(objNames)]);
 
     // Fetch exercices (only user's own exercices)
     const exData = await pb.collection("exercices").getFullList({
@@ -131,12 +128,10 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
   const resetForm = () => {
     setPathologies([]);
-    setObjectifsPrincipaux([]);
-    setObjectifsSecondaires([]);
+    setObjectifs([]);
     setExercices([]);
     setNewPathologie("");
-    setNewObjectifPrincipal("");
-    setNewObjectifSecondaire("");
+    setNewObjectif("");
   };
 
   const addPathologie = (value: string) => {
@@ -146,18 +141,11 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
     setNewPathologie("");
   };
 
-  const addObjectifPrincipal = (value: string) => {
-    if (value && !objectifsPrincipaux.includes(value)) {
-      setObjectifsPrincipaux([...objectifsPrincipaux, value]);
+  const addObjectif = (value: string) => {
+    if (value && !objectifs.includes(value)) {
+      setObjectifs([...objectifs, value]);
     }
-    setNewObjectifPrincipal("");
-  };
-
-  const addObjectifSecondaire = (value: string) => {
-    if (value && !objectifsSecondaires.includes(value)) {
-      setObjectifsSecondaires([...objectifsSecondaires, value]);
-    }
-    setNewObjectifSecondaire("");
+    setNewObjectif("");
   };
 
   const addExercice = () => {
@@ -251,30 +239,23 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         }
       }
 
-      // Save new objectifs principaux
-      for (const obj of objectifsPrincipaux) {
-        if (!availableObjectifsPrincipaux.includes(obj)) {
+      // Save new objectifs (unifiés, type = principal par défaut)
+      for (const obj of objectifs) {
+        if (!availableObjectifs.includes(obj)) {
           await pb.collection("objectifs").create({ user: user.id, name: obj, type: "principal" });
-        }
-      }
-
-      // Save new objectifs secondaires
-      for (const obj of objectifsSecondaires) {
-        if (!availableObjectifsSecondaires.includes(obj)) {
-          await pb.collection("objectifs").create({ user: user.id, name: obj, type: "secondaire" });
         }
       }
 
       if (seance?.id) {
         // Update existing seance
         await pb.collection("seance_types").update(seance.id, {
-            nom: pathologies[0] || objectifsPrincipaux[0] || "Séance",
+            nom: pathologies[0] || objectifs[0] || "Séance",
             pathologies,
-            objectifs_principaux: objectifsPrincipaux,
-            objectifs_secondaires: objectifsSecondaires,
+            objectifs_principaux: objectifs,
+            objectifs_secondaires: [],
             pathologie: pathologies[0] || "",
-            objectif_principal: objectifsPrincipaux[0] || "",
-            objectif_secondaire: objectifsSecondaires[0] || null,
+            objectif_principal: objectifs[0] || "",
+            objectif_secondaire: null,
           });
 
         // Delete old exercices
@@ -319,13 +300,13 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         var newSeance: { id: string } | null = null;
         newSeance = await pb.collection("seance_types").create({
             user: user.id,
-            nom: pathologies[0] || objectifsPrincipaux[0] || "Séance",
+            nom: pathologies[0] || objectifs[0] || "Séance",
             pathologies,
-            objectifs_principaux: objectifsPrincipaux,
-            objectifs_secondaires: objectifsSecondaires,
+            objectifs_principaux: objectifs,
+            objectifs_secondaires: [],
             pathologie: pathologies[0] || "",
-            objectif_principal: objectifsPrincipaux[0] || "",
-            objectif_secondaire: objectifsSecondaires[0] || null,
+            objectif_principal: objectifs[0] || "",
+            objectif_secondaire: null,
             author_name: userPseudo,
             is_shared: false,
             is_copy: false,
@@ -433,63 +414,32 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
             </div>
           </div>
 
-          {/* Objectifs Principaux */}
+          {/* Objectifs */}
           <div className="space-y-2">
-            <Label>Objectifs principaux</Label>
+            <Label>Objectifs</Label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {objectifsPrincipaux.map((o, i) => (
+              {objectifs.map((o, i) => (
                 <Badge key={i} variant="default" className="gap-1">
                   {o}
-                  <X className="w-3 h-3 cursor-pointer" onClick={() => setObjectifsPrincipaux(objectifsPrincipaux.filter((_, idx) => idx !== i))} />
+                  <X className="w-3 h-3 cursor-pointer" onClick={() => setObjectifs(objectifs.filter((_, idx) => idx !== i))} />
                 </Badge>
               ))}
             </div>
             <div className="flex gap-2">
               <SearchableCreatableSelect
-                options={availableObjectifsPrincipaux.filter((o) => !objectifsPrincipaux.includes(o))}
-                onSelect={addObjectifPrincipal}
+                options={availableObjectifs.filter((o) => !objectifs.includes(o))}
+                onSelect={addObjectif}
                 placeholder="Rechercher un objectif"
                 className="flex-1"
               />
               <Input
                 placeholder="Ou créer un nouveau..."
-                value={newObjectifPrincipal}
-                onChange={(e) => setNewObjectifPrincipal(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addObjectifPrincipal(newObjectifPrincipal)}
+                value={newObjectif}
+                onChange={(e) => setNewObjectif(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addObjectif(newObjectif)}
                 className="flex-1"
               />
-              <Button type="button" variant="outline" size="icon" onClick={() => addObjectifPrincipal(newObjectifPrincipal)}>
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Objectifs Secondaires */}
-          <div className="space-y-2">
-            <Label>Objectifs secondaires</Label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {objectifsSecondaires.map((o, i) => (
-                <Badge key={i} variant="outline" className="gap-1">
-                  {o}
-                  <X className="w-3 h-3 cursor-pointer" onClick={() => setObjectifsSecondaires(objectifsSecondaires.filter((_, idx) => idx !== i))} />
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <SearchableCreatableSelect
-                options={availableObjectifsSecondaires.filter((o) => !objectifsSecondaires.includes(o))}
-                onSelect={addObjectifSecondaire}
-                placeholder="Rechercher un objectif"
-                className="flex-1"
-              />
-              <Input
-                placeholder="Ou créer un nouveau..."
-                value={newObjectifSecondaire}
-                onChange={(e) => setNewObjectifSecondaire(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addObjectifSecondaire(newObjectifSecondaire)}
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" size="icon" onClick={() => addObjectifSecondaire(newObjectifSecondaire)}>
+              <Button type="button" variant="outline" size="icon" onClick={() => addObjectif(newObjectif)}>
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
