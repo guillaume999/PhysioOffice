@@ -16,6 +16,7 @@ const sections: Record<string, { label: string; href: string }[]> = {
       { label: "Traitements", href: "/traitement-type" },
       { label: "Séances", href: "/seance-type" },
       { label: "Vidéos", href: "/videos" },
+      { label: "Pathologies", href: "/pathologies" },
   ],
   communaute: [
       { label: "Actualités", href: "/news" },

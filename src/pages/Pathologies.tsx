@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Activity, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, Search, Activity, ArrowRight, Loader2, User, Shield, Users } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -14,14 +14,25 @@ interface Pathologie {
   id: string;
   name: string;
   traitement: string | null;
+  user_id: string;
+  is_shared?: boolean;
+  is_validated?: boolean;
+  is_copy?: boolean;
+  is_hidden_from_list?: boolean;
+  original_id?: string | null;
+  author_name?: string | null;
 }
+
+type FilterType = "mine" | "platform" | "shared";
 
 export default function Pathologies() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [pathologies, setPathologies] = useState<Pathologie[]>([]);
+  const [featuredIds, setFeaturedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<FilterType>("mine");
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -33,12 +44,35 @@ export default function Pathologies() {
     if (!user) return;
     setLoading(true);
     try {
+      // Pathologies — toutes celles visibles par cet utilisateur (siennes + partagées)
       const data = await pb.collection("pathologies").getFullList({
-        filter: `user = "${user.id}"`,
         sort: "name",
-        fields: "id,name,traitement",
+        fields: "id,user,name,traitement,is_shared,is_validated,is_copy,is_hidden_from_list,original,author_name",
       });
-      setPathologies(data as unknown as Pathologie[]);
+
+      // Featured pathologies (plateforme) — la collection peut ne pas exister encore
+      let featured: any[] = [];
+      try {
+        featured = await pb.collection("featured_pathologies").getFullList({ fields: "pathologie" });
+      } catch {
+        featured = [];
+      }
+      setFeaturedIds(featured.map((f: any) => f.pathologie));
+
+      setPathologies(
+        (data as any[]).map((r) => ({
+          id: r.id,
+          name: r.name,
+          traitement: r.traitement || null,
+          user_id: r.user,
+          is_shared: !!r.is_shared,
+          is_validated: !!r.is_validated,
+          is_copy: !!r.is_copy,
+          is_hidden_from_list: !!r.is_hidden_from_list,
+          original_id: r.original ?? null,
+          author_name: r.author_name ?? null,
+        }))
+      );
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors du chargement");
@@ -51,7 +85,16 @@ export default function Pathologies() {
     if (!user || !newName.trim()) return;
     setCreating(true);
     try {
-      await pb.collection("pathologies").create({ user: user.id, name: newName.trim(), traitement: "" });
+      const pseudo = (pb.authStore.record as any)?.pseudo || null;
+      await pb.collection("pathologies").create({
+        user: user.id,
+        name: newName.trim(),
+        traitement: "",
+        author_name: pseudo,
+        is_shared: false,
+        is_validated: false,
+        is_copy: false,
+      });
       toast.success("Pathologie créée");
       setNewName("");
       fetchData();
@@ -63,9 +106,45 @@ export default function Pathologies() {
     }
   };
 
-  const filtered = search.trim()
-    ? pathologies.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    : pathologies;
+  // Filtre + recherche, à la manière de la page Exercices
+  const userCopiedOriginalIds = pathologies
+    .filter((p) => p.is_copy && p.user_id === user?.id && p.original_id)
+    .map((p) => p.original_id);
+
+  const filtered = pathologies.filter((p) => {
+    // Filter type
+    if (filter === "mine") {
+      if (p.user_id !== user?.id || p.is_hidden_from_list) return false;
+    } else if (filter === "platform") {
+      if (!featuredIds.includes(p.id)) return false;
+    } else if (filter === "shared") {
+      if (!p.is_shared || !p.is_validated) return false;
+      if (p.user_id === user?.id) return false;
+      if (featuredIds.includes(p.id)) return false;
+      if (userCopiedOriginalIds.includes(p.id)) return false;
+    }
+
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !(p.author_name || "").toLowerCase().includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  const counts = {
+    mine: pathologies.filter((p) => p.user_id === user?.id && !p.is_hidden_from_list).length,
+    platform: pathologies.filter((p) => featuredIds.includes(p.id)).length,
+    shared: pathologies.filter(
+      (p) =>
+        p.is_shared &&
+        p.is_validated &&
+        p.user_id !== user?.id &&
+        !featuredIds.includes(p.id) &&
+        !userCopiedOriginalIds.includes(p.id)
+    ).length,
+  };
 
   if (!user) {
     return (
@@ -95,14 +174,44 @@ export default function Pathologies() {
           </div>
         </div>
 
-        {/* Création + Recherche */}
+        {/* Filtres + Recherche + Création */}
         <Card className="mb-6">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={filter === "mine" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter("mine")}
+                className="gap-2"
+              >
+                <User className="w-4 h-4" />
+                Mes pathologies ({counts.mine})
+              </Button>
+              <Button
+                variant={filter === "platform" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter("platform")}
+                className="gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                PhysioOffice ({counts.platform})
+              </Button>
+              <Button
+                variant={filter === "shared" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter("shared")}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Partagés ({counts.shared})
+              </Button>
+            </div>
+
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher une pathologie..."
+                  placeholder="Rechercher par nom ou auteur..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10"
@@ -145,11 +254,12 @@ export default function Pathologies() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold">{p.name}</p>
-                      {p.traitement?.trim() && (
-                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                          {p.traitement}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                        {p.author_name && <span>par {p.author_name}</span>}
+                        {p.traitement?.trim() && (
+                          <span className="line-clamp-1">{p.traitement}</span>
+                        )}
+                      </div>
                     </div>
                     <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   </button>

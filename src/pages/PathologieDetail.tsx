@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Loader2, Save, Trash2, X, Shield, User as UserIcon } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -20,6 +21,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { SearchableCreatableSelect } from "@/components/seance/SearchableCreatableSelect";
+
+interface TraitementOption {
+  id: string;
+  nom: string;
+  pathologie: string | null;
+  user_id: string;
+  is_platform: boolean;
+}
 
 export default function PathologieDetail() {
   const { id } = useParams<{ id: string }>();
@@ -31,17 +41,61 @@ export default function PathologieDetail() {
   const [traitement, setTraitement] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Liaisons traitement_types
+  const [linkedIds, setLinkedIds] = useState<string[]>([]);
+  const [availableTraitements, setAvailableTraitements] = useState<TraitementOption[]>([]);
+
   useEffect(() => {
     if (id && user) load();
   }, [id, user]);
 
   const load = async () => {
-    if (!id) return;
+    if (!id || !user) return;
     setLoading(true);
     try {
       const r = await pb.collection("pathologies").getOne(id);
       setName((r as any).name || "");
       setTraitement((r as any).traitement || "");
+      setLinkedIds(Array.isArray((r as any).traitement_types) ? (r as any).traitement_types : []);
+
+      // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
+      const [mine, featured] = await Promise.all([
+        pb.collection("traitement_types").getFullList({
+          filter: `user = "${user.id}"`,
+          fields: "id,nom,pathologie,user",
+        }),
+        pb.collection("featured_traitements").getFullList({
+          fields: "traitement_type",
+        }).catch(() => [] as any[]),
+      ]);
+
+      const platformIds = (featured as any[]).map((f) => f.traitement_type).filter(Boolean);
+      const platformRecords = platformIds.length
+        ? await pb.collection("traitement_types").getFullList({
+            filter: platformIds.map((tid) => `id = "${tid}"`).join(" || "),
+            fields: "id,nom,pathologie,user",
+          })
+        : [];
+
+      const merged: TraitementOption[] = [
+        ...(mine as any[]).map((t) => ({
+          id: t.id,
+          nom: t.nom || "Sans nom",
+          pathologie: t.pathologie || null,
+          user_id: t.user,
+          is_platform: false,
+        })),
+        ...(platformRecords as any[])
+          .filter((t) => !(mine as any[]).some((m) => m.id === t.id))
+          .map((t) => ({
+            id: t.id,
+            nom: t.nom || "Sans nom",
+            pathologie: t.pathologie || null,
+            user_id: t.user,
+            is_platform: true,
+          })),
+      ];
+      setAvailableTraitements(merged);
     } catch (e) {
       console.error(e);
       toast.error("Pathologie introuvable");
@@ -58,7 +112,11 @@ export default function PathologieDetail() {
     }
     setSaving(true);
     try {
-      await pb.collection("pathologies").update(id, { name: name.trim(), traitement });
+      await pb.collection("pathologies").update(id, {
+        name: name.trim(),
+        traitement,
+        traitement_types: linkedIds,
+      });
       toast.success("Enregistré");
     } catch (e) {
       console.error(e);
@@ -78,6 +136,36 @@ export default function PathologieDetail() {
       console.error(e);
       toast.error("Erreur lors de la suppression");
     }
+  };
+
+  // Maps utiles
+  const traitementsById = useMemo(() => {
+    const m = new Map<string, TraitementOption>();
+    for (const t of availableTraitements) m.set(t.id, t);
+    return m;
+  }, [availableTraitements]);
+
+  const linkedTraitements = linkedIds
+    .map((tid) => traitementsById.get(tid))
+    .filter((t): t is TraitementOption => !!t);
+
+  const pickerOptions = availableTraitements
+    .filter((t) => !linkedIds.includes(t.id))
+    .map((t) => `${t.nom}${t.pathologie ? ` (${t.pathologie})` : ""}${t.is_platform ? " · Plateforme" : ""}`);
+
+  const addLink = (label: string) => {
+    // Reconstitue l'ID à partir du libellé affiché
+    const match = availableTraitements.find((t) => {
+      const lbl = `${t.nom}${t.pathologie ? ` (${t.pathologie})` : ""}${t.is_platform ? " · Plateforme" : ""}`;
+      return lbl === label;
+    });
+    if (match && !linkedIds.includes(match.id)) {
+      setLinkedIds([...linkedIds, match.id]);
+    }
+  };
+
+  const removeLink = (tid: string) => {
+    setLinkedIds(linkedIds.filter((x) => x !== tid));
   };
 
   if (!user) {
@@ -127,6 +215,40 @@ export default function PathologieDetail() {
                   placeholder="Décrivez le protocole de traitement, conseils, contre-indications, exercices recommandés…"
                   rows={14}
                   className="min-h-[300px]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Traitements liés</Label>
+                <p className="text-xs text-muted-foreground">
+                  Vos traitements types personnels et ceux de la plateforme rattachés à cette pathologie.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {linkedTraitements.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">Aucun traitement lié</span>
+                  ) : (
+                    linkedTraitements.map((t) => (
+                      <Badge
+                        key={t.id}
+                        variant={t.is_platform ? "default" : "secondary"}
+                        className="gap-1.5"
+                        title={t.is_platform ? "Traitement plateforme" : "Votre traitement"}
+                      >
+                        {t.is_platform ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                        {t.nom}
+                        <X
+                          className="w-3 h-3 cursor-pointer hover:opacity-70"
+                          onClick={() => removeLink(t.id)}
+                        />
+                      </Badge>
+                    ))
+                  )}
+                </div>
+                <SearchableCreatableSelect
+                  options={pickerOptions}
+                  onSelect={addLink}
+                  placeholder="Lier un traitement type…"
+                  className="w-full"
                 />
               </div>
 
