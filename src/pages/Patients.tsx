@@ -112,8 +112,26 @@ export default function Patients() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Prochain numéro = max + 1 (jamais réutilisé, padding 4 chiffres, cap 9999, propre à chaque praticien)
+      const existing = await pb.collection("patients").getFullList({
+        filter: `user = "${user!.id}"`,
+        fields: "numero",
+      });
+      let maxNumero = 0;
+      for (const p of existing as any[]) {
+        const n = parseInt((p.numero ?? "").toString().replace(/\D/g, ""), 10);
+        if (Number.isFinite(n) && n > maxNumero) maxNumero = n;
+      }
+      const next = maxNumero + 1;
+      if (next > 9999) {
+        toast({ title: "Erreur", description: "Numéros patients épuisés (>9999)", variant: "destructive" });
+        return;
+      }
+      const nextNumero = String(next).padStart(4, "0");
+
       await pb.collection("patients").create({
         name: formData.name,
+        numero: nextNumero,
         status: formData.status,
         mutuelle: formData.has_mutual ? "true" : "false",
         seances_restantes: formData.remaining_sessions,
@@ -123,7 +141,7 @@ export default function Patients() {
         prenom: formData.name,
         nom: formData.name,
       });
-      toast({ title: "Patient ajouté" });
+      toast({ title: `Patient ajouté (n°${nextNumero})` });
       setIsDialogOpen(false);
       setFormData({ name: "", status: "active", has_mutual: false, remaining_sessions: 0, prescription: "none" });
       fetchPatients();

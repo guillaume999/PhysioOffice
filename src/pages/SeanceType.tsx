@@ -474,11 +474,11 @@ export default function SeanceType() {
                               {seance.code}
                             </Badge>
                             {pathologies.map((p, i) => (
-                              <Badge key={i} variant="outline" className="text-xs flex-shrink-0">{p}</Badge>
+                              <Badge key={i} variant="outline" className="text-base font-semibold px-3 py-1 flex-shrink-0">{p}</Badge>
                             ))}
                             <span className="text-muted-foreground">-</span>
                             {objectifs.map((o, i) => (
-                              <Badge key={i} variant="default" className="text-xs flex-shrink-0">{o}</Badge>
+                              <Badge key={i} variant="default" className="text-base font-semibold px-3 py-1 flex-shrink-0">{o}</Badge>
                             ))}
                             {seance.is_copy && (
                               <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
