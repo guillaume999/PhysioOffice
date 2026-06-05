@@ -263,7 +263,7 @@ export default function PathologieDetail() {
                             {minePicker.map((t) => (
                               <CommandItem
                                 key={t.id}
-                                value={`mine-${t.id}`}
+                                value={`mine ${t.nom} ${t.pathologie || ""} ${t.id}`}
                                 onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
                               >
                                 <UserIcon className="w-3 h-3 mr-2 text-muted-foreground" />
@@ -280,7 +280,7 @@ export default function PathologieDetail() {
                             {platformPicker.map((t) => (
                               <CommandItem
                                 key={t.id}
-                                value={`platform-${t.id}`}
+                                value={`platform ${t.nom} ${t.pathologie || ""} ${t.id}`}
                                 onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
                               >
                                 <Shield className="w-3 h-3 mr-2 text-primary" />
