@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -63,6 +64,7 @@ export default function Exercices() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
+  const [exerciceToDelete, setExerciceToDelete] = useState<Exercice | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [filter, setFilter] = useState<FilterType>("mine");
@@ -899,7 +901,7 @@ export default function Exercices() {
                               variant="ghost"
                               size="icon"
                               className="text-destructive"
-                              onClick={() => deleteExercice(exercice)}
+                              onClick={() => setExerciceToDelete(exercice)}
                               title="Supprimer"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -915,6 +917,34 @@ export default function Exercices() {
           )}
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!exerciceToDelete} onOpenChange={(open) => !open && setExerciceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l'exercice ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {exerciceToDelete && (featuredExerciceIds.includes(exerciceToDelete.id) || exerciceToDelete.status === "shared" || exerciceToDelete.status === "pending")
+                ? `« ${exerciceToDelete.title} » sera retiré de votre bibliothèque. La copie publique restera visible pour les autres utilisateurs.`
+                : `« ${exerciceToDelete?.title ?? ""} » sera supprimé définitivement. Cette action est irréversible.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (exerciceToDelete) {
+                  await deleteExercice(exerciceToDelete);
+                  setExerciceToDelete(null);
+                }
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={(open) => {
