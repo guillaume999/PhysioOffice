@@ -275,6 +275,23 @@ export default function PathologieDetail() {
                             ))}
                           </CommandGroup>
                         )}
+                        {platformPicker.length > 0 && (
+                          <CommandGroup heading="Plateforme">
+                            {platformPicker.map((t) => (
+                              <CommandItem
+                                key={t.id}
+                                value={`platform-${t.id}`}
+                                onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
+                              >
+                                <Shield className="w-3 h-3 mr-2 text-primary" />
+                                <span className="flex-1">{t.nom}</span>
+                                {t.pathologie && (
+                                  <Badge variant="outline" className="ml-2 text-xs">{t.pathologie}</Badge>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
