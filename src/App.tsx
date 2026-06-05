@@ -21,6 +21,8 @@ import Contact from "./pages/Contact";
 import MentionsLegales from "./pages/MentionsLegales";
 import TraitementType from "./pages/TraitementType";
 import SeanceType from "./pages/SeanceType";
+import Pathologies from "./pages/Pathologies";
+import PathologieDetail from "./pages/PathologieDetail";
 import Exercices from "./pages/Exercices";
 import Videos from "./pages/Videos";
 import Admin from "./pages/Admin";
@@ -71,8 +73,9 @@ const App = () => (
             <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
             <Route path="/traitement-type" element={<ProtectedRoute><TraitementType /></ProtectedRoute>} />
             <Route path="/seance-type" element={<ProtectedRoute><SeanceType /></ProtectedRoute>} />
+            <Route path="/pathologies" element={<ProtectedRoute><Pathologies /></ProtectedRoute>} />
+            <Route path="/pathologies/:id" element={<ProtectedRoute><PathologieDetail /></ProtectedRoute>} />
             <Route path="/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
-
             {/* Admin-only */}
             <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
 

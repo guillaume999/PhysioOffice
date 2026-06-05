@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone, BookOpen } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone, BookOpen, Activity } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PagePopup } from "@/components/popup/PagePopup";
 
@@ -22,6 +22,7 @@ const featureGroups = [
       { title: "Traitements", description: "Protocoles de traitement personnalisés", icon: ClipboardList, href: "/traitement-type", color: "from-cyan-500 to-blue-500", bgColor: "bg-cyan-500/10" },
       { title: "Séances", description: "Créez et gérez vos séances de rééducation", icon: ClipboardList, href: "/seance-type", color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-500/10" },
       { title: "Vidéos", description: "Votre vidéothèque de techniques et exercices", icon: Video, href: "/videos", color: "from-red-500 to-orange-500", bgColor: "bg-red-500/10" },
+      { title: "Pathologies & Traitements", description: "Liste de vos pathologies avec leur protocole de traitement", icon: Activity, href: "/pathologies", color: "from-fuchsia-500 to-pink-500", bgColor: "bg-fuchsia-500/10" },
     ],
   },
   {
