@@ -153,6 +153,15 @@ export default function PathologieDetail() {
   const [traitement, setTraitement] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Auteur de la fiche : seul lui (ou un admin) peut modifier.
+  // Les pathologies plateforme sont donc en lecture seule pour les autres utilisateurs.
+  const [ownerId, setOwnerId] = useState<string>("");
+  const [authorName, setAuthorName] = useState<string>("");
+  const isAdmin = (user as any)?.role === "admin";
+  const isOwner = !!user && !!ownerId && user.id === ownerId;
+  const canEdit = isOwner || isAdmin;
+  const readOnly = !canEdit;
+
   // Liaisons traitement_types
   const [linkedIds, setLinkedIds] = useState<string[]>([]);
   const [availableTraitements, setAvailableTraitements] = useState<TraitementOption[]>([]);
@@ -175,6 +184,8 @@ export default function PathologieDetail() {
       setTraitement(rec.traitement || "");
       setSections(parseDescription(rec.description || ""));
       setLinkedIds(Array.isArray(rec.traitement_types) ? rec.traitement_types : []);
+      setOwnerId(rec.user || "");
+      setAuthorName(rec.author_name || "");
 
       // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
       const [mine, featured] = await Promise.all([
@@ -310,7 +321,15 @@ export default function PathologieDetail() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Pathologie</CardTitle>
+              <div className="flex items-start justify-between gap-3">
+                <CardTitle>Pathologie</CardTitle>
+                {readOnly && (
+                  <Badge variant="outline" className="gap-1.5">
+                    <Shield className="w-3 h-3" />
+                    Lecture seule {authorName ? `(${authorName})` : ""}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -320,13 +339,14 @@ export default function PathologieDetail() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nom de la pathologie"
+                  disabled={readOnly}
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="categorie">Catégorie</Label>
-                  <Select value={categorie} onValueChange={setCategorie}>
+                  <Select value={categorie} onValueChange={setCategorie} disabled={readOnly}>
                     <SelectTrigger id="categorie">
                       <SelectValue placeholder="Choisir une catégorie…" />
                     </SelectTrigger>
@@ -346,6 +366,7 @@ export default function PathologieDetail() {
                     value={objectifs}
                     onChange={(e) => setObjectifs(e.target.value)}
                     placeholder="Ex. récupération de l'amplitude, indolence…"
+                    disabled={readOnly}
                   />
                 </div>
               </div>
@@ -383,6 +404,7 @@ export default function PathologieDetail() {
                           }
                           rows={key === "mots_cles" ? 2 : 6}
                           className={key === "mots_cles" ? "" : "min-h-[120px]"}
+                          disabled={readOnly}
                         />
                       </AccordionContent>
                     </AccordionItem>
@@ -401,6 +423,7 @@ export default function PathologieDetail() {
                   onChange={(e) => setTraitement(e.target.value)}
                   placeholder="Notes libres, à migrer progressivement vers la description structurée."
                   rows={6}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -437,6 +460,7 @@ export default function PathologieDetail() {
                       variant="outline"
                       role="combobox"
                       className="w-full justify-between font-normal text-muted-foreground"
+                      disabled={readOnly}
                     >
                       <span className="flex items-center gap-2">
                         <Search className="w-3 h-3" />
@@ -490,20 +514,27 @@ export default function PathologieDetail() {
                 </Popover>
               </div>
 
-              <div className="flex justify-between gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  className="text-destructive gap-2"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Supprimer
-                </Button>
-                <Button onClick={handleSave} disabled={saving || !name.trim()} className="gap-2">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Enregistrer
-                </Button>
-              </div>
+
+              {readOnly ? (
+                <div className="pt-2 text-xs text-muted-foreground">
+                  Cette pathologie appartient à la plateforme. Vous pouvez la consulter mais seul son auteur ou un administrateur peut la modifier.
+                </div>
+              ) : (
+                <div className="flex justify-between gap-2 pt-2">
+                  <Button
+                    variant="ghost"
+                    className="text-destructive gap-2"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Supprimer
+                  </Button>
+                  <Button onClick={handleSave} disabled={saving || !name.trim()} className="gap-2">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Enregistrer
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
