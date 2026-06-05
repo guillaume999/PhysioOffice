@@ -7,6 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ArrowLeft, Loader2, Save, Trash2, X, Shield, User as UserIcon } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
@@ -33,6 +46,94 @@ interface TraitementOption {
   is_platform: boolean;
 }
 
+const CATEGORIES = [
+  "Traumatologie",
+  "Orthopédie",
+  "Neurologie",
+  "Rhumatologie",
+  "Cardiovasculaire",
+  "Respiratoire",
+  "Psychiatrie",
+  "Gériatrie",
+  "Urologie",
+  "Dermatologie",
+  "Pédiatrie",
+  "Gynécologie",
+  "Médecine interne",
+  "Chirurgie",
+];
+
+// Sections internes structurées du champ `description` (Markdown).
+// Ordre = ordre d'affichage et de stockage.
+const SECTIONS = [
+  { key: "description", label: "Description" },
+  { key: "traitement_orthopedique", label: "Traitement orthopédique" },
+  { key: "traitement_chirurgical", label: "Traitement chirurgical" },
+  { key: "bilan", label: "Bilan" },
+  { key: "traitement_kine", label: "Traitement kiné" },
+  { key: "complications", label: "Complications" },
+  { key: "contre_indications", label: "Contre-indications" },
+  { key: "evolution_delais", label: "Évolution & délais" },
+  { key: "mots_cles", label: "Mots-clés" },
+] as const;
+
+type SectionKey = (typeof SECTIONS)[number]["key"];
+
+// Construit le Markdown final à partir du dictionnaire de sections.
+function buildDescription(sections: Record<SectionKey, string>): string {
+  return SECTIONS.map(({ key, label }) => {
+    const content = (sections[key] || "").trim();
+    return `## ${label}\n${content}`;
+  }).join("\n\n");
+}
+
+// Parse un Markdown structuré en ses sections. Tolérant : ce qui ne matche pas
+// va dans la première section. Cherche les headings de niveau 2.
+function parseDescription(md: string): Record<SectionKey, string> {
+  const empty = SECTIONS.reduce((acc, s) => ({ ...acc, [s.key]: "" }),
+    {} as Record<SectionKey, string>);
+  if (!md) return empty;
+
+  const labelToKey = new Map<string, SectionKey>(
+    SECTIONS.map((s) => [s.label.toLowerCase(), s.key])
+  );
+
+  const lines = md.split(/\r?\n/);
+  let current: SectionKey | null = null;
+  const buffers: Record<SectionKey, string[]> = SECTIONS.reduce(
+    (acc, s) => ({ ...acc, [s.key]: [] }),
+    {} as Record<SectionKey, string[]>
+  );
+  const preamble: string[] = [];
+
+  for (const line of lines) {
+    const m = line.match(/^##\s+(.+?)\s*$/);
+    if (m) {
+      const key = labelToKey.get(m[1].trim().toLowerCase());
+      if (key) {
+        current = key;
+        continue;
+      }
+    }
+    if (current) buffers[current].push(line);
+    else preamble.push(line);
+  }
+
+  // Si rien n'a été reconnu et qu'il y a du contenu en préambule, le mettre
+  // dans la première section "description".
+  if (
+    preamble.join("").trim().length > 0 &&
+    Object.values(buffers).every((b) => b.length === 0)
+  ) {
+    buffers.description = preamble;
+  }
+
+  return SECTIONS.reduce(
+    (acc, s) => ({ ...acc, [s.key]: buffers[s.key].join("\n").trim() }),
+    {} as Record<SectionKey, string>
+  );
+}
+
 export default function PathologieDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -40,6 +141,15 @@ export default function PathologieDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
+  const [categorie, setCategorie] = useState<string>("");
+  const [objectifs, setObjectifs] = useState("");
+  const [sections, setSections] = useState<Record<SectionKey, string>>(() =>
+    SECTIONS.reduce(
+      (acc, s) => ({ ...acc, [s.key]: "" }),
+      {} as Record<SectionKey, string>
+    )
+  );
+  // Champ legacy `traitement` (texte libre) — conservé pour rétrocompat.
   const [traitement, setTraitement] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -50,6 +160,7 @@ export default function PathologieDetail() {
 
   useEffect(() => {
     if (id && user) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user]);
 
   const load = async () => {
@@ -57,9 +168,13 @@ export default function PathologieDetail() {
     setLoading(true);
     try {
       const r = await pb.collection("pathologies").getOne(id);
-      setName((r as any).name || "");
-      setTraitement((r as any).traitement || "");
-      setLinkedIds(Array.isArray((r as any).traitement_types) ? (r as any).traitement_types : []);
+      const rec = r as any;
+      setName(rec.name || "");
+      setCategorie(rec.categorie || "");
+      setObjectifs(rec.objectifs || "");
+      setTraitement(rec.traitement || "");
+      setSections(parseDescription(rec.description || ""));
+      setLinkedIds(Array.isArray(rec.traitement_types) ? rec.traitement_types : []);
 
       // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
       const [mine, featured] = await Promise.all([
@@ -80,9 +195,6 @@ export default function PathologieDetail() {
           })
         : [];
 
-      // Construit la liste finale (ID réels conservés) :
-      // - perso = traitements possédés par l'utilisateur
-      // - plateforme = traitements présents dans featured_traitements (même s'ils appartiennent à l'utilisateur)
       const mineOpts: TraitementOption[] = (mine as any[]).map((t) => ({
         id: t.id,
         nom: t.nom || "Sans nom",
@@ -116,6 +228,9 @@ export default function PathologieDetail() {
     try {
       await pb.collection("pathologies").update(id, {
         name: name.trim(),
+        categorie: categorie || "",
+        objectifs: objectifs.trim(),
+        description: buildDescription(sections),
         traitement,
         traitement_types: linkedIds,
       });
@@ -139,6 +254,9 @@ export default function PathologieDetail() {
       toast.error("Erreur lors de la suppression");
     }
   };
+
+  const setSection = (key: SectionKey, value: string) =>
+    setSections((prev) => ({ ...prev, [key]: value }));
 
   // Maps utiles
   const traitementsById = useMemo(() => {
@@ -172,6 +290,11 @@ export default function PathologieDetail() {
     );
   }
 
+  // Sections renseignées en premier dans l'accordéon
+  const filledKeys = SECTIONS.filter((s) => (sections[s.key] || "").trim().length > 0).map(
+    (s) => s.key
+  );
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -200,15 +323,84 @@ export default function PathologieDetail() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="categorie">Catégorie</Label>
+                  <Select value={categorie} onValueChange={setCategorie}>
+                    <SelectTrigger id="categorie">
+                      <SelectValue placeholder="Choisir une catégorie…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="objectifs">Objectifs</Label>
+                  <Input
+                    id="objectifs"
+                    value={objectifs}
+                    onChange={(e) => setObjectifs(e.target.value)}
+                    placeholder="Ex. récupération de l'amplitude, indolence…"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="traitement">Traitement / Protocole</Label>
+                <Label>Description structurée</Label>
+                <p className="text-xs text-muted-foreground">
+                  Sections enregistrées dans le champ <code>description</code>.
+                </p>
+                <Accordion
+                  type="multiple"
+                  defaultValue={filledKeys.length ? filledKeys : ["description"]}
+                  className="border rounded-md"
+                >
+                  {SECTIONS.map(({ key, label }) => (
+                    <AccordionItem key={key} value={key}>
+                      <AccordionTrigger className="px-3 text-sm font-medium">
+                        <span className="flex items-center gap-2">
+                          {label}
+                          {(sections[key] || "").trim() && (
+                            <Badge variant="outline" className="text-[10px] py-0">
+                              rempli
+                            </Badge>
+                          )}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3 pb-3">
+                        <Textarea
+                          value={sections[key]}
+                          onChange={(e) => setSection(key, e.target.value)}
+                          placeholder={
+                            key === "mots_cles"
+                              ? "genou, ligament, post-op"
+                              : `Saisir ${label.toLowerCase()}…`
+                          }
+                          rows={key === "mots_cles" ? 2 : 6}
+                          className={key === "mots_cles" ? "" : "min-h-[120px]"}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="traitement">Notes libres (legacy)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Champ <code>traitement</code> historique, conservé pour compatibilité.
+                </p>
                 <Textarea
                   id="traitement"
                   value={traitement}
                   onChange={(e) => setTraitement(e.target.value)}
-                  placeholder="Décrivez le protocole de traitement, conseils, contre-indications, exercices recommandés…"
-                  rows={14}
-                  className="min-h-[300px]"
+                  placeholder="Notes libres, à migrer progressivement vers la description structurée."
+                  rows={6}
                 />
               </div>
 
