@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { SearchableCreatableSelect } from "@/components/seance/SearchableCreatableSelect";
 
 interface VideoLibraryItem {
   id: string;
@@ -31,6 +32,7 @@ interface Exercice {
   description: string | null;
   commentaire: string | null;
   pathologie_tags: string[];
+  objectif_tags: string[];
   status: string;
   video_url: string | null;
   thumbnail_url: string | null;
@@ -55,6 +57,7 @@ export default function Exercices() {
   const [filteredExercices, setFilteredExercices] = useState<Exercice[]>([]);
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<string[]>([]);
   const [pathologies, setPathologies] = useState<string[]>([]);
+  const [objectifs, setObjectifs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -70,7 +73,7 @@ export default function Exercices() {
     description: "",
     commentaire: "",
     pathologie_tags: [] as string[],
-    newPathologie: "",
+    objectif_tags: [] as string[],
     videoFile: null as File | null,
     video_url: "",
     thumbnail_url: "",
@@ -177,10 +180,12 @@ export default function Exercices() {
       setUserPseudo(rec?.pseudo || null);
       setUserCanShare(rec?.can_share !== false);
 
-      const [featuredData, exercicesData, pathoData] = await Promise.all([
+      const userFilter = user ? `user = "${user.id}"` : undefined;
+      const [featuredData, exercicesData, pathoData, objectifData] = await Promise.all([
         pb.collection("featured_exercices").getFullList({ fields: "exercice" }),
         pb.collection("exercices").getFullList({ sort: "-created" }),
-        pb.collection("pathologies").getFullList({ fields: "name" }),
+        pb.collection("pathologies").getFullList({ fields: "name", filter: userFilter }),
+        pb.collection("objectifs").getFullList({ fields: "name", filter: userFilter }),
       ]);
       setFeaturedExerciceIds(featuredData.map((f: any) => f.exercice));
       // PocketBase renvoie les champs relation/système bruts (user, original, video, created).
@@ -196,6 +201,7 @@ export default function Exercices() {
       }));
       setExercices(mappedExercices as any[]);
       setPathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
+      setObjectifs([...new Set((objectifData as any[]).map((o: any) => o.name as string).filter(Boolean))]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -242,10 +248,16 @@ export default function Exercices() {
 
     setIsUploading(true);
     try {
-      const tags = [...formData.pathologie_tags];
-      if (formData.newPathologie.trim() && !tags.includes(formData.newPathologie.trim())) {
-        tags.push(formData.newPathologie.trim());
-        await pb.collection("pathologies").create({ user: user.id, name: formData.newPathologie.trim() });
+      // Persister les nouveaux items dans les tables de référence
+      for (const p of formData.pathologie_tags) {
+        if (!pathologies.includes(p)) {
+          await pb.collection("pathologies").create({ user: user.id, name: p });
+        }
+      }
+      for (const o of formData.objectif_tags) {
+        if (!objectifs.includes(o)) {
+          await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" });
+        }
       }
 
       let videoUrl = formData.video_url;
@@ -257,7 +269,7 @@ export default function Exercices() {
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-        
+
         // Also add to video library
         try {
           const videoData = await pb.collection("videos").create({
@@ -272,7 +284,9 @@ export default function Exercices() {
           user: user.id, title: formData.title.trim(),
           description: formData.description.trim() || null,
           commentaire: formData.commentaire.trim() || null,
-          pathologie_tags: tags, video: videoId,
+          pathologie_tags: formData.pathologie_tags,
+          objectif_tags: formData.objectif_tags,
+          video: videoId,
           video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
           author_name: userPseudo, status: "draft",
         });
@@ -299,10 +313,15 @@ export default function Exercices() {
 
     setIsUploading(true);
     try {
-      const tags = [...formData.pathologie_tags];
-      if (formData.newPathologie.trim() && !tags.includes(formData.newPathologie.trim())) {
-        tags.push(formData.newPathologie.trim());
-        await pb.collection("pathologies").create({ user: user.id, name: formData.newPathologie.trim() });
+      for (const p of formData.pathologie_tags) {
+        if (!pathologies.includes(p)) {
+          await pb.collection("pathologies").create({ user: user.id, name: p });
+        }
+      }
+      for (const o of formData.objectif_tags) {
+        if (!objectifs.includes(o)) {
+          await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" });
+        }
       }
 
       let videoUrl = formData.video_url;
@@ -314,7 +333,7 @@ export default function Exercices() {
         const uploaded = await uploadVideoToStorage(formData.videoFile);
         videoUrl = uploaded.publicUrl;
         thumbnailUrl = "";
-        
+
         // Also add to video library
         try {
           const videoData = await pb.collection("videos").create({
@@ -328,7 +347,9 @@ export default function Exercices() {
       await pb.collection("exercices").update(selectedExercice.id, {
           title: formData.title.trim(), description: formData.description.trim() || null,
           commentaire: formData.commentaire.trim() || null,
-          pathologie_tags: tags, video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
+          pathologie_tags: formData.pathologie_tags,
+          objectif_tags: formData.objectif_tags,
+          video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
         });
 
       toast.success("Exercice modifié avec succès");
@@ -349,7 +370,7 @@ export default function Exercices() {
       description: "",
       commentaire: "",
       pathologie_tags: [],
-      newPathologie: "",
+      objectif_tags: [],
       videoFile: null,
       video_url: "",
       thumbnail_url: "",
@@ -366,7 +387,7 @@ export default function Exercices() {
       description: exercice.description || "",
       commentaire: exercice.commentaire || "",
       pathologie_tags: exercice.pathologie_tags || [],
-      newPathologie: "",
+      objectif_tags: exercice.objectif_tags || [],
       videoFile: null,
       video_url: exercice.video_url || "",
       thumbnail_url: exercice.thumbnail_url || "",
@@ -502,18 +523,24 @@ export default function Exercices() {
     setVideoDialogOpen(true);
   };
 
-  const toggleTag = (tag: string) => {
-    if (formData.pathologie_tags.includes(tag)) {
-      setFormData({
-        ...formData,
-        pathologie_tags: formData.pathologie_tags.filter(t => t !== tag)
-      });
-    } else {
-      setFormData({
-        ...formData,
-        pathologie_tags: [...formData.pathologie_tags, tag]
-      });
-    }
+  const addPathologie = (value: string) => {
+    const v = value.trim();
+    if (!v || formData.pathologie_tags.includes(v)) return;
+    setFormData({ ...formData, pathologie_tags: [...formData.pathologie_tags, v] });
+  };
+
+  const removePathologie = (tag: string) => {
+    setFormData({ ...formData, pathologie_tags: formData.pathologie_tags.filter(t => t !== tag) });
+  };
+
+  const addObjectif = (value: string) => {
+    const v = value.trim();
+    if (!v || formData.objectif_tags.includes(v)) return;
+    setFormData({ ...formData, objectif_tags: [...formData.objectif_tags, v] });
+  };
+
+  const removeObjectif = (tag: string) => {
+    setFormData({ ...formData, objectif_tags: formData.objectif_tags.filter(t => t !== tag) });
   };
 
   const getStatusBadge = (exercice: Exercice) => {
@@ -639,7 +666,11 @@ export default function Exercices() {
                   formData={formData}
                   setFormData={setFormData}
                   pathologies={pathologies}
-                  toggleTag={toggleTag}
+                  objectifs={objectifs}
+                  addPathologie={addPathologie}
+                  removePathologie={removePathologie}
+                  addObjectif={addObjectif}
+                  removeObjectif={removeObjectif}
                   onSubmit={handleSubmit}
                   submitLabel="Créer"
                   isUploading={isUploading}
@@ -898,7 +929,11 @@ export default function Exercices() {
             formData={formData}
             setFormData={setFormData}
             pathologies={pathologies}
-            toggleTag={toggleTag}
+            objectifs={objectifs}
+            addPathologie={addPathologie}
+            removePathologie={removePathologie}
+            addObjectif={addObjectif}
+            removeObjectif={removeObjectif}
             onSubmit={handleUpdate}
             submitLabel="Enregistrer"
             isUploading={isUploading}
@@ -1064,7 +1099,7 @@ interface ExerciceFormProps {
     description: string;
     commentaire: string;
     pathologie_tags: string[];
-    newPathologie: string;
+    objectif_tags: string[];
     videoFile: File | null;
     video_url: string;
     thumbnail_url: string;
@@ -1076,7 +1111,7 @@ interface ExerciceFormProps {
     description: string;
     commentaire: string;
     pathologie_tags: string[];
-    newPathologie: string;
+    objectif_tags: string[];
     videoFile: File | null;
     video_url: string;
     thumbnail_url: string;
@@ -1084,14 +1119,18 @@ interface ExerciceFormProps {
     video_title: string;
   }>>;
   pathologies: string[];
-  toggleTag: (tag: string) => void;
+  objectifs: string[];
+  addPathologie: (value: string) => void;
+  removePathologie: (tag: string) => void;
+  addObjectif: (value: string) => void;
+  removeObjectif: (tag: string) => void;
   onSubmit: () => void;
   submitLabel: string;
   isUploading?: boolean;
   userId: string;
 }
 
-function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit, submitLabel, isUploading, userId }: ExerciceFormProps) {
+function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathologie, removePathologie, addObjectif, removeObjectif, onSubmit, submitLabel, isUploading, userId }: ExerciceFormProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -1241,33 +1280,44 @@ function ExerciceForm({ formData, setFormData, pathologies, toggleTag, onSubmit,
       </div>
 
       <div className="space-y-2">
-        <Label>Tags pathologie</Label>
-        <p className="text-xs text-muted-foreground">Cliquez pour sélectionner plusieurs tags</p>
-        <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/30 min-h-[60px]">
-          {pathologies.map((pathologie) => (
-            <Badge
-              key={pathologie}
-              variant={formData.pathologie_tags.includes(pathologie) ? "default" : "outline"}
-              className="cursor-pointer transition-all hover:scale-105"
-              onClick={() => toggleTag(pathologie)}
-            >
-              {formData.pathologie_tags.includes(pathologie) && <Check className="w-3 h-3 mr-1" />}
-              {pathologie}
+        <Label>Pathologies</Label>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {formData.pathologie_tags.map((tag) => (
+            <Badge key={tag} variant="secondary" className="gap-1">
+              {tag}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => removePathologie(tag)} />
             </Badge>
           ))}
-          {pathologies.length === 0 && (
-            <span className="text-sm text-muted-foreground">Aucun tag disponible</span>
+          {formData.pathologie_tags.length === 0 && (
+            <span className="text-xs text-muted-foreground">Aucune pathologie sélectionnée</span>
           )}
         </div>
-        {formData.pathologie_tags.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {formData.pathologie_tags.length} tag(s) sélectionné(s)
-          </p>
-        )}
-        <Input
-          value={formData.newPathologie}
-          onChange={(e) => setFormData({ ...formData, newPathologie: e.target.value })}
-          placeholder="Ajouter un nouveau tag pathologie..."
+        <SearchableCreatableSelect
+          options={pathologies.filter((p) => !formData.pathologie_tags.includes(p))}
+          onSelect={addPathologie}
+          placeholder="Rechercher ou créer une pathologie"
+          className="w-full"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Objectifs</Label>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {formData.objectif_tags.map((tag) => (
+            <Badge key={tag} variant="default" className="gap-1">
+              {tag}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => removeObjectif(tag)} />
+            </Badge>
+          ))}
+          {formData.objectif_tags.length === 0 && (
+            <span className="text-xs text-muted-foreground">Aucun objectif sélectionné</span>
+          )}
+        </div>
+        <SearchableCreatableSelect
+          options={objectifs.filter((o) => !formData.objectif_tags.includes(o))}
+          onSelect={addObjectif}
+          placeholder="Rechercher ou créer un objectif"
+          className="w-full"
         />
       </div>
 
