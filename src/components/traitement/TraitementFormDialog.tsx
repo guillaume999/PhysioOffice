@@ -12,6 +12,7 @@ import { Plus, X, Trash2, Calendar, GripVertical, ChevronUp, ChevronDown, Search
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 
 interface SeanceExercice {
   id: string;
@@ -437,24 +438,34 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
           {/* Pathologie */}
           <div className="space-y-2">
             <Label>Pathologie *</Label>
-            <div className="flex gap-2">
-              <Select value={pathologie} onValueChange={(v) => { setPathologie(v); setNewPathologie(""); }}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Sélectionner une pathologie" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availablePathologies.map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="Ou créer une nouvelle..."
-                value={newPathologie}
-                onChange={(e) => { setNewPathologie(e.target.value); setPathologie(""); }}
-                className="flex-1"
-              />
-            </div>
+            {(pathologie || newPathologie) && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                <Badge variant="secondary" className="gap-1">
+                  {pathologie || newPathologie}
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={() => { setPathologie(""); setNewPathologie(""); }}
+                  />
+                </Badge>
+              </div>
+            )}
+            <TagReferenceSelect
+              type="pathologie"
+              options={availablePathologies}
+              userId={user?.id || ""}
+              onSelect={(v) => {
+                if (availablePathologies.includes(v)) {
+                  setPathologie(v);
+                  setNewPathologie("");
+                } else {
+                  setPathologie("");
+                  setNewPathologie(v);
+                }
+              }}
+              onReferenceChanged={fetchOptions}
+              placeholder="Rechercher ou créer une pathologie"
+              className="w-full"
+            />
           </div>
 
           {/* Description */}

@@ -18,6 +18,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { SearchableCreatableSelect } from "@/components/seance/SearchableCreatableSelect";
+import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 
 interface VideoLibraryItem {
   id: string;
@@ -673,6 +674,7 @@ export default function Exercices() {
                   removePathologie={removePathologie}
                   addObjectif={addObjectif}
                   removeObjectif={removeObjectif}
+                  onTagsChanged={fetchData}
                   onSubmit={handleSubmit}
                   submitLabel="Créer"
                   isUploading={isUploading}
@@ -964,6 +966,7 @@ export default function Exercices() {
             removePathologie={removePathologie}
             addObjectif={addObjectif}
             removeObjectif={removeObjectif}
+            onTagsChanged={fetchData}
             onSubmit={handleUpdate}
             submitLabel="Enregistrer"
             isUploading={isUploading}
@@ -1154,13 +1157,14 @@ interface ExerciceFormProps {
   removePathologie: (tag: string) => void;
   addObjectif: (value: string) => void;
   removeObjectif: (tag: string) => void;
+  onTagsChanged: () => void;
   onSubmit: () => void;
   submitLabel: string;
   isUploading?: boolean;
   userId: string;
 }
 
-function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathologie, removePathologie, addObjectif, removeObjectif, onSubmit, submitLabel, isUploading, userId }: ExerciceFormProps) {
+function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathologie, removePathologie, addObjectif, removeObjectif, onTagsChanged, onSubmit, submitLabel, isUploading, userId }: ExerciceFormProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -1322,9 +1326,12 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
             <span className="text-xs text-muted-foreground">Aucune pathologie sélectionnée</span>
           )}
         </div>
-        <SearchableCreatableSelect
+        <TagReferenceSelect
+          type="pathologie"
           options={pathologies.filter((p) => !formData.pathologie_tags.includes(p))}
+          userId={userId}
           onSelect={addPathologie}
+          onReferenceChanged={onTagsChanged}
           placeholder="Rechercher ou créer une pathologie"
           className="w-full"
         />
@@ -1343,9 +1350,12 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
             <span className="text-xs text-muted-foreground">Aucun objectif sélectionné</span>
           )}
         </div>
-        <SearchableCreatableSelect
+        <TagReferenceSelect
+          type="objectif"
           options={objectifs.filter((o) => !formData.objectif_tags.includes(o))}
+          userId={userId}
           onSelect={addObjectif}
+          onReferenceChanged={onTagsChanged}
           placeholder="Rechercher ou créer un objectif"
           className="w-full"
         />

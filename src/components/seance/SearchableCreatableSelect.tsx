@@ -2,21 +2,19 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, Plus, Search } from "lucide-react";
+import { ChevronsUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   options: string[];
   onSelect: (value: string) => void;
+  onEdit?: (value: string) => void;
+  onDelete?: (value: string) => void;
   placeholder?: string;
   className?: string;
 }
 
-/**
- * Searchable combobox: type to filter existing options, or create a new one
- * when no match exists. Calls onSelect with the picked or created value.
- */
-export function SearchableCreatableSelect({ options, onSelect, placeholder = "Rechercher...", className }: Props) {
+export function SearchableCreatableSelect({ options, onSelect, onEdit, onDelete, placeholder = "Rechercher...", className }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -49,7 +47,7 @@ export function SearchableCreatableSelect({ options, onSelect, placeholder = "Re
       <PopoverContent className="w-[320px] p-0" align="start">
         <Command shouldFilter={true}>
           <CommandInput
-            placeholder="Rechercher ou créer..."
+            placeholder="Rechercher ou creer..."
             value={query}
             onValueChange={setQuery}
             onKeyDown={(e) => {
@@ -68,22 +66,48 @@ export function SearchableCreatableSelect({ options, onSelect, placeholder = "Re
                   onClick={() => pick(query)}
                 >
                   <Plus className="w-3 h-3" />
-                  Créer "{query.trim()}"
+                  Creer "{query.trim()}"
                 </button>
               ) : (
-                "Aucun résultat."
+                "Aucun resultat."
               )}
             </CommandEmpty>
             <CommandGroup>
               {options.map((opt) => (
-                <CommandItem key={opt} value={opt} onSelect={() => pick(opt)}>
-                  {opt}
+                <CommandItem key={opt} value={opt} onSelect={() => pick(opt)} className="group">
+                  <span className="flex-1 truncate">{opt}</span>
+                  {(onEdit || onDelete) && (
+                    <span className="flex items-center gap-1 opacity-60 group-hover:opacity-100">
+                      {onEdit && (
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-muted"
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onEdit(opt); }}
+                          title="Renommer"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-muted text-destructive"
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onDelete(opt); }}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
               {query.trim() && !exactExists && (
                 <CommandItem value={`__add__${query}`} onSelect={() => pick(query)}>
                   <Plus className="w-3 h-3 mr-2" />
-                  Créer "{query.trim()}"
+                  Creer "{query.trim()}"
                 </CommandItem>
               )}
             </CommandGroup>

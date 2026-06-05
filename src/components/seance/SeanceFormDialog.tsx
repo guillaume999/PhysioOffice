@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCreatableSelect } from "./SearchableCreatableSelect";
+import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { pb } from "@/integrations/pocketbase/client";
@@ -395,9 +396,12 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
               ))}
             </div>
             <div className="flex gap-2">
-              <SearchableCreatableSelect
+              <TagReferenceSelect
+                type="pathologie"
                 options={availablePathologies.filter((p) => !pathologies.includes(p))}
+                userId={user?.id || ""}
                 onSelect={addPathologie}
+                onReferenceChanged={fetchOptions}
                 placeholder="Rechercher une pathologie"
                 className="flex-1"
               />
@@ -426,9 +430,12 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
               ))}
             </div>
             <div className="flex gap-2">
-              <SearchableCreatableSelect
+              <TagReferenceSelect
+                type="objectif"
                 options={availableObjectifs.filter((o) => !objectifs.includes(o))}
+                userId={user?.id || ""}
                 onSelect={addObjectif}
+                onReferenceChanged={fetchOptions}
                 placeholder="Rechercher un objectif"
                 className="flex-1"
               />
@@ -638,7 +645,6 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
             </div>
           </div>
         </div>
-
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler
