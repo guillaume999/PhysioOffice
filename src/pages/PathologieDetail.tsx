@@ -157,6 +157,9 @@ export default function PathologieDetail() {
   // Pour un user non-admin propriétaire, seul is_shared est piloté (validation reste à un admin).
   const [isShared, setIsShared] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
+  // Visibilité plateforme (admin-only) : si true, la pathologie est masquée à tous les non-admins
+  // — n'apparaît dans aucun des filtres (Mes, Plateforme, Partagés). Les admins la voient toujours.
+  const [isHiddenFromList, setIsHiddenFromList] = useState(false);
 
   // Auteur de la fiche : seul lui (ou un admin) peut modifier.
   // Les pathologies plateforme sont donc en lecture seule pour les autres utilisateurs.
@@ -192,6 +195,7 @@ export default function PathologieDetail() {
       setAuthorName(rec.author_name || "");
       setIsShared(!!rec.is_shared);
       setIsValidated(!!rec.is_validated);
+      setIsHiddenFromList(!!rec.is_hidden_from_list);
 
       // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
       const [mine, featured] = await Promise.all([
@@ -254,6 +258,9 @@ export default function PathologieDetail() {
         // Un admin coche/décoche → validation suit la visibilité.
         // Un user non-admin ne peut pas modifier is_validated, on conserve la valeur courante.
         is_validated: isAdmin ? isShared : isValidated,
+        // Toggle admin-only "masqué aux non-admins". Le Switch n'est rendu que pour isAdmin,
+        // donc isHiddenFromList reste sur la valeur chargée pour un non-admin.
+        is_hidden_from_list: isHiddenFromList,
       });
       toast.success("Enregistré");
     } catch (e) {
@@ -404,6 +411,26 @@ export default function PathologieDetail() {
                   disabled={readOnly}
                 />
               </div>
+
+              {isAdmin && (
+                <div className="flex items-start justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="is-visible-non-admin" className="text-sm font-medium flex items-center gap-1.5">
+                      <Shield className="w-3 h-3" />
+                      Visible pour les non-admins
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Contrôle admin. Désactivé → cette pathologie est masquée à tous les utilisateurs non-admins
+                      (n'apparaît dans aucun onglet : Mes, PhysioOffice, Partagés). Les admins continuent de la voir.
+                    </p>
+                  </div>
+                  <Switch
+                    id="is-visible-non-admin"
+                    checked={!isHiddenFromList}
+                    onCheckedChange={(v) => setIsHiddenFromList(!v)}
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Description structurée</Label>

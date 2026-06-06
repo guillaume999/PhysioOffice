@@ -220,97 +220,134 @@ export default function Admin() {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      // Fetch users (the PocketBase `users` collection holds the former `profiles` data).
-      // The auth record id replaces the old profiles.user_id; `created` replaces created_at.
-      const usersRecords = await pb.collection("users").getFullList({ sort: "-created" });
-      const usersData = usersRecords.map((r: any) => ({ ...r, user_id: r.id, created_at: r.created }));
-      setUsers(usersData as any);
 
-      // Admin role now lives on the user record (subscription_tier === "admin")
-      setAdminUserIds(
-        new Set(usersData.filter((u: any) => u.subscription_tier === "admin").map((u: any) => u.user_id))
-      );
+    // Helper: isole chaque appel pour qu'une collection manquante (404) ou une
+    // erreur ponctuelle ne casse pas toute la page admin.
+    const safeFetch = async <T,>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await fn();
+      } catch (error: any) {
+        console.error(`[Admin] Échec chargement ${label}:`, error);
+        return fallback;
+      }
+    };
 
-      // Fetch seances
-      const seancesData = (await pb.collection("seance_types").getFullList({ sort: "-created" }))
-        .map((r: any) => ({ ...r, created_at: r.created }));
-      setSeances(seancesData as any);
+    // Fetch users (the PocketBase `users` collection holds the former `profiles` data).
+    const usersRecords = await safeFetch(
+      "users",
+      () => pb.collection("users").getFullList({ sort: "-created" }),
+      [] as any[],
+    );
+    const usersData = usersRecords.map((r: any) => ({ ...r, user_id: r.id, created_at: r.created }));
+    setUsers(usersData as any);
+    setAdminUserIds(
+      new Set(usersData.filter((u: any) => u.subscription_tier === "admin").map((u: any) => u.user_id)),
+    );
 
-      // Fetch traitements
-      const traitementsData = (await pb.collection("traitement_types").getFullList({ sort: "-created" }))
-        .map((r: any) => ({ ...r, created_at: r.created }));
-      setTraitements(traitementsData as any);
+    // Fetch seances
+    const seancesData = (
+      await safeFetch("seance_types", () => pb.collection("seance_types").getFullList({ sort: "-created" }), [] as any[])
+    ).map((r: any) => ({ ...r, created_at: r.created }));
+    setSeances(seancesData as any);
 
-      // Fetch exercices
-      const exercicesData = (await pb.collection("exercices").getFullList({ sort: "-created" }))
-        .map((r: any) => ({ ...r, created_at: r.created }));
-      setExercices(exercicesData as any);
+    // Fetch traitements
+    const traitementsData = (
+      await safeFetch(
+        "traitement_types",
+        () => pb.collection("traitement_types").getFullList({ sort: "-created" }),
+        [] as any[],
+      )
+    ).map((r: any) => ({ ...r, created_at: r.created }));
+    setTraitements(traitementsData as any);
 
-      // Fetch featured exercices (relation field is `exercice`)
-      const featuredData = await pb.collection("featured_exercices").getFullList({ fields: "exercice" });
-      setFeaturedExerciceIds(new Set(featuredData.map((f: any) => f.exercice)));
+    // Fetch exercices
+    const exercicesData = (
+      await safeFetch("exercices", () => pb.collection("exercices").getFullList({ sort: "-created" }), [] as any[])
+    ).map((r: any) => ({ ...r, created_at: r.created }));
+    setExercices(exercicesData as any);
 
-      // Fetch consulted exercices for current admin
-      const consultedData = user
-        ? await pb.collection("exercice_consultations").getFullList({
-            filter: `user = "${user.id}" && is_consulted = true`,
-            fields: "exercice",
-          })
-        : [];
-      setConsultedExerciceIds(new Set(consultedData.map((c: any) => c.exercice)));
+    // Fetch featured exercices (relation field is `exercice`)
+    const featuredData = await safeFetch(
+      "featured_exercices",
+      () => pb.collection("featured_exercices").getFullList({ fields: "exercice" }),
+      [] as any[],
+    );
+    setFeaturedExerciceIds(new Set(featuredData.map((f: any) => f.exercice)));
 
-      // Fetch platform certificat models
-      const modelsData = (await pb.collection("certificat_models").getFullList({
-        filter: "is_platform = true",
-        sort: "-created",
-      })).map((r: any) => ({ ...r, created_at: r.created }));
-      setCertificatModels(modelsData as any);
+    // Fetch consulted exercices for current admin
+    const consultedData = user
+      ? await safeFetch(
+          "exercice_consultations",
+          () =>
+            pb.collection("exercice_consultations").getFullList({
+              filter: `user = "${user.id}" && is_consulted = true`,
+              fields: "exercice",
+            }),
+          [] as any[],
+        )
+      : [];
+    setConsultedExerciceIds(new Set(consultedData.map((c: any) => c.exercice)));
 
-      // Fetch subscription limits
-      const limitsData = await pb.collection("subscription_limits").getFullList({ sort: "tier" });
+    // Fetch platform certificat models
+    const modelsData = (
+      await safeFetch(
+        "certificat_models",
+        () =>
+          pb.collection("certificat_models").getFullList({
+            filter: "is_platform = true",
+            sort: "-created",
+          }),
+        [] as any[],
+      )
+    ).map((r: any) => ({ ...r, created_at: r.created }));
+    setCertificatModels(modelsData as any);
 
-      setSubscriptionLimits(limitsData as any);
+    // Fetch subscription limits
+    const limitsData = await safeFetch(
+      "subscription_limits",
+      () => pb.collection("subscription_limits").getFullList({ sort: "tier" }),
+      [] as any[],
+    );
+    setSubscriptionLimits(limitsData as any);
 
-      // Calculate stats
-      const now = new Date();
-      const premiumCount = usersData?.filter(u => u.subscription_tier === 'premium').length || 0;
-      const basicCount = usersData?.filter(u => u.subscription_tier === 'basic').length || 0;
-      const trialCount = usersData?.filter(u => 
-        u.subscription_tier === 'free' && u.trial_end_date && new Date(u.trial_end_date) > now
+    // Fetch patients count
+    const patientsCount = await safeFetch(
+      "patients",
+      async () => (await pb.collection("patients").getList(1, 1)).totalItems,
+      0,
+    );
+
+    // Calculate stats
+    const now = new Date();
+    const premiumCount = usersData?.filter((u: any) => u.subscription_tier === "premium").length || 0;
+    const basicCount = usersData?.filter((u: any) => u.subscription_tier === "basic").length || 0;
+    const trialCount =
+      usersData?.filter(
+        (u: any) => u.subscription_tier === "free" && u.trial_end_date && new Date(u.trial_end_date) > now,
       ).length || 0;
-      const freeCount = usersData?.filter(u => 
-        u.subscription_tier === 'free' && (!u.trial_end_date || new Date(u.trial_end_date) <= now)
+    const freeCount =
+      usersData?.filter(
+        (u: any) =>
+          u.subscription_tier === "free" && (!u.trial_end_date || new Date(u.trial_end_date) <= now),
       ).length || 0;
-      const pendingTraitementsCount = traitementsData?.filter(t => t.is_shared && !t.is_validated).length || 0;
-      const pendingExercicesCount = exercicesData?.filter(e => e.status === 'pending').length || 0;
+    const pendingTraitementsCount = traitementsData?.filter((t: any) => t.is_shared && !t.is_validated).length || 0;
+    const pendingExercicesCount = exercicesData?.filter((e: any) => e.status === "pending").length || 0;
 
-      // Fetch patients count
-      const patientsCount = (await pb.collection("patients").getList(1, 1)).totalItems;
+    setStats({
+      totalUsers: usersData?.length || 0,
+      premiumUsers: premiumCount,
+      basicUsers: basicCount,
+      trialUsers: trialCount,
+      freeUsers: freeCount,
+      totalSeances: seancesData?.length || 0,
+      totalTraitements: traitementsData?.length || 0,
+      pendingTraitements: pendingTraitementsCount,
+      totalExercices: exercicesData?.length || 0,
+      pendingExercices: pendingExercicesCount,
+      totalPatients: patientsCount || 0,
+    });
 
-      setStats({
-        totalUsers: usersData?.length || 0,
-        premiumUsers: premiumCount,
-        basicUsers: basicCount,
-        trialUsers: trialCount,
-        freeUsers: freeCount,
-        totalSeances: seancesData?.length || 0,
-        totalTraitements: traitementsData?.length || 0,
-        pendingTraitements: pendingTraitementsCount,
-        totalExercices: exercicesData?.length || 0,
-        pendingExercices: pendingExercicesCount,
-        totalPatients: patientsCount || 0,
-      });
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les données.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   const updateSubscriptionTier = async (userId: string, newTier: "free" | "basic" | "premium") => {

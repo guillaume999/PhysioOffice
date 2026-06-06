@@ -26,7 +26,7 @@ interface Pathologie {
 type FilterType = "mine" | "platform" | "shared";
 
 export default function Pathologies() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [pathologies, setPathologies] = useState<Pathologie[]>([]);
   const [featuredIds, setFeaturedIds] = useState<string[]>([]);
@@ -112,9 +112,12 @@ export default function Pathologies() {
     .map((p) => p.original_id);
 
   const filtered = pathologies.filter((p) => {
+    // Visibilité globale : les non-admins ne voient jamais les pathologies marquées is_hidden_from_list.
+    if (!isAdmin && p.is_hidden_from_list) return false;
+
     // Filter type
     if (filter === "mine") {
-      if (p.user_id !== user?.id || p.is_hidden_from_list) return false;
+      if (p.user_id !== user?.id) return false;
     } else if (filter === "platform") {
       if (!featuredIds.includes(p.id)) return false;
     } else if (filter === "shared") {
@@ -133,10 +136,12 @@ export default function Pathologies() {
     return true;
   });
 
+  // Pour les non-admins, on exclut les pathologies masquées (is_hidden_from_list) des compteurs.
+  const visibleForCounts = pathologies.filter((p) => isAdmin || !p.is_hidden_from_list);
   const counts = {
-    mine: pathologies.filter((p) => p.user_id === user?.id && !p.is_hidden_from_list).length,
-    platform: pathologies.filter((p) => featuredIds.includes(p.id)).length,
-    shared: pathologies.filter(
+    mine: visibleForCounts.filter((p) => p.user_id === user?.id).length,
+    platform: visibleForCounts.filter((p) => featuredIds.includes(p.id)).length,
+    shared: visibleForCounts.filter(
       (p) =>
         p.is_shared &&
         p.is_validated &&
