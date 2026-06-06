@@ -49,6 +49,8 @@ export default function PatientBilanIntermediaire() {
     observations: "",
   });
 
+  const [bilanDate, setBilanDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+
   useEffect(() => {
     if (patientId && user) {
       fetchData();
@@ -76,6 +78,10 @@ export default function PatientBilanIntermediaire() {
 
         if (bilanData) {
           setExistingBilanId(bilanData.id);
+          if (bilanData.bilan_date) {
+            // Normalize to yyyy-MM-dd for the date input
+            setBilanDate(String(bilanData.bilan_date).slice(0, 10));
+          }
           // Try to parse existing data if it's JSON
           if (bilanData.content) {
             try {
@@ -117,10 +123,8 @@ export default function PatientBilanIntermediaire() {
     try {
       if (existingBilanId) {
         // Update existing bilan
-        await pb.collection("patient_bilans").update(existingBilanId, { content: bilanJson });
+        await pb.collection("patient_bilans").update(existingBilanId, { content: bilanJson, bilan_date: bilanDate });
       } else {
-        // Create new bilan with today's date
-        const todayDate = format(new Date(), "yyyy-MM-dd");
         const data = await pb.collection("patient_bilans").create({
           patient: patientId,
           traitement: traitementId || null,
@@ -128,7 +132,7 @@ export default function PatientBilanIntermediaire() {
           user: user.id,
           position_after_seance: 0,
           content: bilanJson,
-          bilan_date: todayDate,
+          bilan_date: bilanDate,
         });
         setExistingBilanId(data.id);
       }
@@ -183,6 +187,21 @@ export default function PatientBilanIntermediaire() {
         </div>
 
         <div className="space-y-6">
+          {/* Date du bilan */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Date du bilan</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                type="date"
+                value={bilanDate}
+                onChange={(e) => setBilanDate(e.target.value)}
+                className="max-w-xs"
+              />
+            </CardContent>
+          </Card>
+
           {/* Objectif intermédiaire */}
           <Card className="border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10">
             <CardHeader>
