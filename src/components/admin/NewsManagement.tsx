@@ -89,7 +89,7 @@ export function NewsManagement() {
 
   const fetchNews = async () => {
     try {
-      setNews(await pb.collection("news").getFullList({ sort: "-created" }));
+      setNews(await pb.collection("news").getFullList({ sort: "-created_at" }));
     } catch (error) {
       console.error("Error fetching news:", error);
       toast({

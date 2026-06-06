@@ -66,7 +66,7 @@ export function AnnoncesManagement() {
     setLoading(true);
     try {
       // Fetch all annonces
-      setAnnonces(await pb.collection("annonces").getFullList({ sort: "-created" }) as unknown as Annonce[]);
+      setAnnonces(await pb.collection("annonces").getFullList({ sort: "-created_at" }) as unknown as Annonce[]);
 
       const settingsRes = await pb.collection("annonce_settings").getList(1, 1, {});
       const settingsData = settingsRes.items[0] ?? null;

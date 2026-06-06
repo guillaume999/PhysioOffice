@@ -16,7 +16,7 @@ interface NewsItem {
   description: string;
   category: string;
   is_new: boolean;
-  created: string;
+  created_at: string;
 }
 
 const getCategoryColor = (category: string) => {
@@ -43,7 +43,7 @@ export default function News() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const data = await pb.collection("news").getFullList({ sort: "-created" });
+        const data = await pb.collection("news").getFullList({ sort: "-created_at" });
         setNewsItems(data as unknown as NewsItem[]);
       } catch (error) {
         console.error("Error fetching news:", error);
@@ -191,7 +191,7 @@ export default function News() {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      {format(new Date(news.created), "d MMMM yyyy", { locale: fr })}
+                      {format(new Date(news.created_at), "d MMMM yyyy", { locale: fr })}
                     </div>
                   </div>
                   <CardTitle className="text-lg">{news.title}</CardTitle>

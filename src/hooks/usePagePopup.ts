@@ -38,7 +38,7 @@ export function usePagePopup(pageKey: string) {
         setPopup(popupData as unknown as Popup);
 
         const dismissed = await pb.collection("user_dismissed_popups").getList(1, 1, {
-          filter: `popup_id = "${popupData.id}" && user = "${user.id}"`,
+          filter: `popup_id = "${popupData.id}" && user_id = "${user.id}"`,
         });
         setIsDismissed(dismissed.items.length > 0);
       } catch (err) {
@@ -57,7 +57,7 @@ export function usePagePopup(pageKey: string) {
     if (dontShowAgain) {
       try {
         await pb.collection("user_dismissed_popups").create({
-          user: user.id,
+          user_id: user.id,
           popup_id: popup.id,
         });
       } catch (err) {

@@ -112,13 +112,13 @@ export default function Annonces() {
       // Fetch all active annonces
       const annoncesData = await pb.collection("annonces").getFullList({
         filter: `is_active = true && expires_at > "${new Date().toISOString()}"`,
-        sort: "-is_featured,-created",
+        sort: "-is_featured,-created_at",
       });
       setAnnonces(annoncesData as unknown as Annonce[]);
 
       // Fetch my annonces if logged in
       if (user) {
-        const myData = await pb.collection("annonces").getFullList({ filter: `user = "${user.id}"`, sort: "-created" });
+        const myData = await pb.collection("annonces").getFullList({ filter: `user_id = "${user.id}"`, sort: "-created_at" });
         setMyAnnonces(myData as unknown as Annonce[]);
       }
     } catch (error) {
@@ -167,7 +167,7 @@ export default function Annonces() {
       const expiresAt = addDays(new Date(), settings.free_duration_days);
 
       await pb.collection("annonces").create({
-        user: user.id,
+        user_id: user.id,
         title: formTitle.trim(),
         description: formDescription.trim(),
         type: formType,
