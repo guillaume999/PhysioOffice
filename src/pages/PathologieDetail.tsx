@@ -21,7 +21,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, Loader2, Save, Trash2, X, Shield, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, X, Shield, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -174,6 +174,22 @@ export default function PathologieDetail() {
   const isOwner = !!user && !!ownerId && user.id === ownerId;
   const canEdit = isOwner || isAdmin;
   const readOnly = !canEdit;
+
+  // Ordre des pathologies issues de la liste source (Mes/Plateforme/Partagés filtrés).
+  // Stocké en sessionStorage par la page Pathologies au moment de l'ouverture du détail.
+  // Permet la navigation prev/next entre les pathologies du même contexte.
+  const [navOrder, setNavOrder] = useState<string[]>([]);
+  useEffect(() => {
+    const raw = sessionStorage.getItem("pathologies_nav_ctx");
+    if (raw) {
+      try {
+        const ctx = JSON.parse(raw);
+        if (Array.isArray(ctx.orderedIds)) setNavOrder(ctx.orderedIds);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   // Liaisons traitement_types
   const [linkedIds, setLinkedIds] = useState<string[]>([]);
@@ -370,10 +386,46 @@ export default function PathologieDetail() {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Button variant="ghost" onClick={() => navigate("/pathologies")} className="gap-2 mb-4">
-          <ArrowLeft className="w-4 h-4" />
-          Retour
-        </Button>
+        {(() => {
+          const currentIdx = id ? navOrder.indexOf(id) : -1;
+          const prevId = currentIdx > 0 ? navOrder[currentIdx - 1] : null;
+          const nextId = currentIdx >= 0 && currentIdx < navOrder.length - 1 ? navOrder[currentIdx + 1] : null;
+          return (
+            <div className="flex items-center justify-between mb-4">
+              <Button variant="ghost" onClick={() => navigate("/pathologies")} className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Retour
+              </Button>
+              {navOrder.length > 1 && currentIdx >= 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!prevId}
+                    onClick={() => prevId && navigate(`/pathologies/${prevId}`)}
+                    className="gap-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Précédente
+                  </Button>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {currentIdx + 1} / {navOrder.length}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!nextId}
+                    onClick={() => nextId && navigate(`/pathologies/${nextId}`)}
+                    className="gap-1"
+                  >
+                    Suivante
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {loading ? (
           <div className="flex justify-center py-12">

@@ -36,6 +36,22 @@ export default function Pathologies() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Restaure l'onglet et la recherche à partir de sessionStorage si on revient d'un détail.
+  useEffect(() => {
+    const raw = sessionStorage.getItem("pathologies_nav_ctx");
+    if (raw) {
+      try {
+        const ctx = JSON.parse(raw);
+        if (ctx.filter === "mine" || ctx.filter === "platform" || ctx.filter === "shared") {
+          setFilter(ctx.filter);
+        }
+        if (typeof ctx.search === "string") setSearch(ctx.search);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (user) fetchData();
   }, [user]);
@@ -254,7 +270,20 @@ export default function Pathologies() {
                 {filtered.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => navigate(`/pathologies/${p.id}`)}
+                    onClick={() => {
+                      // Sauvegarde le contexte (onglet, recherche, ordre des ids visibles)
+                      // pour permettre au détail d'offrir la navigation prev/next et au retour
+                      // de restaurer le bon onglet.
+                      sessionStorage.setItem(
+                        "pathologies_nav_ctx",
+                        JSON.stringify({
+                          filter,
+                          search,
+                          orderedIds: filtered.map((x) => x.id),
+                        })
+                      );
+                      navigate(`/pathologies/${p.id}`);
+                    }}
                     className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">
