@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +160,12 @@ export default function PathologieDetail() {
   // Visibilité plateforme (admin-only) : si true, la pathologie est masquée à tous les non-admins
   // — n'apparaît dans aucun des filtres (Mes, Plateforme, Partagés). Les admins la voient toujours.
   const [isHiddenFromList, setIsHiddenFromList] = useState(false);
+  // Pathologie plateforme : présente dans featured_pathologies → masque le toggle is_shared
+  // (la visibilité aux non-admins est gérée par is_hidden_from_list).
+  const [isPlatform, setIsPlatform] = useState(false);
+  // État initial chargé en BDD : sert à détecter "user non-admin modifie une patho déjà
+  // validée" pour reset is_shared+is_validated à la sauvegarde (re-proposition obligatoire).
+  const initialShareState = useRef<{ shared: boolean; validated: boolean }>({ shared: false, validated: false });
 
   // Auteur de la fiche : seul lui (ou un admin) peut modifier.
   // Les pathologies plateforme sont donc en lecture seule pour les autres utilisateurs.
@@ -196,6 +202,18 @@ export default function PathologieDetail() {
       setIsShared(!!rec.is_shared);
       setIsValidated(!!rec.is_validated);
       setIsHiddenFromList(!!rec.is_hidden_from_list);
+      initialShareState.current = { shared: !!rec.is_shared, validated: !!rec.is_validated };
+
+      // Détection plateforme : un id présent dans featured_pathologies.
+      try {
+        const fp = await pb.collection("featured_pathologies").getFullList({
+          filter: `pathologie = "${id}"`,
+          fields: "id",
+        });
+        setIsPlatform((fp as any[]).length > 0);
+      } catch {
+        setIsPlatform(false);
+      }
 
       // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
       const [mine, featured] = await Promise.all([
@@ -254,20 +272,46 @@ export default function PathologieDetail() {
         description: buildDescription(sections),
         traitement,
         traitement_types: linkedIds,
-        is_shared: isShared,
-        // Un admin coche/décoche → validation suit la visibilité.
-        // Un user non-admin ne peut pas modifier is_validated, on conserve la valeur courante.
-        is_validated: isAdmin ? isShared : isValidated,
+        // Workflow validation : si user non-admin modifie une patho qui était déjà
+        // is_shared+is_validated, on remet les deux à false (la copie validée existante
+        // est conservée intacte côté Admin, mais l'original doit être re-proposé).
+        ...(() => {
+          const wasValidatedShared = initialShareState.current.shared && initialShareState.current.validated;
+          if (!isAdmin && wasValidatedShared) {
+            return { is_shared: false, is_validated: false };
+          }
+          // Admin : is_shared est piloté par lui ; is_validated est géré dans la section Admin (toggle dédié à venir).
+          return { is_shared: isShared, is_validated: isValidated };
+        })(),
         // Toggle admin-only "masqué aux non-admins". Le Switch n'est rendu que pour isAdmin,
         // donc isHiddenFromList reste sur la valeur chargée pour un non-admin.
         is_hidden_from_list: isHiddenFromList,
       });
+      // Si on a reset is_shared/is_validated, on synchronise l'UI locale + la ref.
+      if (!isAdmin && initialShareState.current.shared && initialShareState.current.validated) {
+        setIsShared(false);
+        setIsValidated(false);
+        initialShareState.current = { shared: false, validated: false };
+      }
       toast.success("Enregistré");
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Autosave d'un sous-ensemble de champs (utilisé par les toggles).
+  // Met à jour la BDD immédiatement sans bloquer l'UI principal.
+  const saveField = async (patch: Record<string, unknown>) => {
+    if (!id) return;
+    try {
+      await pb.collection("pathologies").update(id, patch);
+      toast.success("Enregistré");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur d'enregistrement");
     }
   };
 
@@ -388,6 +432,7 @@ export default function PathologieDetail() {
                 </div>
               </div>
 
+              {!isPlatform && (
               <div className="flex items-start justify-between gap-3 rounded-md border p-3">
                 <div className="space-y-1">
                   <Label htmlFor="is-shared" className="text-sm font-medium">
@@ -395,7 +440,7 @@ export default function PathologieDetail() {
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     {isAdmin
-                      ? "En tant qu'admin, activer cette option valide et publie la pathologie pour tous."
+                      ? "Marque la pathologie comme partagée. La validation se fait dans la section Admin (création d'une copie publique)."
                       : "Soumet la pathologie au partage. Un administrateur doit ensuite la valider."}
                   </p>
                   {isShared && !isValidated && !isAdmin && (
@@ -407,10 +452,16 @@ export default function PathologieDetail() {
                 <Switch
                   id="is-shared"
                   checked={isShared}
-                  onCheckedChange={setIsShared}
+                  onCheckedChange={(v) => {
+                    setIsShared(v);
+                    // is_validated n'est plus couplé : il sera piloté par un toggle admin dédié
+                    // dans la section Admin (qui déclenchera aussi la duplication en partagé).
+                    saveField({ is_shared: v });
+                  }}
                   disabled={readOnly}
                 />
               </div>
+              )}
 
               {isAdmin && (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20 p-3">
@@ -427,7 +478,11 @@ export default function PathologieDetail() {
                   <Switch
                     id="is-visible-non-admin"
                     checked={!isHiddenFromList}
-                    onCheckedChange={(v) => setIsHiddenFromList(!v)}
+                    onCheckedChange={(v) => {
+                      const hidden = !v;
+                      setIsHiddenFromList(hidden);
+                      saveField({ is_hidden_from_list: hidden });
+                    }}
                   />
                 </div>
               )}
