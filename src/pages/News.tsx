@@ -43,7 +43,7 @@ export default function News() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const data = await pb.collection("news").getFullList({ sort: "-created_at" });
+        const data = await pb.collection("news").getFullList({ sort: "-id" });
         setNewsItems(data as unknown as NewsItem[]);
       } catch (error) {
         console.error("Error fetching news:", error);

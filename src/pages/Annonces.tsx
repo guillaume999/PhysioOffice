@@ -34,7 +34,7 @@ import { fr } from "date-fns/locale";
 
 interface Annonce {
   id: string;
-  user_id: string;
+  user: string;
   title: string;
   description: string;
   type: AnnonceType;
@@ -112,13 +112,13 @@ export default function Annonces() {
       // Fetch all active annonces
       const annoncesData = await pb.collection("annonces").getFullList({
         filter: `is_active = true && expires_at > "${new Date().toISOString()}"`,
-        sort: "-is_featured,-created_at",
+        sort: "-is_featured,-id",
       });
       setAnnonces(annoncesData as unknown as Annonce[]);
 
       // Fetch my annonces if logged in
       if (user) {
-        const myData = await pb.collection("annonces").getFullList({ filter: `user_id = "${user.id}"`, sort: "-created_at" });
+        const myData = await pb.collection("annonces").getFullList({ filter: `user = "${user.id}"`, sort: "-id" });
         setMyAnnonces(myData as unknown as Annonce[]);
       }
     } catch (error) {
@@ -167,7 +167,7 @@ export default function Annonces() {
       const expiresAt = addDays(new Date(), settings.free_duration_days);
 
       await pb.collection("annonces").create({
-        user_id: user.id,
+        user: user.id,
         title: formTitle.trim(),
         description: formDescription.trim(),
         type: formType,
@@ -522,7 +522,7 @@ export default function Annonces() {
                       </div>
                     </div>
 
-                    {showMyAnnonces && annonce.user_id === user?.id && (
+                    {showMyAnnonces && annonce.user === user?.id && (
                       <Button
                         variant="destructive"
                         size="sm"
