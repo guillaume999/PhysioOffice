@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -66,11 +67,11 @@ const CATEGORIES = [
 // Sections internes structurées du champ `description` (Markdown).
 // Ordre = ordre d'affichage et de stockage.
 const SECTIONS = [
+  { key: "traitement_kine", label: "Traitement kiné" },
+  { key: "bilan", label: "Bilan" },
   { key: "description", label: "Description" },
   { key: "traitement_orthopedique", label: "Traitement orthopédique" },
   { key: "traitement_chirurgical", label: "Traitement chirurgical" },
-  { key: "bilan", label: "Bilan" },
-  { key: "traitement_kine", label: "Traitement kiné" },
   { key: "complications", label: "Complications" },
   { key: "contre_indications", label: "Contre-indications" },
   { key: "evolution_delais", label: "Évolution & délais" },
@@ -136,7 +137,7 @@ function parseDescription(md: string): Record<SectionKey, string> {
 
 export default function PathologieDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -152,12 +153,15 @@ export default function PathologieDetail() {
   // Champ legacy `traitement` (texte libre) — conservé pour rétrocompat.
   const [traitement, setTraitement] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Visibilité : un admin peut basculer is_shared + is_validated en un clic.
+  // Pour un user non-admin propriétaire, seul is_shared est piloté (validation reste à un admin).
+  const [isShared, setIsShared] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
 
   // Auteur de la fiche : seul lui (ou un admin) peut modifier.
   // Les pathologies plateforme sont donc en lecture seule pour les autres utilisateurs.
   const [ownerId, setOwnerId] = useState<string>("");
   const [authorName, setAuthorName] = useState<string>("");
-  const isAdmin = (user as any)?.role === "admin";
   const isOwner = !!user && !!ownerId && user.id === ownerId;
   const canEdit = isOwner || isAdmin;
   const readOnly = !canEdit;
@@ -186,6 +190,8 @@ export default function PathologieDetail() {
       setLinkedIds(Array.isArray(rec.traitement_types) ? rec.traitement_types : []);
       setOwnerId(rec.user || "");
       setAuthorName(rec.author_name || "");
+      setIsShared(!!rec.is_shared);
+      setIsValidated(!!rec.is_validated);
 
       // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
       const [mine, featured] = await Promise.all([
@@ -244,6 +250,10 @@ export default function PathologieDetail() {
         description: buildDescription(sections),
         traitement,
         traitement_types: linkedIds,
+        is_shared: isShared,
+        // Un admin coche/décoche → validation suit la visibilité.
+        // Un user non-admin ne peut pas modifier is_validated, on conserve la valeur courante.
+        is_validated: isAdmin ? isShared : isValidated,
       });
       toast.success("Enregistré");
     } catch (e) {
@@ -369,6 +379,30 @@ export default function PathologieDetail() {
                     disabled={readOnly}
                   />
                 </div>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 rounded-md border p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="is-shared" className="text-sm font-medium">
+                    Visible par les autres utilisateurs
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {isAdmin
+                      ? "En tant qu'admin, activer cette option valide et publie la pathologie pour tous."
+                      : "Soumet la pathologie au partage. Un administrateur doit ensuite la valider."}
+                  </p>
+                  {isShared && !isValidated && !isAdmin && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      En attente de validation par un administrateur.
+                    </p>
+                  )}
+                </div>
+                <Switch
+                  id="is-shared"
+                  checked={isShared}
+                  onCheckedChange={setIsShared}
+                  disabled={readOnly}
+                />
               </div>
 
               <div className="space-y-2">
