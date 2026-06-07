@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
+import { parseJsonField } from "@/lib/utils";
 import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
 
 interface BilanEntry {
@@ -129,7 +130,10 @@ export default function PatientBilanInitial() {
   const [patientName, setPatientName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  // Bloque les sauvegardes si on n'a pas pu charger un bilan existant
+  // (évite d'écraser des données réelles avec un formulaire vide).
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const [bilan, setBilan] = useState<BilanData>(defaultBilan);
 
   useEffect(() => {
@@ -158,13 +162,19 @@ export default function PatientBilanInitial() {
     } catch { /* none yet */ }
 
     if (carePlan?.bilan_initial_data) {
-      try {
-        const parsed = JSON.parse(carePlan.bilan_initial_data);
-        if (typeof parsed === "object") {
-          setBilan({ ...defaultBilan, ...parsed });
-        }
-      } catch {
-        // If parsing fails, start fresh
+      // PB SDK renvoie un objet (champ type "json"). Anciens records peuvent contenir une string.
+      const parsed = parseJsonField<Partial<BilanData>>(carePlan.bilan_initial_data);
+      if (parsed && typeof parsed === "object") {
+        setBilan({ ...defaultBilan, ...parsed });
+      } else {
+        // Donnée présente en base mais illisible : ne JAMAIS sauvegarder par-dessus.
+        console.error("[BilanInitial] Impossible de parser bilan_initial_data", carePlan.bilan_initial_data);
+        setLoadFailed(true);
+        toast({
+          title: "Bilan illisible",
+          description: "Un bilan existe en base mais n'a pas pu être chargé. La sauvegarde est bloquée pour ne rien écraser. Contactez l'administrateur.",
+          variant: "destructive",
+        });
       }
     }
 
@@ -173,6 +183,14 @@ export default function PatientBilanInitial() {
 
   const handleSave = async () => {
     if (!id || !user) return;
+    if (loadFailed) {
+      toast({
+        title: "Sauvegarde bloquée",
+        description: "Le bilan existant n'a pas pu être lu — on ne l'écrase pas.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
 
     const bilanJson = JSON.stringify(bilan);

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight, AlertTriangle } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +22,7 @@ import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDia
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { instantiateTraitementForPatient } from "@/lib/patientTraitement";
+import { parseJsonField } from "@/lib/utils";
 
 interface PatientData {
   id: string;
@@ -151,16 +152,9 @@ export default function PatientDetail() {
       });
 
       // Parse bilan initial data
-      if (data.bilan_initial_data) {
-        try {
-          const parsed = JSON.parse(data.bilan_initial_data);
-          setBilanInitialData(parsed);
-        } catch {
-          setBilanInitialData(null);
-        }
-      } else {
-        setBilanInitialData(null);
-      }
+      // PB SDK renvoie un objet (champ "json"), mais d'anciens records peuvent être en string.
+      const parsedBilan = parseJsonField<Record<string, any>>(data.bilan_initial_data);
+      setBilanInitialData(parsedBilan);
       
       // Treatment summary is loaded from the patient instance below (independent of care_plan).
     } else {
@@ -511,24 +505,44 @@ export default function PatientDetail() {
           />
         </div>
 
-        {/* Antécédents Card */}
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <History className="w-5 h-5 text-amber-500" />
-              <CardTitle className="text-lg">Antécédents</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              placeholder="Antécédents médicaux, chirurgicaux, familiaux..."
-              value={formData.antecedents || ""}
-              onChange={(e) => setFormData({ ...formData, antecedents: e.target.value })}
-              onBlur={handleAutoSave}
-              className="min-h-[120px]"
-            />
-          </CardContent>
-        </Card>
+        {/* Antécédents & Allergies Cards */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-amber-500" />
+                <CardTitle className="text-lg">Antécédents</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Antécédents médicaux, chirurgicaux, familiaux..."
+                value={formData.antecedents || ""}
+                onChange={(e) => setFormData({ ...formData, antecedents: e.target.value })}
+                onBlur={handleAutoSave}
+                className="min-h-[120px]"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                <CardTitle className="text-lg">Allergies</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Allergies médicamenteuses, alimentaires, environnementales..."
+                value={formData.allergies || ""}
+                onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                onBlur={handleAutoSave}
+                className="min-h-[120px]"
+              />
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="mt-6">
           <CardHeader>
