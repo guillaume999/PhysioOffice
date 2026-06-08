@@ -108,7 +108,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
     if (!user) return;
 
     // Fetch user pseudo
-    setUserPseudo(pb.authStore.record?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch pathologies
     const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
