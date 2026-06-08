@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Printer, Trash2, FileText, Edit, Save, X, BookTemplate, Star } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2, FileText, Edit, Save, X, BookTemplate, Star, LayoutTemplate } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,42 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface TemplateField {
+  key: string;
+  label: string;
+  type: "input" | "textarea";
+  placeholder: string;
+}
+
+const CERTIFICAT_MEDICAL_FIELDS: TemplateField[] = [
+  { key: "NOM_KINE", label: "Nom du praticien", type: "input", placeholder: "Dupont Jean" },
+  { key: "DATE_EXAMEN", label: "Date d'examen (en toutes lettres)", type: "input", placeholder: "le huit juin deux mille vingt-six" },
+  { key: "HEURE_EXAMEN", label: "Heure d'examen", type: "input", placeholder: "9 heures 30" },
+  { key: "LIEU_EXAMEN", label: "Lieu d'examen (cabinet, service hospitalier, domicile, autre)", type: "input", placeholder: "cabinet" },
+  { key: "NOM_PATIENT", label: "Nom et prénom du patient", type: "input", placeholder: "MARTIN Sophie" },
+  { key: "DATE_NAISSANCE", label: "Date de naissance (en toutes lettres)", type: "input", placeholder: "le quinze mars mil neuf cent quatre-vingt-dix" },
+  { key: "CONSTATATIONS", label: "Constatations cliniques", type: "textarea", placeholder: "Décrivez vos constatations..." },
+  { key: "MOTIF", label: "Motif du certificat", type: "input", placeholder: "demande du patient" },
+  { key: "LIEU_CERTIFICAT", label: "Fait à (lieu)", type: "input", placeholder: "Paris" },
+  { key: "DATE_CERTIFICAT", label: "Le (date)", type: "input", placeholder: "8 juin 2026" },
+];
+
+const renderCertificatMedical = (params: Record<string, string>): string => {
+  const g = (key: string, blank: string) => params[key]?.trim() || blank;
+  return `Je, soussigné(e) ${g("NOM_KINE", "_______________________________________________")}, masseur-kinésithérapeute,
+certifie avoir examiné le (date en toutes lettres) ${g("DATE_EXAMEN", "___________________________________________")}
+à ${g("HEURE_EXAMEN", "_____ heure_____")}, à (Lieu : cabinet, service hospitalier, domicile, autre)
+${g("LIEU_EXAMEN", "_____________________________________________________________")}, Madame ou Monsieur
+(nom - prénom) ${g("NOM_PATIENT", "________________________________________________")} né le (date de naissance en
+toutes lettres) ${g("DATE_NAISSANCE", "____________________________________________________")} et avoir constaté que
+${g("CONSTATATIONS", "__________________________________________________________________________________\n__________________________________________________________________________________\n__________________________________________________________________________________\n__________________________________________________________________________________\n__________________________________________________________________________________\n__________________________________________________________________________________\n__________________________________________________________________________________")}.
+Ce certificat est établi au motif de ${g("MOTIF", "________________________________")}.
+Fait à ${g("LIEU_CERTIFICAT", "_______________________")} le ${g("DATE_CERTIFICAT", "______________________")}
+Remis en main propre
+Signature
+_______________________________`;
+};
+
 interface Certificat {
   id: string;
   title: string;
@@ -39,7 +75,7 @@ interface CertificatModel {
   title: string;
   content: string;
   is_platform: boolean;
-  user_id: string;
+  user: string;
 }
 
 export default function PatientCertificats() {
@@ -55,6 +91,8 @@ export default function PatientCertificats() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [templateMode, setTemplateMode] = useState(false);
+  const [templateParams, setTemplateParams] = useState<Record<string, string>>({});
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printingCertificat, setPrintingCertificat] = useState<Certificat | null>(null);
   const [includeDate, setIncludeDate] = useState(true);
@@ -95,10 +133,11 @@ export default function PatientCertificats() {
 
   const handleAddCertificat = async () => {
     if (!newTitle.trim() || !user) return;
+    const content = templateMode ? renderCertificatMedical(templateParams) : newContent;
 
     try {
       const data = await pb.collection("notes").create({
-          title: newTitle, content: newContent, patient: patientId, user: user.id,
+          title: newTitle, content, patient: patientId, user: user.id,
         });
       setCertificats([
         {
@@ -111,6 +150,8 @@ export default function PatientCertificats() {
       ]);
       setNewTitle("");
       setNewContent("");
+      setTemplateMode(false);
+      setTemplateParams({});
       toast.success("Certificat ajouté");
     } catch (error) {
       console.error("Error adding certificat:", error);
@@ -168,7 +209,20 @@ export default function PatientCertificats() {
   const handleSelectModel = (model: CertificatModel) => {
     setNewTitle(model.title);
     setNewContent(model.content);
+    setTemplateMode(false);
+    setTemplateParams({});
     toast.success("Modèle appliqué");
+  };
+
+  const activateTemplate = () => {
+    if (!newTitle.trim()) setNewTitle("Certificat médical");
+    setTemplateMode(true);
+    setTemplateParams({});
+  };
+
+  const switchToFreeText = () => {
+    setNewContent(renderCertificatMedical(templateParams));
+    setTemplateMode(false);
   };
 
   const handleSaveAsModel = async (certificat: Certificat) => {
@@ -267,7 +321,7 @@ export default function PatientCertificats() {
     setPrintingCertificat(null);
   };
 
-  const userModels = models.filter((m) => !m.is_platform && m.user_id === user?.id);
+  const userModels = models.filter((m) => !m.is_platform && m.user === user?.id);
   const platformModels = models.filter((m) => m.is_platform);
 
   if (isLoading) {
@@ -360,13 +414,64 @@ export default function PatientCertificats() {
               />
             </div>
             <div>
-              <Label>Contenu</Label>
-              <Textarea
-                placeholder="Rédigez le contenu du certificat..."
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                className="mt-1 min-h-[150px]"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <Label>Contenu</Label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant={templateMode ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={activateTemplate}
+                  >
+                    <LayoutTemplate className="w-3 h-3 mr-1" />
+                    Certificat médical
+                  </Button>
+                  {templateMode && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={switchToFreeText}
+                    >
+                      Texte libre
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {templateMode ? (
+                <div className="border rounded-md p-4 space-y-3 bg-muted/20">
+                  {CERTIFICAT_MEDICAL_FIELDS.map((field) => (
+                    <div key={field.key}>
+                      <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                      {field.type === "textarea" ? (
+                        <Textarea
+                          value={templateParams[field.key] || ""}
+                          onChange={(e) => setTemplateParams((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                          className="mt-0.5 min-h-[80px] text-sm"
+                          placeholder={field.placeholder}
+                        />
+                      ) : (
+                        <Input
+                          value={templateParams[field.key] || ""}
+                          onChange={(e) => setTemplateParams((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                          className="mt-0.5 h-8 text-sm"
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Textarea
+                  placeholder="Rédigez le contenu du certificat..."
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  className="mt-1 min-h-[150px]"
+                />
+              )}
             </div>
             <Button onClick={handleAddCertificat} disabled={!newTitle.trim()}>
               <Plus className="w-4 h-4 mr-2" />
