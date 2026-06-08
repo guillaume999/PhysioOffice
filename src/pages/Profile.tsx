@@ -37,17 +37,25 @@ export default function Profile() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      const rec = pb.authStore.record;
-      if (rec) {
+    if (!user) return;
+    pb.collection("users").getOne(user.id)
+      .then((rec) => {
         setFirstName(rec.first_name || "");
         setLastName(rec.last_name || "");
         setSpecialty(rec.specialty || "");
         setPseudo(rec.pseudo || "");
-      }
-      setLoading(false);
-    }
-  }, [user]);
+      })
+      .catch(() => {
+        const rec = pb.authStore.record;
+        if (rec) {
+          setFirstName(rec.first_name || "");
+          setLastName(rec.last_name || "");
+          setSpecialty(rec.specialty || "");
+          setPseudo(rec.pseudo || "");
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [user?.id]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -95,7 +95,7 @@ export function AddExerciceToSeanceDialog({
     setLoading(true);
 
     // Fetch user pseudo
-    setUserPseudo(pb.authStore.record?.pseudo || null);
+    setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch exercices (user's own exercices)
     const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url" });

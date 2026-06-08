@@ -180,7 +180,7 @@ export default function Exercices() {
     try {
       // Fetch user profile
       const rec = pb.authStore.record;
-      setUserPseudo(rec?.pseudo || null);
+      setUserPseudo(rec?.pseudo || rec?.name || rec?.email || null);
       setUserCanShare(rec?.can_share !== false);
 
       const userFilter = user ? `user = "${user.id}"` : undefined;
