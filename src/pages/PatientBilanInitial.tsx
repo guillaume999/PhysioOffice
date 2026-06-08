@@ -74,6 +74,12 @@ interface BilanData {
   
   // Commentaires
   commentaires: string;
+
+  // Champs d'identification (pour impression)
+  nom: string;
+  prenom: string;
+  date_naissance: string;
+  date_bilan: string;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -120,6 +126,10 @@ const defaultBilan: BilanData = {
   force_musculaire: "",
   tests_specifiques: "",
   commentaires: "",
+  nom: "",
+  prenom: "",
+  date_naissance: "",
+  date_bilan: "",
 };
 
 export default function PatientBilanInitial() {
@@ -161,11 +171,32 @@ export default function PatientBilanInitial() {
       carePlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
     } catch { /* none yet */ }
 
+    const fullName = patient?.name ?? "";
+    // Split patient name into nom (last word) and prenom (everything before).
+    // Auto-populate only when the stored bilan doesn't already have nom/prenom.
+    const splitName = (name: string) => {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length === 1) return { nom: parts[0], prenom: "" };
+      const nom = parts[parts.length - 1];
+      const prenom = parts.slice(0, -1).join(" ");
+      return { nom, prenom };
+    };
+
     if (carePlan?.bilan_initial_data) {
       // PB SDK renvoie un objet (champ type "json"). Anciens records peuvent contenir une string.
       const parsed = parseJsonField<Partial<BilanData>>(carePlan.bilan_initial_data);
       if (parsed && typeof parsed === "object") {
-        setBilan({ ...defaultBilan, ...parsed });
+        const merged = { ...defaultBilan, ...parsed };
+        // Auto-populate nom/prenom from patient name if not yet stored in the bilan.
+        if (!merged.nom && !merged.prenom && fullName) {
+          Object.assign(merged, splitName(fullName));
+        }
+        // Fall back to the care plan's last-updated timestamp when date_bilan is absent
+        // (bilans saved before this field was introduced).
+        if (!merged.date_bilan && carePlan.updated) {
+          merged.date_bilan = new Date(carePlan.updated).toLocaleDateString("fr-FR");
+        }
+        setBilan(merged);
       } else {
         // Donnée présente en base mais illisible : ne JAMAIS sauvegarder par-dessus.
         console.error("[BilanInitial] Impossible de parser bilan_initial_data", carePlan.bilan_initial_data);
@@ -176,6 +207,9 @@ export default function PatientBilanInitial() {
           variant: "destructive",
         });
       }
+    } else if (fullName) {
+      // New bilan — pre-populate nom/prenom from the patient record.
+      setBilan(prev => ({ ...prev, ...splitName(fullName) }));
     }
 
     setLoading(false);
@@ -193,7 +227,9 @@ export default function PatientBilanInitial() {
     }
     setSaving(true);
 
-    const bilanJson = JSON.stringify(bilan);
+    const savedBilan = { ...bilan, date_bilan: new Date().toLocaleDateString("fr-FR") };
+    setBilan(savedBilan);
+    const bilanJson = JSON.stringify(savedBilan);
 
     let existingPlan: any = null;
     try {
@@ -305,19 +341,21 @@ export default function PatientBilanInitial() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <Label className="font-semibold">Nom :</Label>
-                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">{bilan.nom}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label className="font-semibold">Prénom :</Label>
-                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">{bilan.prenom}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label className="font-semibold">Date de naissance :</Label>
-                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">
+                    {bilan.date_naissance ? new Date(bilan.date_naissance).toLocaleDateString("fr-FR") : ""}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label className="font-semibold">Date :</Label>
-                  <div className="flex-1 border-b border-foreground min-h-[1.5rem]"></div>
+                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">{bilan.date_bilan}</span>
                 </div>
               </div>
             </CardContent>
@@ -332,6 +370,35 @@ export default function PatientBilanInitial() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 print:space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:gap-2 print:hidden">
+                <div>
+                  <Label>Nom</Label>
+                  <Input
+                    placeholder="Nom de famille"
+                    value={bilan.nom}
+                    onChange={(e) => handleChange("nom", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Prénom</Label>
+                  <Input
+                    placeholder="Prénom"
+                    value={bilan.prenom}
+                    onChange={(e) => handleChange("prenom", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Date de naissance</Label>
+                  <Input
+                    type="date"
+                    value={bilan.date_naissance}
+                    onChange={(e) => handleChange("date_naissance", e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:gap-2">
                 <div>
                   <Label>Profession</Label>
