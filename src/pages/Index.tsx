@@ -53,16 +53,16 @@ export default function Index() {
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">Plateforme médicale intelligente</span>
             </div>
-            
+
             <h1 className="text-3xl md:text-5xl lg:text-7xl font-display font-bold mb-4 md:mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
               Votre cabinet kiné
               <span className="text-gradient block mt-2">simplifié</span>
             </h1>
-            
+
             <p className="text-base md:text-xl text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto animate-fade-up px-4" style={{ animationDelay: "0.2s" }}>
               Gérez vos patients, accédez à votre vidéothèque, utilisez l'IA pour vos diagnostics et organisez vos notes en un seul endroit.
             </p>
-            
+
             {!user && (
               <Link
                 to="/auth"
@@ -74,6 +74,7 @@ export default function Index() {
               </Link>
             )}
           </div>
+
         </div>
       </section>
 

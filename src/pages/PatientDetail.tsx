@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight, AlertTriangle, Plus } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -460,7 +460,7 @@ export default function PatientDetail() {
         </div>
 
         {/* Lien vers le traitement actif */}
-        <Card 
+        <Card
           className="cursor-pointer hover:bg-accent/50 transition-colors"
           onClick={() => navigate(`/patients/${id}/traitement-actif`)}
         >
@@ -477,7 +477,20 @@ export default function PatientDetail() {
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                {!activeTraitementName && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={(e) => { e.stopPropagation(); setSelectTraitementDialogOpen(true); }}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Créer
+                  </Button>
+                )}
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </div>
             </div>
           </CardContent>
         </Card>
