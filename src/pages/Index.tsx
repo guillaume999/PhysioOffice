@@ -42,7 +42,7 @@ export default function Index() {
   return (
     <Layout>
       <PagePopup pageKey="home" />
-      <section className="relative overflow-hidden py-12 md:py-20 lg:py-32">
+      <section className="relative overflow-hidden py-6 md:py-10 lg:py-16">
         <div className="absolute inset-0 gradient-primary opacity-5" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
@@ -78,7 +78,7 @@ export default function Index() {
       </section>
 
       {/* Features Grid */}
-      <div className="py-12 md:py-20 bg-muted/30">
+      <div className="py-6 md:py-10 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-4xl font-display font-bold mb-4">
