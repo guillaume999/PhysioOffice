@@ -6,6 +6,7 @@ Entries were collected by scanning the repository for `TODO` and `FIXME` comment
 
 ## Current items
 
+- quand on crée un nouveau compte, s'il n'y a pas des chiffres et caractères spéciaux, ou autres (comme un nombre minimal de caractères), il n'est pas clairement indiqué qu'il faut ces conditions, il y a juste un message d'erreur
 - `index.html` (approx. line 14)
   - Comment: "TODO: Update og:title to match your application name"
   - Action: Update the `<meta property="og:title" ...>` value to your product/app name (for example: "PhysioOffice") and verify other Open Graph tags.
