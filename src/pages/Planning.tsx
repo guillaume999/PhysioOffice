@@ -371,6 +371,31 @@ export default function Planning() {
       )
     : TIME_SLOTS;
 
+  // Pre-compute rowSpan so each appointment occupies the correct number of 15-min rows
+  const slotDaySpanMap: { skip: boolean; rowSpan: number }[][] = visibleSlots.map(() =>
+    displayDays.map(() => ({ skip: false, rowSpan: 1 }))
+  );
+  visibleSlots.forEach((slot, slotIdx) => {
+    displayDays.forEach((day, dayIdx) => {
+      if (slotDaySpanMap[slotIdx][dayIdx].skip) return;
+      const starting = appointments.filter(apt => {
+        const s = parseISO(apt.start_time);
+        return isSameDay(s, day) && s.getHours() === slot.hours && s.getMinutes() === slot.minutes;
+      });
+      if (starting.length === 0) return;
+      const durationMin = Math.max(15, Math.round(
+        (parseISO(starting[0].end_time).getTime() - parseISO(starting[0].start_time).getTime()) / 60000
+      ));
+      const numSlots = Math.round(durationMin / 15);
+      slotDaySpanMap[slotIdx][dayIdx].rowSpan = numSlots;
+      for (let i = 1; i < numSlots; i++) {
+        if (slotIdx + i < visibleSlots.length) {
+          slotDaySpanMap[slotIdx + i][dayIdx].skip = true;
+        }
+      }
+    });
+  });
+
   return (
     <Layout>
       <PagePopup pageKey="planning" />
@@ -473,50 +498,59 @@ export default function Planning() {
                 </thead>
                 <tbody>
                   {visibleSlots.map((slot, slotIdx) => (
-                    <tr key={slotIdx} className={slot.minutes === 0 ? "border-t-2" : ""}>
-                      <td className="border p-1 text-xs text-muted-foreground text-center bg-muted/30">
-                        {slot.minutes === 0 ? slot.label : ""}
+                    <tr key={slotIdx} className={slot.minutes === 0 ? "border-t-2" : slot.minutes === 30 ? "border-t border-border/40" : "border-t border-border/20"}>
+                      <td className="border-r border-b bg-muted/30 select-none w-16 p-0 pr-1 align-top">
+                        <span className={slot.minutes === 0
+                          ? "text-[11px] font-semibold text-foreground/80 block leading-none pt-px"
+                          : "text-[9px] text-muted-foreground/50 block leading-none pt-px"
+                        }>
+                          {slot.label.replace(":", "h")}
+                        </span>
                       </td>
                       {displayDays.map((day, dayIdx) => {
+                        const spanInfo = slotDaySpanMap[slotIdx][dayIdx];
+                        if (spanInfo.skip) return null;
                         const slotAppointments = getAppointmentsForSlot(day, slot);
+                        const rowSpan = spanInfo.rowSpan;
                         return (
-                          <td 
-                            key={dayIdx} 
+                          <td
+                            key={dayIdx}
+                            rowSpan={rowSpan > 1 ? rowSpan : undefined}
                             className={`border p-0.5 h-8 cursor-pointer hover:bg-primary/5 transition-colors relative ${
                               isSameDay(day, new Date()) ? "bg-primary/5" : ""
                             }`}
                             onClick={() => slotAppointments.length === 0 && handleSlotClick(day, slot)}
                           >
                             {slotAppointments.map((apt) => (
-                              <div 
+                              <div
                                 key={apt.id}
-                                className="absolute inset-0.5 bg-primary/20 border border-primary/30 rounded text-xs p-1 overflow-hidden"
+                                className="absolute inset-0.5 bg-primary/20 border border-primary/30 rounded text-xs p-1 overflow-hidden flex flex-col"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="font-medium truncate flex-1">{apt.patient?.name || "Patient"}</span>
                                   <div className="flex gap-0.5 shrink-0 print:hidden">
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
                                       className="h-5 w-5 p-0 bg-primary/20 hover:bg-primary/40"
                                       onClick={() => handleAddToPatientTreatment(apt)}
                                       title="Ajouter séance au traitement"
                                     >
                                       <Plus className="h-3 w-3" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
                                       className="h-5 w-5 p-0 bg-primary/20 hover:bg-primary/40"
                                       onClick={() => handleEditAppointment(apt)}
                                       title="Modifier le rendez-vous"
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
                                       className="h-5 w-5 p-0 bg-destructive/20 hover:bg-destructive/40 text-destructive"
                                       onClick={() => handleDeleteAppointment(apt.id)}
                                       title="Supprimer le rendez-vous"
@@ -525,6 +559,11 @@ export default function Planning() {
                                     </Button>
                                   </div>
                                 </div>
+                                {rowSpan >= 2 && (
+                                  <div className="text-[10px] text-primary/70 mt-0.5 print:hidden">
+                                    {format(parseISO(apt.start_time), "HH:mm")} – {format(parseISO(apt.end_time), "HH:mm")}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </td>
