@@ -15,12 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import { AdminPasswordConfirmDialog } from "@/components/admin/AdminPasswordConfirmDialog";
 import { ExerciceDetailDialog } from "@/components/admin/ExerciceDetailDialog";
 import { RejectExerciceDialog } from "@/components/admin/RejectExerciceDialog";
-import { 
-  Users, 
-  FileText, 
-  Search, 
-  Crown, 
-  Clock, 
+import {
+  Users,
+  FileText,
+  Search,
+  Crown,
+  Clock,
   Trash2,
   Shield,
   CheckCircle,
@@ -37,6 +37,8 @@ import {
   Newspaper,
   Megaphone,
   MessageSquare,
+  Undo2,
+  Mail,
 } from "lucide-react";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
@@ -99,6 +101,15 @@ interface ExerciceType {
   rejection_reason?: string | null;
 }
 
+interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  created: string;
+}
+
 interface CertificatModel {
   id: string;
   user_id: string;
@@ -145,8 +156,21 @@ export default function Admin() {
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [exercices, setExercices] = useState<ExerciceType[]>([]);
   const [certificatModels, setCertificatModels] = useState<CertificatModel[]>([]);
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
+  const [consultedTraitementIds, setConsultedTraitementIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`admin_consulted_traitements_${user?.id}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const [consultedSeanceIds, setConsultedSeanceIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`admin_consulted_seances_${user?.id}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
   const [selectedExercice, setSelectedExercice] = useState<ExerciceType | null>(null);
   const [exerciceDialogOpen, setExerciceDialogOpen] = useState(false);
   const [subscriptionLimits, setSubscriptionLimits] = useState<SubscriptionLimit[]>([]);
@@ -301,6 +325,14 @@ export default function Admin() {
       )
     ).map((r: any) => ({ ...r, created_at: r.created }));
     setCertificatModels(modelsData as any);
+
+    // Fetch contact messages
+    const messagesData = await safeFetch(
+      "contact_messages",
+      () => pb.collection("contact_messages").getFullList({ sort: "-created" }),
+      [] as any[],
+    );
+    setContactMessages(messagesData as any);
 
     // Fetch subscription limits
     const limitsData = await safeFetch(
@@ -681,6 +713,60 @@ export default function Admin() {
     }
   };
 
+  const toggleSeanceConsulted = (seanceId: string, isCurrentlyConsulted: boolean) => {
+    if (!user) return;
+    setConsultedSeanceIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyConsulted) {
+        next.delete(seanceId);
+      } else {
+        next.add(seanceId);
+      }
+      try {
+        localStorage.setItem(`admin_consulted_seances_${user.id}`, JSON.stringify([...next]));
+      } catch { /* ignore quota errors */ }
+      return next;
+    });
+  };
+
+  const toggleTraitementConsulted = (traitementId: string, isCurrentlyConsulted: boolean) => {
+    if (!user) return;
+    setConsultedTraitementIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyConsulted) {
+        next.delete(traitementId);
+      } else {
+        next.add(traitementId);
+      }
+      try {
+        localStorage.setItem(`admin_consulted_traitements_${user.id}`, JSON.stringify([...next]));
+      } catch { /* ignore quota errors */ }
+      return next;
+    });
+  };
+
+  const approveWithdrawalRequest = async (exerciceId: string) => {
+    try {
+      await pb.collection("exercices").update(exerciceId, { status: "draft" });
+      setExercices((prev) => prev.map((e) => (e.id === exerciceId ? { ...e, status: "draft" } : e)));
+      toast({ title: "Retrait approuvé", description: "L'exercice a été retiré des partagés." });
+    } catch (error) {
+      console.error("Error approving withdrawal:", error);
+      toast({ title: "Erreur", description: "Impossible d'approuver la demande.", variant: "destructive" });
+    }
+  };
+
+  const denyWithdrawalRequest = async (exerciceId: string) => {
+    try {
+      await pb.collection("exercices").update(exerciceId, { status: "shared" });
+      setExercices((prev) => prev.map((e) => (e.id === exerciceId ? { ...e, status: "shared" } : e)));
+      toast({ title: "Demande refusée", description: "L'exercice reste dans les partagés." });
+    } catch (error) {
+      console.error("Error denying withdrawal:", error);
+      toast({ title: "Erreur", description: "Impossible de refuser la demande.", variant: "destructive" });
+    }
+  };
+
   // Certificat model functions
   const handleAddModel = async () => {
     if (!newModelTitle.trim() || !newModelContent.trim() || !user) return;
@@ -847,6 +933,7 @@ export default function Admin() {
     );
 
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
+  const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
 
   if (authLoading || adminLoading || loading) {
     return (
@@ -922,22 +1009,25 @@ export default function Admin() {
               <Users className="w-4 h-4" />
               Utilisateurs
             </TabsTrigger>
-            <TabsTrigger value="seances" className="flex items-center gap-2">
+            <TabsTrigger value="seances" className="relative flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Séances
-            </TabsTrigger>
-            <TabsTrigger value="traitements" className="flex items-center gap-2">
-              <ClipboardList className="w-4 h-4" />
-              Traitements
-              {pendingTraitements.length > 0 && (
-                <Badge variant="destructive" className="ml-1">{pendingTraitements.length}</Badge>
+              {filteredSeances.filter(s => !consultedSeanceIds.has(s.id)).length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredSeances.filter(s => !consultedSeanceIds.has(s.id)).length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="exercices" className="flex items-center gap-2">
+            <TabsTrigger value="traitements" className="relative flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Traitements
+              {filteredTraitements.filter(t => !consultedTraitementIds.has(t.id)).length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredTraitements.filter(t => !consultedTraitementIds.has(t.id)).length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="exercices" className="relative flex items-center gap-2">
               <Dumbbell className="w-4 h-4" />
               Exercices
-              {pendingExercices.length > 0 && (
-                <Badge variant="destructive" className="ml-1">{pendingExercices.length}</Badge>
+              {filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="certificats" className="flex items-center gap-2">
@@ -959,6 +1049,13 @@ export default function Admin() {
             <TabsTrigger value="popups" className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
               Pop-ups
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="relative flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Messages
+              {contactMessages.length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{contactMessages.length}</Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -1121,6 +1218,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Actions</th>
                         <th className="text-left py-3 px-2">Utilisateur</th>
+                        <th className="text-left py-3 px-2">Consulté</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1152,6 +1250,17 @@ export default function Admin() {
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {getUserDisplayName(s.user_id)}
+                          </td>
+                          <td className="py-3 px-2" onClick={(ev) => ev.stopPropagation()}>
+                            <Button
+                              variant={consultedSeanceIds.has(s.id) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleSeanceConsulted(s.id, consultedSeanceIds.has(s.id))}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              {consultedSeanceIds.has(s.id) ? "Consulté" : "Non consulté"}
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -1230,6 +1339,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2">Validé</th>
                         <th className="text-left py-3 px-2">Actions</th>
                         <th className="text-left py-3 px-2">Utilisateur</th>
+                        <th className="text-left py-3 px-2">Consulté</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1279,6 +1389,17 @@ export default function Admin() {
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {getUserDisplayName(t.user_id)}
                           </td>
+                          <td className="py-3 px-2" onClick={(ev) => ev.stopPropagation()}>
+                            <Button
+                              variant={consultedTraitementIds.has(t.id) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleTraitementConsulted(t.id, consultedTraitementIds.has(t.id))}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              {consultedTraitementIds.has(t.id) ? "Consulté" : "Non consulté"}
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1303,6 +1424,45 @@ export default function Admin() {
                 </div>
               </CardHeader>
               <CardContent>
+                {withdrawalExercices.length > 0 && (
+                  <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <h3 className="font-semibold text-blue-600 mb-3 flex items-center gap-2">
+                      <Undo2 className="w-4 h-4" />
+                      Demandes de retrait ({withdrawalExercices.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {withdrawalExercices.map((e) => (
+                        <div key={e.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                          <div>
+                            <p className="font-medium">{e.title}</p>
+                            <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => approveWithdrawalRequest(e.id)}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Approuver le retrait
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => denyWithdrawalRequest(e.id)}
+                              className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Refuser
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {pendingExercices.length > 0 && (
                   <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
                     <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
@@ -1399,6 +1559,10 @@ export default function Admin() {
                               <Badge className="bg-green-500">Partagé</Badge>
                             ) : e.status === 'pending' ? (
                               <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                            ) : e.status === 'rejected' ? (
+                              <Badge className="bg-red-500">Refusé</Badge>
+                            ) : e.status === 'withdrawal_requested' ? (
+                              <Badge variant="secondary" className="bg-purple-500">Retrait demandé</Badge>
                             ) : (
                               <Badge variant="outline">Brouillon</Badge>
                             )}
@@ -1718,6 +1882,55 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <PopupsManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader>
+                <CardTitle>Messages de contact ({contactMessages.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {contactMessages.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Aucun message reçu.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {contactMessages.map((msg) => (
+                      <div key={msg.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <p className="font-medium">{msg.name || "—"}</p>
+                            <p className="text-sm text-muted-foreground">{msg.email}</p>
+                            {msg.subject && (
+                              <p className="text-sm font-medium text-foreground/80">{msg.subject}</p>
+                            )}
+                            <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <p className="text-xs text-muted-foreground">{formatDateTime(msg.created)}</p>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={async () => {
+                                if (!confirm("Supprimer ce message ?")) return;
+                                try {
+                                  await pb.collection("contact_messages").delete(msg.id);
+                                  setContactMessages(prev => prev.filter(m => m.id !== msg.id));
+                                  toast({ title: "Message supprimé" });
+                                } catch (e: any) {
+                                  toast({ title: "Erreur", description: e.message, variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

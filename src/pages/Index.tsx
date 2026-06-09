@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone, BookOpen, Activity } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 const featureGroups = [
   {
@@ -91,41 +92,44 @@ export default function Index() {
           </div>
 
           <div className="flex flex-col gap-6 md:gap-8 max-w-4xl mx-auto">
-            {featureGroups.map((group) => (
-              <div key={group.label} className="rounded-2xl border-2 border-border bg-card/50 p-4 md:p-6">
-                <h3 className="text-lg md:text-xl font-display font-semibold mb-4 text-foreground">{group.label}</h3>
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                  {group.items.map((feature) => {
-                    const Icon = feature.icon;
-                    return (
-                      <Link
-                        key={feature.title}
-                        to={user || (feature as any).public ? feature.href : "/auth"}
-                        className="group"
-                      >
-                        <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
-                          <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
-                            <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
-                              <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
-                                <Icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-sm md:text-xl font-display group-hover:text-primary transition-colors leading-tight">
-                                {feature.title}
-                              </CardTitle>
-                              <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm line-clamp-2">
-                                {feature.description}
-                              </CardDescription>
-                            </div>
-                            <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all hidden md:block" />
-                          </CardHeader>
-                        </Card>
-                      </Link>
-                    );
-                  })}
+            {featureGroups.map((group, groupIndex) => (
+              <ScrollReveal key={group.label} variant="up" delay={groupIndex === 0 ? 0 : groupIndex === 1 ? 100 : 200}>
+                <div className="rounded-2xl border-2 border-border bg-card/50 p-4 md:p-6">
+                  <h3 className="text-lg md:text-xl font-display font-semibold mb-4 text-foreground">{group.label}</h3>
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    {group.items.map((feature, i) => {
+                      const Icon = feature.icon;
+                      return (
+                        <ScrollReveal key={feature.title} variant="scale" delay={((i % 4) * 100) as 0 | 100 | 200 | 300}>
+                          <Link
+                            to={user || (feature as any).public ? feature.href : "/auth"}
+                            className="group block h-full"
+                          >
+                            <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
+                              <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
+                                <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
+                                  <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>
+                                    <Icon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <CardTitle className="text-sm md:text-xl font-display group-hover:text-primary transition-colors leading-tight">
+                                    {feature.title}
+                                  </CardTitle>
+                                  <CardDescription className="mt-1 md:mt-2 text-xs md:text-sm line-clamp-2">
+                                    {feature.description}
+                                  </CardDescription>
+                                </div>
+                                <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all hidden md:block" />
+                              </CardHeader>
+                            </Card>
+                          </Link>
+                        </ScrollReveal>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              </ScrollReveal>
             ))}
           </div>
 
@@ -142,6 +146,7 @@ export default function Index() {
       {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
+          <ScrollReveal variant="scale">
           <div className="relative rounded-3xl overflow-hidden gradient-primary p-8 md:p-16">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIi8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
             
@@ -163,6 +168,7 @@ export default function Index() {
               )}
             </div>
           </div>
+          </ScrollReveal>
         </div>
       </section>
     </Layout>

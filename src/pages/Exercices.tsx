@@ -121,8 +121,8 @@ export default function Exercices() {
     } else if (filter === "platform") {
       result = result.filter((e) => featuredExerciceIds.includes(e.id));
     } else if (filter === "shared") {
-      result = result.filter((e) => 
-        e.status === "shared" && 
+      result = result.filter((e) =>
+        (e.status === "shared" || e.status === "withdrawal_requested") &&
         !featuredExerciceIds.includes(e.id) &&
         !(e as any).deleted_by_author
       );
@@ -158,8 +158,8 @@ export default function Exercices() {
 
     const platform = exercices.filter((e) => featuredExerciceIds.includes(e.id)).length;
 
-    const shared = exercices.filter((e) => 
-      e.status === "shared" && 
+    const shared = exercices.filter((e) =>
+      (e.status === "shared" || e.status === "withdrawal_requested") &&
       !featuredExerciceIds.includes(e.id) &&
       !(e as any).deleted_by_author &&
       !userCopiedOriginalIds.includes(e.id)
@@ -205,6 +205,7 @@ export default function Exercices() {
       setExercices(mappedExercices as any[]);
       setPathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
       setObjectifs([...new Set((objectifData as any[]).map((o: any) => o.name as string).filter(Boolean))]);
+
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -434,6 +435,28 @@ export default function Exercices() {
     }
   };
 
+  const requestWithdrawal = async (exercice: Exercice) => {
+    try {
+      await pb.collection("exercices").update(exercice.id, { status: "withdrawal_requested" });
+      toast.success("Demande de retrait envoyée à l'administrateur");
+      fetchData();
+    } catch (error) {
+      console.error("Error requesting withdrawal:", error);
+      toast.error("Erreur lors de la demande de retrait");
+    }
+  };
+
+  const cancelWithdrawalRequest = async (exercice: Exercice) => {
+    try {
+      await pb.collection("exercices").update(exercice.id, { status: "shared" });
+      toast.success("Demande de retrait annulée");
+      fetchData();
+    } catch (error) {
+      console.error("Error cancelling withdrawal request:", error);
+      toast.error("Erreur lors de l'annulation");
+    }
+  };
+
   const validateExercice = async (exercice: Exercice) => {
     try {
       await pb.collection("exercices").update(exercice.id, { status: "shared" });
@@ -572,8 +595,42 @@ export default function Exercices() {
         );
       }
       
+      if (exercice.status === "withdrawal_requested") {
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Retrait demandé</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                cancelWithdrawalRequest(exercice);
+              }}
+              className="h-6 text-xs text-muted-foreground hover:text-foreground px-0"
+            >
+              Annuler la demande
+            </Button>
+          </div>
+        );
+      }
+
       if (exercice.status === "shared") {
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                requestWithdrawal(exercice);
+              }}
+              className="h-6 text-xs"
+            >
+              Demander le retrait
+            </Button>
+          </div>
+        );
       }
       
       // Draft status - show share button if allowed
@@ -769,9 +826,13 @@ export default function Exercices() {
                 </TableHeader>
                 <TableBody>
                   {filteredExercices.map((exercice) => (
-                    <TableRow key={exercice.id}>
+                    <TableRow
+                      key={exercice.id}
+                      onClick={() => canEdit(exercice) && openEditDialog(exercice)}
+                      className={canEdit(exercice) ? "cursor-pointer" : ""}
+                    >
                       {/* Thumbnail */}
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <ExerciceThumbnail
                           exercice={exercice}
                           onOpen={() => openVideoDialog(exercice)}
@@ -832,7 +893,7 @@ export default function Exercices() {
                       </TableCell>
 
                       {/* Actions */}
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           {/* Edit */}
                           {canEdit(exercice) && (

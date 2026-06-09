@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { useAdmin } from "@/hooks/useAdmin";
+import { usePendingAdminCount } from "@/hooks/usePendingAdminCount";
 import {
   LogOut, User, Shield,
   Briefcase, Stethoscope, Globe,
@@ -89,8 +89,8 @@ function getCurrentSection(pathname: string): string | null {
 }
 
 export function Navbar() {
-  const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { user, signOut, isAdmin } = useAuth();
+  const pendingAdminCount = usePendingAdminCount();
   const navigate = useNavigate();
   const location = useLocation();
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -187,12 +187,17 @@ export function Navbar() {
               {isAdmin && (
                 <Link
                   to="/admin"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ml-1 ${
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ml-1 ${
                     isActive("/admin") ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
                   <Shield className="w-4 h-4" />
                   Admin
+                  {pendingAdminCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                      {pendingAdminCount}
+                    </span>
+                  )}
                 </Link>
               )}
             </div>

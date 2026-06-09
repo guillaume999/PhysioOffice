@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { Mail, Send, MapPin, Phone, Loader2 } from "lucide-react";
 
 export default function Contact() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+
+  useEffect(() => {
+    if (!user) return;
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.name || "";
+    setForm(f => ({ ...f, name: fullName, email: user.email ?? "" }));
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +28,8 @@ export default function Contact() {
     try {
       await pb.collection("contact_messages").create(form);
       toast({ title: "Message envoyé !" });
-      setForm({ name: "", email: "", subject: "", message: "" });
+      const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() || user?.name || "";
+      setForm({ name: fullName, email: user?.email ?? "", subject: "", message: "" });
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
