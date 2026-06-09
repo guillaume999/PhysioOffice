@@ -39,6 +39,7 @@ import {
   MessageSquare,
   Undo2,
   Mail,
+  Target,
 } from "lucide-react";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
@@ -101,6 +102,14 @@ interface ExerciceType {
   rejection_reason?: string | null;
 }
 
+interface ObjectifItem {
+  id: string;
+  name: string;
+  user_id: string | null;
+  source: "objectifs" | "exercices" | "pathologies";
+  created_at: string | null;
+}
+
 interface ContactMessage {
   id: string;
   name: string;
@@ -142,6 +151,8 @@ interface Stats {
   totalExercices: number;
   pendingExercices: number;
   totalPatients: number;
+  totalObjectifs: number;
+  pendingObjectifs: number;
 }
 
 export default function Admin() {
@@ -155,6 +166,8 @@ export default function Admin() {
   const [seances, setSeances] = useState<SeanceType[]>([]);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
   const [exercices, setExercices] = useState<ExerciceType[]>([]);
+  const [objectifs, setObjectifs] = useState<ObjectifItem[]>([]);
+  const [newObjectifName, setNewObjectifName] = useState("");
   const [certificatModels, setCertificatModels] = useState<CertificatModel[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
@@ -188,11 +201,14 @@ export default function Admin() {
     totalExercices: 0,
     pendingExercices: 0,
     totalPatients: 0,
+    totalObjectifs: 0,
+    pendingObjectifs: 0,
   });
   const [userSearch, setUserSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
   const [traitementSearch, setTraitementSearch] = useState("");
   const [exerciceSearch, setExerciceSearch] = useState("");
+  const [objectifSearch, setObjectifSearch] = useState("");
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
 
@@ -290,6 +306,53 @@ export default function Admin() {
     ).map((r: any) => ({ ...r, created_at: r.created }));
     setExercices(exercicesData as any);
 
+    // Fetch objectifs (bibliothèque), + tags des exercices + champ objectifs des pathologies
+    const objectifsRecords = await safeFetch(
+      "objectifs",
+      () => pb.collection("objectifs").getFullList({ sort: "-created" }),
+      [] as any[],
+    );
+    const pathologiesRecords = await safeFetch(
+      "pathologies",
+      () => pb.collection("pathologies").getFullList({ fields: "id,objectifs" }),
+      [] as any[],
+    );
+
+    const aggregated = new Map<string, ObjectifItem>();
+    for (const r of objectifsRecords as any[]) {
+      const key = (r.name || "").trim().toLowerCase();
+      if (!key) continue;
+      if (!aggregated.has(key)) {
+        aggregated.set(key, {
+          id: r.id,
+          name: r.name,
+          user_id: r.user || null,
+          source: "objectifs",
+          created_at: r.created || null,
+        });
+      }
+    }
+    for (const e of exercicesData as any[]) {
+      const tags: string[] = Array.isArray(e.objectif_tags) ? e.objectif_tags : [];
+      for (const t of tags) {
+        const key = (t || "").trim().toLowerCase();
+        if (!key || aggregated.has(key)) continue;
+        aggregated.set(key, { id: `ex_${e.id}_${key}`, name: t, user_id: e.user || null, source: "exercices", created_at: e.created || null });
+      }
+    }
+    for (const p of pathologiesRecords as any[]) {
+      const raw = (p.objectifs || "").trim();
+      if (!raw) continue;
+      // Split sur retours ligne / puces / points-virgules
+      for (const line of raw.split(/[\n;]+/)) {
+        const name = line.replace(/^[-•*\s]+/, "").trim();
+        const key = name.toLowerCase();
+        if (!key || aggregated.has(key)) continue;
+        aggregated.set(key, { id: `pa_${p.id}_${key}`, name, user_id: null, source: "pathologies", created_at: null });
+      }
+    }
+    setObjectifs(Array.from(aggregated.values()).sort((a, b) => a.name.localeCompare(b.name, "fr")));
+
     // Fetch featured exercices (relation field is `exercice`)
     const featuredData = await safeFetch(
       "featured_exercices",
@@ -377,6 +440,8 @@ export default function Admin() {
       totalExercices: exercicesData?.length || 0,
       pendingExercices: pendingExercicesCount,
       totalPatients: patientsCount || 0,
+      totalObjectifs: aggregated.size,
+      pendingObjectifs: 0,
     });
 
     setLoading(false);
@@ -729,6 +794,60 @@ export default function Admin() {
     });
   };
 
+  const addObjectif = async () => {
+    const name = newObjectifName.trim();
+    if (!name || !user) return;
+    // évite les doublons (insensible casse)
+    if (objectifs.some(o => o.name.toLowerCase() === name.toLowerCase())) {
+      toast({ title: "Cet objectif existe déjà", variant: "destructive" });
+      return;
+    }
+    try {
+      const created: any = await pb.collection("objectifs").create({
+        user: user.id,
+        name,
+        type: "principal",
+      });
+      setObjectifs(prev =>
+        [
+          ...prev,
+          {
+            id: created.id,
+            name: created.name,
+            user_id: created.user || null,
+            source: "objectifs" as const,
+            created_at: created.created || null,
+          },
+        ].sort((a, b) => a.name.localeCompare(b.name, "fr"))
+      );
+      setNewObjectifName("");
+      toast({ title: "Objectif ajouté" });
+    } catch (error) {
+      console.error("Error adding objectif:", error);
+      toast({ title: "Erreur", description: "Impossible d'ajouter l'objectif.", variant: "destructive" });
+    }
+  };
+
+  const deleteObjectif = async (objectif: ObjectifItem) => {
+    if (objectif.source !== "objectifs") {
+      toast({
+        title: "Suppression impossible",
+        description: "Cet objectif provient d'un exercice ou d'une pathologie, pas de la bibliothèque.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!confirm(`Supprimer l'objectif "${objectif.name}" ?`)) return;
+    try {
+      await pb.collection("objectifs").delete(objectif.id);
+      setObjectifs(prev => prev.filter(o => o.id !== objectif.id));
+      toast({ title: "Objectif supprimé" });
+    } catch (error) {
+      console.error("Error deleting objectif:", error);
+      toast({ title: "Erreur", description: "Impossible de supprimer l'objectif.", variant: "destructive" });
+    }
+  };
+
   const toggleTraitementConsulted = (traitementId: string, isCurrentlyConsulted: boolean) => {
     if (!user) return;
     setConsultedTraitementIds(prev => {
@@ -935,6 +1054,10 @@ export default function Admin() {
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
   const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
 
+  const filteredObjectifs = objectifs.filter(o =>
+    o.name.toLowerCase().includes(objectifSearch.toLowerCase())
+  );
+
   if (authLoading || adminLoading || loading) {
     return (
       <Layout>
@@ -1029,6 +1152,10 @@ export default function Admin() {
               {filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length}</Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="objectifs" className="flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Objectifs
             </TabsTrigger>
             <TabsTrigger value="certificats" className="flex items-center gap-2">
               <BookTemplate className="w-4 h-4" />
@@ -1587,6 +1714,90 @@ export default function Admin() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="objectifs">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bibliothèque d'objectifs ({objectifs.length})</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Agrégation de la collection <code className="px-1 py-0.5 bg-muted rounded text-xs">objectifs</code>, des tags d'objectifs des exercices et des objectifs des pathologies.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nouvel objectif..."
+                    value={newObjectifName}
+                    onChange={(e) => setNewObjectifName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addObjectif(); } }}
+                  />
+                  <Button onClick={addObjectif} disabled={!newObjectifName.trim()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher..."
+                    value={objectifSearch}
+                    onChange={(e) => setObjectifSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2">Objectif</th>
+                        <th className="text-left py-3 px-2">Origine</th>
+                        <th className="text-left py-3 px-2">Utilisateur</th>
+                        <th className="text-left py-3 px-2 w-24">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredObjectifs.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                            Aucun objectif.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredObjectifs.map((o) => (
+                          <tr key={o.id} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-2 font-medium">{o.name}</td>
+                            <td className="py-3 px-2">
+                              {o.source === "objectifs" ? (
+                                <Badge variant="secondary">Bibliothèque</Badge>
+                              ) : o.source === "exercices" ? (
+                                <Badge variant="outline" className="border-blue-500 text-blue-600">Exercice</Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-amber-500 text-amber-600">Pathologie</Badge>
+                              )}
+                            </td>
+                            <td className="py-3 px-2 text-sm text-muted-foreground">
+                              {o.user_id ? getUserDisplayName(o.user_id) : "—"}
+                            </td>
+                            <td className="py-3 px-2">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteObjectif(o)}
+                                disabled={o.source !== "objectifs"}
+                                title={o.source !== "objectifs" ? "Provient d'un exercice/pathologie" : ""}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
