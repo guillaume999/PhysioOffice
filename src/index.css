@@ -163,6 +163,40 @@
   animation: slide-in 0.5s ease-out forwards;
 }
 
+/* ── Page entry animation ─────────────────────────────────────────────────── */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.animate-page-in {
+  animation: page-in 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ── Scroll reveal ────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 0.65s;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: none !important;
+}
+
+.reveal-up    { transform: translateY(40px); }
+.reveal-left  { transform: translateX(-40px); }
+.reveal-right { transform: translateX(40px); }
+.reveal-scale { transform: scale(0.92); }
+
+.reveal-delay-100 { transition-delay: 100ms; }
+.reveal-delay-200 { transition-delay: 200ms; }
+.reveal-delay-300 { transition-delay: 300ms; }
+.reveal-delay-400 { transition-delay: 400ms; }
+.reveal-delay-500 { transition-delay: 500ms; }
+
 /* Print styles */
 @media print {
   body {

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { useAdmin } from "@/hooks/useAdmin";
+import { usePendingAdminCount } from "@/hooks/usePendingAdminCount";
 import { Home, Users, Dumbbell, Brain, FileText, MoreHorizontal, Calendar, ClipboardList, Video, Shield, User, LogOut } from "lucide-react";
 import {
   Sheet,
@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 export function MobileBottomNav() {
-  const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { user, signOut, isAdmin } = useAuth();
+  const pendingAdminCount = usePendingAdminCount();
   const location = useLocation();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
@@ -95,8 +95,18 @@ export function MobileBottomNav() {
                 onClick={() => setIsMoreOpen(false)}
                 className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 mb-4"
               >
-                <Shield className="w-5 h-5 text-primary" />
+                <div className="relative">
+                  <Shield className="w-5 h-5 text-primary" />
+                  {pendingAdminCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                      {pendingAdminCount}
+                    </span>
+                  )}
+                </div>
                 <span className="font-medium">Administration</span>
+                {pendingAdminCount > 0 && (
+                  <span className="ml-auto text-xs text-destructive font-semibold">{pendingAdminCount} en attente</span>
+                )}
               </Link>
             )}
 

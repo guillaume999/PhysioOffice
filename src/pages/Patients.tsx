@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 interface Patient {
   id: string;
@@ -198,6 +199,7 @@ export default function Patients() {
     <Layout>
       <PagePopup pageKey="patients" />
       <div className="container mx-auto px-4 py-8">
+        <ScrollReveal variant="up">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-blue-500/10"><Users className="w-6 h-6 text-blue-500" /></div>
@@ -281,6 +283,7 @@ export default function Patients() {
             </Dialog>
           </div>
         </div>
+        </ScrollReveal>
 
         {/* Status filter buttons */}
         <div className="flex flex-wrap gap-2 mb-6">
@@ -325,6 +328,7 @@ export default function Patients() {
           </Button>
         </div>
 
+        <ScrollReveal variant="up" delay={100}>
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -427,6 +431,7 @@ export default function Patients() {
             </div>
           </CardContent>
         </Card>
+        </ScrollReveal>
       </div>
     </Layout>
   );

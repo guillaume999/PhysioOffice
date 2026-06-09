@@ -50,6 +50,20 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Running locally
+
+The app connects to the shared dev PocketBase instance (`https://pocketbase-dev.physiooffice.com`) by default — no local database setup needed.
+
+```sh
+# Step 1: Install dependencies
+npm i
+
+# Step 2: Start the dev server
+npm run dev
+```
+
+Open [http://localhost:8080](http://localhost:8080).
+
 ## What technologies are used for this project?
 
 This project is built with:
