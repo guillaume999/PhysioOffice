@@ -2,15 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Target, ClipboardList, FileText, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { Target, ClipboardList, FileText } from "lucide-react";
 
 interface CarePlanData {
   motif_consultation: string;
   bilan_kine: string;
   objectifs_prise_en_charge: string;
-  bilan_initial_date?: string | null;
 }
 
 interface PatientCareObjectivesCardProps {
@@ -40,19 +37,10 @@ export function PatientCareObjectivesCard({
         {/* Actions - responsive layout */}
         <div className="flex flex-col sm:flex-row gap-2">
           {onBilanInitial && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={carePlan.bilan_initial_date || ""}
-                onChange={(e) => onChange("bilan_initial_date", e.target.value)}
-                onBlur={onBlur}
-                className="flex-1 sm:w-36 h-9 text-xs"
-              />
-              <Button variant="outline" size="sm" onClick={onBilanInitial} className="shrink-0">
-                <ClipboardList className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Bilan initial</span>
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={onBilanInitial} className="shrink-0">
+              <ClipboardList className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Bilan initial</span>
+            </Button>
           )}
           {onCertificats && (
             <Button variant="outline" size="sm" onClick={onCertificats} className="shrink-0">

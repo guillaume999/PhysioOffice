@@ -513,7 +513,6 @@ export default function PatientDetail() {
               motif_consultation: carePlan.motif_consultation,
               bilan_kine: carePlan.bilan_kine,
               objectifs_prise_en_charge: carePlan.objectifs_prise_en_charge,
-              bilan_initial_date: carePlan.bilan_initial_date,
             }}
             onChange={handleCarePlanChange}
             onBlur={handleAutoSave}
