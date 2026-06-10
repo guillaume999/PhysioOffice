@@ -22,6 +22,7 @@ const escapeHtml = (text: string | null | undefined): string => {
 interface TraitementSeance {
   ordre: number;
   seance_date: string | null;
+  nom?: string | null;
   objectifs_principaux: string[];
   objectifs_secondaires: string[];
   pathologies: string[];
@@ -269,11 +270,9 @@ export function PatientReportPrintDialog({
         sections.push(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">`);
         sections.push(`<thead><tr style="background: #f5f5f5;">`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">N°</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Type</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Catégorie</th>`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs principaux</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Objectifs secondaires</th>`);
-        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Pathologies</th>`);
+        sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Type</th>`);
         sections.push(`</tr></thead><tbody>`);
         
         // Create combined list of seances and bilans sorted by date (chronological)
@@ -302,26 +301,18 @@ export function PatientReportPrintDialog({
         items.forEach((item) => {
           if (item.type === 'seance') {
             const seance = item.data;
-            const dateStr = seance.seance_date 
-              ? new Date(seance.seance_date).toLocaleDateString("fr-FR") 
+            const dateStr = seance.seance_date
+              ? new Date(seance.seance_date).toLocaleDateString("fr-FR")
               : "____/____/________";
-            const objectifsPrincipaux = seance.objectifs_principaux.length > 0 
-              ? escapeHtml(seance.objectifs_principaux.join(", ")) 
+            const titre = seance.nom
+              ? escapeHtml(seance.nom)
               : "-";
-            const objectifsSecondaires = seance.objectifs_secondaires.length > 0 
-              ? escapeHtml(seance.objectifs_secondaires.join(", ")) 
-              : "-";
-            const pathologies = seance.pathologies.length > 0 
-              ? escapeHtml(seance.pathologies.join(", ")) 
-              : "-";
-            
+
             sections.push(`<tr>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${seance.ordre}</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">Séance</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${dateStr}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsPrincipaux}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${objectifsSecondaires}</td>`);
-            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${pathologies}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px;">${titre}</td>`);
             sections.push(`</tr>`);
           } else {
             const bilan = item.data;
@@ -330,13 +321,20 @@ export function PatientReportPrintDialog({
               : "____/____/________";
             let observations = "-";
             if (bilan.content) {
-              try {
-                const parsed = JSON.parse(bilan.content);
-                if (parsed && typeof parsed === "object" && parsed.objectif_intermediaire) {
-                  observations = escapeHtml(String(parsed.objectif_intermediaire));
+              // PocketBase renvoie `content` soit en string JSON, soit déjà désérialisé en objet.
+              let parsed: any = null;
+              if (typeof bilan.content === "string") {
+                try { parsed = JSON.parse(bilan.content); } catch { /* ancien format texte libre */ }
+                if (parsed === null) {
+                  // contenu en texte libre → on l'utilise tel quel
+                  const raw = String(bilan.content).trim();
+                  if (raw) observations = escapeHtml(raw);
                 }
-              } catch {
-                // content is not JSON, ignore
+              } else if (typeof bilan.content === "object") {
+                parsed = bilan.content;
+              }
+              if (parsed && typeof parsed === "object" && parsed.objectif_intermediaire) {
+                observations = escapeHtml(String(parsed.objectif_intermediaire));
               }
             }
 
@@ -344,7 +342,7 @@ export function PatientReportPrintDialog({
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">-</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">Bilan intermédiaire</td>`);
             sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic;">${dateStr}</td>`);
-            sections.push(`<td colspan="3" style="border: 1px solid #ddd; padding: 8px; font-style: italic; white-space: pre-wrap;"><strong>Observations / commentaires :</strong> ${observations}</td>`);
+            sections.push(`<td style="border: 1px solid #ddd; padding: 8px; font-style: italic; white-space: pre-wrap;"><strong>Observations / commentaires :</strong> ${observations}</td>`);
             sections.push(`</tr>`);
           }
         });

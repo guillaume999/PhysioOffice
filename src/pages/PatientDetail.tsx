@@ -89,6 +89,7 @@ export default function PatientDetail() {
   const [traitementSeances, setTraitementSeances] = useState<{
     ordre: number;
     seance_date: string | null;
+    nom?: string | null;
     objectifs_principaux: string[];
     objectifs_secondaires: string[];
     pathologies: string[];
@@ -177,6 +178,7 @@ export default function PatientDetail() {
         setTraitementSeances(ps.map((s: any, i: number) => ({
           ordre: i + 1,
           seance_date: s.date_prevue || null,
+          nom: s.nom || null,
           objectifs_principaux: s.objectif ? [s.objectif] : [],
           objectifs_secondaires: [],
           pathologies: [],
