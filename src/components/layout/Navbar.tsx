@@ -161,7 +161,7 @@ export function Navbar() {
                         isOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"
                       }`}
                     >
-                      <div className="bg-card/95 backdrop-blur border border-border rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 min-w-44">
+                      <div className="bg-card border border-border rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 min-w-44">
                         {section.items.map((item) => {
                           const ItemIcon = item.icon;
                           return (

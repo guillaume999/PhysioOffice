@@ -191,7 +191,7 @@ export default function News() {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      {format(new Date(news.created_at), "d MMMM yyyy", { locale: fr })}
+                      {news.created_at ? format(new Date(news.created_at), "d MMMM yyyy", { locale: fr }) : "—"}
                     </div>
                   </div>
                   <CardTitle className="text-lg">{news.title}</CardTitle>

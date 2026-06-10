@@ -93,6 +93,9 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  button, a, [role="button"] {
+    transition-duration: 80ms !important;
+  }
 }
 
 @layer utilities {
@@ -112,7 +115,8 @@
     box-shadow: var(--shadow-glow);
   }
   .glass {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    @apply bg-card/95 border border-border/50;
+    transform: translateZ(0);
   }
   .text-gradient {
     @apply bg-clip-text text-transparent;
@@ -178,7 +182,8 @@
   opacity: 0;
   transition-property: opacity, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 0.65s;
+  transition-duration: 0.25s;
+  will-change: transform, opacity;
 }
 
 .reveal.visible {
@@ -186,16 +191,16 @@
   transform: none !important;
 }
 
-.reveal-up    { transform: translateY(40px); }
-.reveal-left  { transform: translateX(-40px); }
-.reveal-right { transform: translateX(40px); }
-.reveal-scale { transform: scale(0.92); }
+.reveal-up    { transform: translateY(14px); }
+.reveal-left  { transform: translateX(-14px); }
+.reveal-right { transform: translateX(14px); }
+.reveal-scale { transform: scale(0.97); }
 
-.reveal-delay-100 { transition-delay: 100ms; }
-.reveal-delay-200 { transition-delay: 200ms; }
-.reveal-delay-300 { transition-delay: 300ms; }
-.reveal-delay-400 { transition-delay: 400ms; }
-.reveal-delay-500 { transition-delay: 500ms; }
+.reveal-delay-100 { transition-delay: 40ms; }
+.reveal-delay-200 { transition-delay: 80ms; }
+.reveal-delay-300 { transition-delay: 120ms; }
+.reveal-delay-400 { transition-delay: 160ms; }
+.reveal-delay-500 { transition-delay: 200ms; }
 
 /* Print styles */
 @media print {

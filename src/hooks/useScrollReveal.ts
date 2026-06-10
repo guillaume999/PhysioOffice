@@ -12,9 +12,10 @@ export function useScrollReveal(threshold = 0.1) {
         if (entry.isIntersecting) {
           el.classList.add("visible");
           observer.unobserve(el);
+          setTimeout(() => { el.style.willChange = "auto"; }, 700);
         }
       },
-      { threshold, rootMargin: "0px 0px -40px 0px" }
+      { threshold, rootMargin: "0px 0px 80px 0px" }
     );
 
     observer.observe(el);

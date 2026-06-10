@@ -94,7 +94,7 @@ export function SectionDock() {
 
   return (
     <div
-      className="hidden md:flex flex-col items-center gap-3 fixed bottom-6 left-1/2 -translate-x-1/2 z-40 select-none"
+      className="hidden md:flex flex-col items-center gap-3 fixed bottom-6 left-1/2 -translate-x-1/2 z-40 select-none will-change-transform"
       onMouseEnter={clearLeave}
       onMouseLeave={startLeave}
     >
@@ -125,7 +125,7 @@ export function SectionDock() {
                       <span className="text-[11px] font-medium text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         {item.title}
                       </span>
-                      <div className={`w-10 h-10 rounded-xl bg-background/70 backdrop-blur-sm border border-border/60 shadow-sm flex items-center justify-center ${section.accent}`}>
+                      <div className={`w-10 h-10 rounded-xl bg-background/95 border border-border/60 shadow-sm flex items-center justify-center ${section.accent}`}>
                         <Icon className="w-[18px] h-[18px]" />
                       </div>
                     </Link>
@@ -159,7 +159,7 @@ export function SectionDock() {
               className="flex flex-col items-center gap-1.5 cursor-pointer"
               style={{ transformOrigin: "bottom center", transition: "transform 0.12s ease" }}
             >
-              <div className={`w-12 h-12 rounded-xl bg-background/70 backdrop-blur-sm border border-border/60 shadow-sm flex items-center justify-center ${section.accent}`}>
+              <div className={`w-12 h-12 rounded-xl bg-background/95 border border-border/60 shadow-sm flex items-center justify-center ${section.accent}`}>
                 <Icon className="w-5 h-5" />
               </div>
               <span className="text-[11px] font-medium text-muted-foreground">{section.label}</span>

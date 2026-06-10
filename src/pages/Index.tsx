@@ -45,8 +45,8 @@ export default function Index() {
       <PagePopup pageKey="home" />
       <section className="relative overflow-hidden py-6 md:py-10 lg:py-16">
         <div className="absolute inset-0 gradient-primary opacity-5" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl will-change-transform" aria-hidden="true" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl will-change-transform" aria-hidden="true" />
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center max-w-4xl mx-auto">
@@ -67,7 +67,7 @@ export default function Index() {
             {!user && (
               <Link
                 to="/auth"
-                className="inline-flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-base md:text-lg shadow-soft hover:shadow-glow transition-all duration-300 animate-fade-up"
+                className="inline-flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 rounded-xl gradient-primary text-primary-foreground font-semibold text-base md:text-lg shadow-soft hover:shadow-glow transition-all animate-fade-up"
                 style={{ animationDelay: "0.3s" }}
               >
                 Commencer maintenant
@@ -105,7 +105,7 @@ export default function Index() {
                             to={user || (feature as any).public ? feature.href : "/auth"}
                             className="group block h-full"
                           >
-                            <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all duration-300 hover:shadow-soft group-hover:-translate-y-1">
+                            <Card className="h-full border-2 border-transparent hover:border-primary/20 transition-all hover:shadow-soft group-hover:-translate-y-1">
                               <CardHeader className="flex flex-col md:flex-row items-start gap-3 md:gap-4 p-4 md:p-6">
                                 <div className={`p-2 md:p-3 rounded-xl ${feature.bgColor}`}>
                                   <div className={`w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center`}>

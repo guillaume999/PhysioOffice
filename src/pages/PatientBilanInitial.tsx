@@ -208,6 +208,16 @@ export default function PatientBilanInitial() {
           merged.date_bilan = new Date(carePlan.updated).toLocaleDateString("fr-FR");
         }
         setBilan(merged);
+        // Fallback: if bilan_initial_date on the care plan is absent or unreadable,
+        // derive the date input value from date_bilan stored in the JSON (dd/mm/yyyy).
+        if (!toIsoDate(carePlan.bilan_initial_date) && merged.date_bilan) {
+          const parts = merged.date_bilan.split("/");
+          if (parts.length === 3) {
+            const [d, m, y] = parts;
+            const iso = `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) setBilanInitialDate(iso);
+          }
+        }
       } else {
         // Donnée présente en base mais illisible : ne JAMAIS sauvegarder par-dessus.
         console.error("[BilanInitial] Impossible de parser bilan_initial_data", carePlan.bilan_initial_data);
@@ -393,7 +403,7 @@ export default function PatientBilanInitial() {
                   <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">
                     {bilanInitialDate
                       ? new Date(bilanInitialDate).toLocaleDateString("fr-FR")
-                      : bilan.date_bilan}
+                      : bilan.date_bilan || new Date().toLocaleDateString("fr-FR")}
                   </span>
                 </div>
               </div>

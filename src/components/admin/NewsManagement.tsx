@@ -440,7 +440,7 @@ export function NewsManagement() {
                             </Badge>
                           )}
                           <span className="text-sm text-muted-foreground">
-                            {format(new Date(item.created_at), "d MMM yyyy", { locale: fr })}
+                            {item.created_at ? format(new Date(item.created_at), "d MMM yyyy", { locale: fr }) : "—"}
                           </span>
                         </div>
                         <h4 className="font-semibold mb-1">{item.title}</h4>
