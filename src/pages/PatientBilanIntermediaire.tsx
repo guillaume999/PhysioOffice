@@ -253,14 +253,14 @@ export default function PatientBilanIntermediaire() {
             </CardContent>
           </Card>
 
-          {/* Objectif intermédiaire */}
+          {/* Observations / commentaires */}
           <Card className="border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10">
             <CardHeader>
-              <CardTitle className="text-lg text-amber-700 dark:text-amber-400">Objectif intermédiaire</CardTitle>
+              <CardTitle className="text-lg text-amber-700 dark:text-amber-400">Observations / commentaires</CardTitle>
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Objectif à atteindre pour ce bilan intermédiaire..."
+                placeholder="Observations et commentaires pour ce bilan intermédiaire..."
                 value={bilan.objectif_intermediaire}
                 onChange={(e) => handleChange("objectif_intermediaire", e.target.value)}
                 onBlur={handleAutoSave}
