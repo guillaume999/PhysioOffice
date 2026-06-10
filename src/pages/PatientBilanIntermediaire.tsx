@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout/Layout";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, ClipboardList, Loader2, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
+import { parseJsonField } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface BilanData {
@@ -37,6 +38,10 @@ export default function PatientBilanIntermediaire() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [existingBilanId, setExistingBilanId] = useState<string | null>(bilanId);
+  // Empêche d'enregistrer pendant le chargement initial (sinon onBlur peut créer un bilan vide).
+  const isReadyRef = useRef(false);
+  // Sérialise les sauvegardes concurrentes (onBlur rapides) pour éviter de dupliquer la création.
+  const savingPromiseRef = useRef<Promise<void> | null>(null);
 
   const [bilan, setBilan] = useState<BilanData>({
     objectif_intermediaire: "",
@@ -82,25 +87,28 @@ export default function PatientBilanIntermediaire() {
             // Normalize to yyyy-MM-dd for the date input
             setBilanDate(String(bilanData.bilan_date).slice(0, 10));
           }
-          // Try to parse existing data if it's JSON
+          // PocketBase renvoie le champ `json` déjà déserialisé en objet,
+          // mais d'anciens records peuvent être une string brute.
           if (bilanData.content) {
-            try {
-              const parsed = JSON.parse(bilanData.content);
-              if (typeof parsed === "object") {
-                setBilan({
-                  objectif_intermediaire: parsed.objectif_intermediaire || "",
-                  douleur_localisation: parsed.douleur_localisation || "",
-                  douleur_intensite: parsed.douleur_intensite || "",
-                  douleur_type: parsed.douleur_type || "",
-                  amplitude_articulaire: parsed.amplitude_articulaire || "",
-                  force_musculaire: parsed.force_musculaire || "",
-                  tests_specifiques: parsed.tests_specifiques || "",
-                  observations: parsed.observations || "",
-                });
-              }
-            } catch {
-              // If not JSON, put it in observations
-              setBilan(prev => ({ ...prev, observations: bilanData.content || "" }));
+            const parsed = parseJsonField<Partial<BilanData>>(bilanData.content);
+            if (parsed && typeof parsed === "object") {
+              // Force string : d'anciens records corrompus contiennent un sous-objet
+              // dans `observations` (régression d'un bug précédent où content entier
+              // était écrit dans observations).
+              const s = (v: unknown) => (typeof v === "string" ? v : "");
+              setBilan({
+                objectif_intermediaire: s(parsed.objectif_intermediaire),
+                douleur_localisation: s(parsed.douleur_localisation),
+                douleur_intensite: s(parsed.douleur_intensite),
+                douleur_type: s(parsed.douleur_type),
+                amplitude_articulaire: s(parsed.amplitude_articulaire),
+                force_musculaire: s(parsed.force_musculaire),
+                tests_specifiques: s(parsed.tests_specifiques),
+                observations: s(parsed.observations),
+              });
+            } else if (typeof bilanData.content === "string") {
+              // Contenu en texte libre (ancien format) → on le met dans observations.
+              setBilan(prev => ({ ...prev, observations: bilanData.content }));
             }
           }
         }
@@ -110,20 +118,36 @@ export default function PatientBilanIntermediaire() {
       toast.error("Erreur lors du chargement");
     } finally {
       setIsLoading(false);
+      // Active l'auto-save uniquement après le chargement initial.
+      isReadyRef.current = true;
     }
   };
 
-  const handleSave = async () => {
+  // Sauvegarde silencieuse (create/update) sans toast ni navigation.
+  // Utilisée pour l'auto-save onBlur. Sérialisée pour ne pas créer plusieurs records.
+  const persistBilan = async (
+    nextBilan: BilanData,
+    nextDate: string,
+  ): Promise<void> => {
     if (!user || !patientId) return;
-    setIsSaving(true);
+    if (!isReadyRef.current) return;
 
-    // Store bilan as JSON string
-    const bilanJson = JSON.stringify(bilan);
+    // Évite de créer un record vide tant qu'on n'a aucun contenu.
+    const hasContent = Object.values(nextBilan).some(v => v && v.trim() !== "");
+    if (!existingBilanId && !hasContent) return;
 
-    try {
+    // Attend la sauvegarde en cours pour récupérer l'id éventuellement créé.
+    if (savingPromiseRef.current) {
+      try { await savingPromiseRef.current; } catch { /* ignore */ }
+    }
+
+    const bilanJson = JSON.stringify(nextBilan);
+    const run = (async () => {
       if (existingBilanId) {
-        // Update existing bilan
-        await pb.collection("patient_bilans").update(existingBilanId, { content: bilanJson, bilan_date: bilanDate });
+        await pb.collection("patient_bilans").update(existingBilanId, {
+          content: bilanJson,
+          bilan_date: nextDate,
+        });
       } else {
         const data = await pb.collection("patient_bilans").create({
           patient: patientId,
@@ -132,16 +156,37 @@ export default function PatientBilanIntermediaire() {
           user: user.id,
           position_after_seance: 0,
           content: bilanJson,
-          bilan_date: bilanDate,
+          bilan_date: nextDate,
         });
         setExistingBilanId(data.id);
       }
+    })();
 
+    savingPromiseRef.current = run;
+    try {
+      await run;
+    } catch (error) {
+      console.error("Error auto-saving bilan:", error);
+      toast.error("Erreur lors de l'enregistrement automatique");
+    } finally {
+      if (savingPromiseRef.current === run) savingPromiseRef.current = null;
+    }
+  };
+
+  const handleAutoSave = () => {
+    void persistBilan(bilan, bilanDate);
+  };
+
+  // Bouton "Enregistrer" : sauvegarde explicite avec feedback + retour arrière.
+  const handleSave = async () => {
+    if (!user || !patientId) return;
+    setIsSaving(true);
+    try {
+      // Force le flag même si onBlur n'a jamais été déclenché.
+      isReadyRef.current = true;
+      await persistBilan(bilan, bilanDate);
       toast.success("Bilan enregistré");
       navigate(-1);
-    } catch (error) {
-      console.error("Error saving bilan:", error);
-      toast.error("Erreur lors de l'enregistrement");
     } finally {
       setIsSaving(false);
     }
@@ -196,7 +241,13 @@ export default function PatientBilanIntermediaire() {
               <Input
                 type="date"
                 value={bilanDate}
-                onChange={(e) => setBilanDate(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setBilanDate(v);
+                  // La date ne reçoit pas onBlur de manière fiable → on déclenche l'auto-save sur change.
+                  setTimeout(() => { void persistBilan(bilan, v); }, 0);
+                }}
+                onBlur={handleAutoSave}
                 className="max-w-xs"
               />
             </CardContent>
@@ -212,6 +263,7 @@ export default function PatientBilanIntermediaire() {
                 placeholder="Objectif à atteindre pour ce bilan intermédiaire..."
                 value={bilan.objectif_intermediaire}
                 onChange={(e) => handleChange("objectif_intermediaire", e.target.value)}
+                onBlur={handleAutoSave}
                 className="min-h-[100px]"
               />
             </CardContent>
@@ -229,6 +281,7 @@ export default function PatientBilanIntermediaire() {
                   placeholder="Ex: Épaule droite, lombaires..."
                   value={bilan.douleur_localisation}
                   onChange={(e) => handleChange("douleur_localisation", e.target.value)}
+                  onBlur={handleAutoSave}
                   className="mt-1"
                 />
               </div>
@@ -239,6 +292,7 @@ export default function PatientBilanIntermediaire() {
                     placeholder="Ex: 6/10"
                     value={bilan.douleur_intensite}
                     onChange={(e) => handleChange("douleur_intensite", e.target.value)}
+                    onBlur={handleAutoSave}
                     className="mt-1"
                   />
                 </div>
@@ -248,6 +302,7 @@ export default function PatientBilanIntermediaire() {
                     placeholder="Ex: Mécanique, inflammatoire, mixte..."
                     value={bilan.douleur_type}
                     onChange={(e) => handleChange("douleur_type", e.target.value)}
+                    onBlur={handleAutoSave}
                     className="mt-1"
                   />
                 </div>
@@ -267,6 +322,7 @@ export default function PatientBilanIntermediaire() {
                   placeholder="Décrivez les limitations d'amplitude..."
                   value={bilan.amplitude_articulaire}
                   onChange={(e) => handleChange("amplitude_articulaire", e.target.value)}
+                  onBlur={handleAutoSave}
                   className="mt-1 min-h-[100px]"
                 />
               </div>
@@ -276,6 +332,7 @@ export default function PatientBilanIntermediaire() {
                   placeholder="Testing musculaire, déficits observés..."
                   value={bilan.force_musculaire}
                   onChange={(e) => handleChange("force_musculaire", e.target.value)}
+                  onBlur={handleAutoSave}
                   className="mt-1 min-h-[100px]"
                 />
               </div>
@@ -292,6 +349,7 @@ export default function PatientBilanIntermediaire() {
                 placeholder="Tests orthopédiques réalisés et résultats..."
                 value={bilan.tests_specifiques}
                 onChange={(e) => handleChange("tests_specifiques", e.target.value)}
+                onBlur={handleAutoSave}
                 className="min-h-[120px]"
               />
             </CardContent>
@@ -307,6 +365,7 @@ export default function PatientBilanIntermediaire() {
                 placeholder="Évolution depuis le dernier bilan, progrès, difficultés..."
                 value={bilan.observations}
                 onChange={(e) => handleChange("observations", e.target.value)}
+                onBlur={handleAutoSave}
                 className="min-h-[120px]"
               />
             </CardContent>
