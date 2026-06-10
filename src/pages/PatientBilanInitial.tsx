@@ -145,6 +145,10 @@ export default function PatientBilanInitial() {
   const [loadFailed, setLoadFailed] = useState(false);
 
   const [bilan, setBilan] = useState<BilanData>(defaultBilan);
+  // Date du bilan initial — partagée avec la fiche patient (patient_care_plans.bilan_initial_date)
+  // Stockée au format ISO (YYYY-MM-DD) pour l'input type="date".
+  const [bilanInitialDate, setBilanInitialDate] = useState<string>("");
+  const [carePlanId, setCarePlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -170,6 +174,12 @@ export default function PatientBilanInitial() {
     try {
       carePlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
     } catch { /* none yet */ }
+
+    if (carePlan) {
+      setCarePlanId(carePlan.id);
+      // bilan_initial_date est la source de vérité (partagée avec PatientDetail).
+      setBilanInitialDate(carePlan.bilan_initial_date || "");
+    }
 
     const fullName = patient?.name ?? "";
     // Split patient name into nom (last word) and prenom (everything before).
@@ -227,7 +237,15 @@ export default function PatientBilanInitial() {
     }
     setSaving(true);
 
-    const savedBilan = { ...bilan, date_bilan: new Date().toLocaleDateString("fr-FR") };
+    // Auto-génération de la date si laissée vide (ISO YYYY-MM-DD).
+    const today = new Date().toISOString().slice(0, 10);
+    const effectiveDate = bilanInitialDate || today;
+    if (!bilanInitialDate) setBilanInitialDate(effectiveDate);
+
+    // On garde date_bilan dans le JSON pour les anciens records, synchronisé en fr-FR (impression).
+    const [yyyy, mm, dd] = effectiveDate.split("-");
+    const dateBilanFr = dd && mm && yyyy ? `${dd}/${mm}/${yyyy}` : "";
+    const savedBilan = { ...bilan, date_bilan: dateBilanFr };
     setBilan(savedBilan);
     const bilanJson = JSON.stringify(savedBilan);
 
@@ -237,13 +255,19 @@ export default function PatientBilanInitial() {
     } catch { /* none yet */ }
 
     if (existingPlan) {
-      await pb.collection("patient_care_plans").update(existingPlan.id, { bilan_initial_data: bilanJson });
+      await pb.collection("patient_care_plans").update(existingPlan.id, {
+        bilan_initial_data: bilanJson,
+        bilan_initial_date: effectiveDate,
+      });
+      setCarePlanId(existingPlan.id);
     } else {
-      await pb.collection("patient_care_plans").create({
+      const created = await pb.collection("patient_care_plans").create({
         patient: id,
         user: user.id,
         bilan_initial_data: bilanJson,
+        bilan_initial_date: effectiveDate,
       });
+      setCarePlanId(created.id);
     }
 
     toast({ title: "Bilan initial enregistré" });
@@ -318,12 +342,22 @@ export default function PatientBilanInitial() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePrint} className="print:hidden">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="bilan-initial-date" className="text-sm whitespace-nowrap">Date du bilan</Label>
+              <Input
+                id="bilan-initial-date"
+                type="date"
+                value={bilanInitialDate}
+                onChange={(e) => setBilanInitialDate(e.target.value)}
+                className="w-40 h-9"
+              />
+            </div>
+            <Button variant="outline" onClick={handlePrint}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimer
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground print:hidden">
+            <Button onClick={handleSave} disabled={saving} className="gradient-primary text-primary-foreground">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
               Enregistrer
             </Button>
@@ -355,7 +389,11 @@ export default function PatientBilanInitial() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Label className="font-semibold">Date :</Label>
-                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">{bilan.date_bilan}</span>
+                  <span className="flex-1 border-b border-foreground min-h-[1.5rem] flex items-end pb-0.5">
+                    {bilanInitialDate
+                      ? new Date(bilanInitialDate).toLocaleDateString("fr-FR")
+                      : bilan.date_bilan}
+                  </span>
                 </div>
               </div>
             </CardContent>
