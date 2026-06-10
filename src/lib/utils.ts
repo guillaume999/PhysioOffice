@@ -24,3 +24,17 @@ export function parseJsonField<T = unknown>(value: unknown): T | null {
   }
   return null;
 }
+
+/**
+ * Normalise une date PocketBase pour un <Input type="date">.
+ * PB renvoie les champs `date` au format "YYYY-MM-DD HH:mm:ss.sssZ" (ou ISO complet),
+ * mais l'input HTML n'accepte que "YYYY-MM-DD". Retourne "" si la valeur est vide/invalide.
+ */
+export function toIsoDate(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value !== "string") return "";
+  // Slice les 10 premiers caractères : "YYYY-MM-DD" ou ISO complet → "YYYY-MM-DD"
+  const sliced = value.slice(0, 10);
+  // Sanity check : format YYYY-MM-DD
+  return /^\d{4}-\d{2}-\d{2}$/.test(sliced) ? sliced : "";
+}

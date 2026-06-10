@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { parseJsonField } from "@/lib/utils";
+import { parseJsonField, toIsoDate } from "@/lib/utils";
 import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
 
 interface BilanEntry {
@@ -178,7 +178,8 @@ export default function PatientBilanInitial() {
     if (carePlan) {
       setCarePlanId(carePlan.id);
       // bilan_initial_date est la source de vérité (partagée avec PatientDetail).
-      setBilanInitialDate(carePlan.bilan_initial_date || "");
+      // PB renvoie au format "YYYY-MM-DD HH:mm:ss.sssZ" → on slice pour l'Input.
+      setBilanInitialDate(toIsoDate(carePlan.bilan_initial_date));
     }
 
     const fullName = patient?.name ?? "";

@@ -22,7 +22,7 @@ import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDia
 import { PatientReportPrintDialog } from "@/components/patient/PatientReportPrintDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { instantiateTraitementForPatient } from "@/lib/patientTraitement";
-import { parseJsonField } from "@/lib/utils";
+import { parseJsonField, toIsoDate } from "@/lib/utils";
 
 interface PatientData {
   id: string;
@@ -147,8 +147,10 @@ export default function PatientDetail() {
         bilan_kine: data.bilan_kine || "",
         objectifs_prise_en_charge: data.objectifs_prise_en_charge || "",
         active_traitement_id: data.active_traitement ?? data.active_traitement_id,
-        bilan_initial_date: data.bilan_initial_date || null,
-        traitement_start_date: data.traitement_start_date || null,
+        // PB renvoie les dates au format "YYYY-MM-DD HH:mm:ss.sssZ" — on slice
+        // en "YYYY-MM-DD" pour que <Input type="date"> les affiche correctement.
+        bilan_initial_date: toIsoDate(data.bilan_initial_date) || null,
+        traitement_start_date: toIsoDate(data.traitement_start_date) || null,
       });
 
       // Parse bilan initial data
