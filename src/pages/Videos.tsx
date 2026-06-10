@@ -6,17 +6,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Trash2, Edit, Play, Upload, Loader2, Video, Image as ImageIcon } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import {
+  type MediaType,
+  detectFileMediaType,
+  MAX_IMAGE_SIZE,
+  MAX_VIDEO_SIZE,
+} from "@/lib/exerciceMedia";
+
+type MediaFilter = "all" | "video" | "image";
 
 interface VideoItem {
   id: string;
   title: string;
-  video_url: string;
+  video_url: string | null;
   thumbnail_url: string | null;
+  image_url: string | null;
+  media_type: MediaType | string | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,13 +44,15 @@ export default function Videos() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const editVideoInputRef = useRef<HTMLInputElement>(null);
+  const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
+
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const editMediaInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
-  const [formVideoFile, setFormVideoFile] = useState<File | null>(null);
+  const [formMediaFile, setFormMediaFile] = useState<File | null>(null);
+  const [formMediaType, setFormMediaType] = useState<MediaType>("video");
 
   useEffect(() => {
     if (user) {
@@ -49,10 +62,17 @@ export default function Videos() {
 
   useEffect(() => {
     applyFilters();
-  }, [videos, searchQuery]);
+  }, [videos, searchQuery, mediaFilter]);
 
   const applyFilters = () => {
     let result = [...videos];
+
+    if (mediaFilter !== "all") {
+      result = result.filter((v) => {
+        const t = v.media_type === "image" ? "image" : "video";
+        return t === mediaFilter;
+      });
+    }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -220,6 +240,15 @@ export default function Videos() {
     return pb.files.getURL(rec, rec.file as string);
   };
 
+  const uploadImageToStorage = async (imageFile: File): Promise<string> => {
+    if (!user) throw new Error("Not authenticated");
+    const fd = new FormData();
+    fd.append("file", imageFile);
+    fd.append("user", user.id);
+    const rec = await pb.collection("exercice_images").create(fd);
+    return pb.files.getURL(rec, rec.file as string);
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
 
@@ -228,41 +257,58 @@ export default function Videos() {
       return;
     }
 
-    if (!formVideoFile) {
-      toast.error("Veuillez sélectionner une vidéo");
+    if (!formMediaFile) {
+      toast.error("Veuillez sélectionner un fichier");
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      // Generate thumbnail first
-      setUploadProgress(10);
-      const thumbnailDataUrl = await generateThumbnailFromFile(formVideoFile);
-      let thumbnailUrl: string | null = null;
-      
-      if (thumbnailDataUrl) {
-        setUploadProgress(20);
-        thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+      if (formMediaType === "image") {
+        setUploadProgress(40);
+        const imageUrl = await uploadImageToStorage(formMediaFile);
+        setUploadProgress(80);
+
+        await pb.collection("videos").create({
+          user: user.id,
+          title: formTitle.trim(),
+          image_url: imageUrl,
+          media_type: "image",
+          name: formMediaFile.name || formTitle.trim(),
+        });
+      } else {
+        setUploadProgress(10);
+        const thumbnailDataUrl = await generateThumbnailFromFile(formMediaFile);
+        let thumbnailUrl: string | null = null;
+
+        if (thumbnailDataUrl) {
+          setUploadProgress(20);
+          thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+        }
+
+        setUploadProgress(40);
+        const videoUrl = await uploadVideoToStorage(formMediaFile);
+        setUploadProgress(80);
+
+        await pb.collection("videos").create({
+          user: user.id,
+          title: formTitle.trim(),
+          video_url: videoUrl,
+          thumbnail_url: thumbnailUrl,
+          media_type: "video",
+          name: formMediaFile.name || formTitle.trim(),
+        });
       }
 
-      setUploadProgress(40);
-      const videoUrl = await uploadVideoToStorage(formVideoFile);
-      setUploadProgress(80);
-
-      await pb.collection("videos").create({
-          user: user.id, title: formTitle.trim(), video_url: videoUrl, thumbnail_url: thumbnailUrl,
-          name: formVideoFile?.name || formTitle.trim(),
-        });
-
       setUploadProgress(100);
-      toast.success("Vidéo ajoutée avec succès");
+      toast.success(`${formMediaType === "image" ? "Image" : "Vidéo"} ajoutée avec succès`);
       setDialogOpen(false);
       resetForm();
       fetchVideos();
     } catch (error) {
-      console.error("Error creating video:", error);
-      toast.error("Erreur lors de l'ajout de la vidéo");
+      console.error("Error creating media:", error);
+      toast.error("Erreur lors de l'ajout du média");
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -280,46 +326,57 @@ export default function Videos() {
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      let videoUrl = selectedVideo.video_url;
-      let thumbnailUrl = selectedVideo.thumbnail_url;
+      const isImage = (selectedVideo.media_type === "image");
+      const updatePayload: Record<string, any> = { title: formTitle.trim() };
 
-      if (formVideoFile) {
-        // Generate new thumbnail from new file
-        setUploadProgress(10);
-        const thumbnailDataUrl = await generateThumbnailFromFile(formVideoFile);
-        
-        if (thumbnailDataUrl) {
-          setUploadProgress(20);
-          thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+      if (formMediaFile) {
+        const detected = detectFileMediaType(formMediaFile);
+        if (detected === "image") {
+          setUploadProgress(40);
+          const imageUrl = await uploadImageToStorage(formMediaFile);
+          updatePayload.image_url = imageUrl;
+          updatePayload.video_url = null;
+          updatePayload.thumbnail_url = null;
+          updatePayload.media_type = "image";
+          setUploadProgress(80);
+        } else {
+          setUploadProgress(10);
+          const thumbnailDataUrl = await generateThumbnailFromFile(formMediaFile);
+          let thumbnailUrl: string | null = null;
+          if (thumbnailDataUrl) {
+            setUploadProgress(20);
+            thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+          }
+          setUploadProgress(40);
+          const videoUrl = await uploadVideoToStorage(formMediaFile);
+          updatePayload.video_url = videoUrl;
+          updatePayload.thumbnail_url = thumbnailUrl;
+          updatePayload.image_url = null;
+          updatePayload.media_type = "video";
+          setUploadProgress(80);
         }
-
-        setUploadProgress(40);
-        videoUrl = await uploadVideoToStorage(formVideoFile);
-        setUploadProgress(80);
-      } else if (!thumbnailUrl && videoUrl) {
+      } else if (!isImage && !selectedVideo.thumbnail_url && selectedVideo.video_url) {
         // Generate thumbnail from existing video URL if missing
         setUploadProgress(20);
         toast.info("Génération de la vignette...");
-        const thumbnailDataUrl = await generateThumbnailFromUrl(videoUrl);
-        
+        const thumbnailDataUrl = await generateThumbnailFromUrl(selectedVideo.video_url);
         if (thumbnailDataUrl) {
           setUploadProgress(50);
-          thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+          const thumbnailUrl = await uploadThumbnailToStorage(thumbnailDataUrl);
+          updatePayload.thumbnail_url = thumbnailUrl;
         }
         setUploadProgress(80);
       }
 
-      await pb.collection("videos").update(selectedVideo.id, { title: formTitle.trim(), video_url: videoUrl, thumbnail_url: thumbnailUrl });
+      await pb.collection("videos").update(selectedVideo.id, updatePayload);
 
       setUploadProgress(100);
-      toast.success(thumbnailUrl && !selectedVideo.thumbnail_url 
-        ? "Vidéo modifiée et vignette générée" 
-        : "Vidéo modifiée avec succès");
+      toast.success("Média modifié avec succès");
       setEditDialogOpen(false);
       resetForm();
       fetchVideos();
     } catch (error) {
-      console.error("Error updating video:", error);
+      console.error("Error updating media:", error);
       toast.error("Erreur lors de la modification");
     } finally {
       setIsUploading(false);
@@ -328,34 +385,36 @@ export default function Videos() {
   };
 
   const handleDelete = async (video: VideoItem) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette vidéo ?")) return;
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce média ?")) return;
 
     try {
-      // First, remove the video reference from all exercices using it
+      // First, remove the media reference from all exercices using it
       const linkedEx = await pb.collection("exercices").getFullList({ filter: `video = "${video.id}"` });
-      for (const ex of linkedEx) await pb.collection("exercices").update(ex.id, { video: null, video_url: null, thumbnail_url: null });
+      for (const ex of linkedEx) await pb.collection("exercices").update(ex.id, { video: null, video_url: null, thumbnail_url: null, image_url: null });
 
-      // Delete the video record (PocketBase auto-deletes the linked file)
+      // Delete the media record (PocketBase auto-deletes the linked file)
       await pb.collection("videos").delete(video.id);
 
-      toast.success("Vidéo supprimée avec succès");
+      toast.success("Média supprimé avec succès");
       fetchVideos();
     } catch (error) {
-      console.error("Error deleting video:", error);
+      console.error("Error deleting media:", error);
       toast.error("Erreur lors de la suppression");
     }
   };
 
   const resetForm = () => {
     setFormTitle("");
-    setFormVideoFile(null);
+    setFormMediaFile(null);
+    setFormMediaType("video");
     setSelectedVideo(null);
   };
 
   const openEditDialog = (video: VideoItem) => {
     setSelectedVideo(video);
     setFormTitle(video.title);
-    setFormVideoFile(null);
+    setFormMediaFile(null);
+    setFormMediaType((video.media_type === "image" ? "image" : "video") as MediaType);
     setEditDialogOpen(true);
   };
 
@@ -364,21 +423,27 @@ export default function Videos() {
     setVideoDialogOpen(true);
   };
 
-  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('video/')) {
-      toast.error("Veuillez sélectionner un fichier vidéo");
+    const detected = detectFileMediaType(file);
+    if (!detected) {
+      toast.error("Format non supporté : sélectionnez une image ou une vidéo");
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) {
+    if (detected === "video" && file.size > MAX_VIDEO_SIZE) {
       toast.error("La vidéo ne doit pas dépasser 50 Mo");
       return;
     }
+    if (detected === "image" && file.size > MAX_IMAGE_SIZE) {
+      toast.error("L'image ne doit pas dépasser 5 Mo");
+      return;
+    }
 
-    setFormVideoFile(file);
+    setFormMediaFile(file);
+    setFormMediaType(detected);
   };
 
   if (loading) {
@@ -397,9 +462,9 @@ export default function Videos() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Bibliothèque Vidéos</h1>
+            <h1 className="text-3xl font-bold">Médiathèque</h1>
             <p className="text-muted-foreground">
-              Gérez votre bibliothèque de vidéos
+              Gérez votre bibliothèque d'images et de vidéos
             </p>
           </div>
 
@@ -410,12 +475,12 @@ export default function Videos() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                Ajouter une vidéo
+                Ajouter un média
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Nouvelle vidéo</DialogTitle>
+                <DialogTitle>Nouveau média</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -424,29 +489,34 @@ export default function Videos() {
                     id="add-title"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Titre de la vidéo"
+                    placeholder="Titre du média"
                   />
                 </div>
 
                 <div>
-                  <Label>Vidéo *</Label>
+                  <Label>Fichier (image ou vidéo) *</Label>
                   <div className="mt-2">
                     <input
-                      ref={videoInputRef}
+                      ref={mediaInputRef}
                       type="file"
-                      accept="video/*"
-                      onChange={handleVideoSelect}
+                      accept="image/*,video/*"
+                      onChange={handleMediaSelect}
                       className="hidden"
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => videoInputRef.current?.click()}
+                      onClick={() => mediaInputRef.current?.click()}
                       className="w-full"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {formVideoFile ? formVideoFile.name : "Sélectionner une vidéo"}
+                      {formMediaFile ? formMediaFile.name : "Sélectionner un fichier"}
                     </Button>
+                    {formMediaFile && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Type détecté : {formMediaType === "image" ? "Image" : "Vidéo"}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -489,16 +559,43 @@ export default function Videos() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2">
                 <Video className="h-5 w-5" />
-                Mes vidéos ({filteredVideos.length})
+                Mes médias ({filteredVideos.length})
               </CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="flex gap-1">
+                  <Button
+                    variant={mediaFilter === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMediaFilter("all")}
+                  >
+                    Tous
+                  </Button>
+                  <Button
+                    variant={mediaFilter === "video" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMediaFilter("video")}
+                  >
+                    <Video className="h-3.5 w-3.5 mr-1" />
+                    Vidéos
+                  </Button>
+                  <Button
+                    variant={mediaFilter === "image" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMediaFilter("image")}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 mr-1" />
+                    Images
+                  </Button>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -506,9 +603,9 @@ export default function Videos() {
             {filteredVideos.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Aucune vidéo trouvée</p>
+                <p>Aucun média trouvé</p>
                 <p className="text-sm mt-2">
-                  Ajoutez votre première vidéo pour commencer
+                  Ajoutez votre premier média pour commencer
                 </p>
               </div>
             ) : (
@@ -518,58 +615,74 @@ export default function Videos() {
                     <TableRow>
                       <TableHead>Aperçu</TableHead>
                       <TableHead>Titre</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredVideos.map((video) => (
-                      <TableRow key={video.id}>
-                        <TableCell>
-                          <button 
-                            type="button"
-                            className="w-20 h-14 bg-muted rounded overflow-hidden flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative group"
-                            onClick={() => openVideoPlayer(video)}
-                          >
-                            {video.thumbnail_url ? (
-                              <img 
-                                src={video.thumbnail_url} 
-                                alt={video.title}
-                                className="w-full h-full object-cover"
-                              />
+                    {filteredVideos.map((video) => {
+                      const isImg = video.media_type === "image";
+                      const thumbSrc = isImg ? video.image_url : video.thumbnail_url;
+                      return (
+                        <TableRow key={video.id}>
+                          <TableCell>
+                            <button
+                              type="button"
+                              className="w-20 h-14 bg-muted rounded overflow-hidden flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative group"
+                              onClick={() => openVideoPlayer(video)}
+                            >
+                              {thumbSrc ? (
+                                <img
+                                  src={thumbSrc}
+                                  alt={video.title}
+                                  className={`w-full h-full ${isImg ? "object-contain bg-black/5" : "object-cover"}`}
+                                />
+                              ) : (
+                                isImg
+                                  ? <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                  : <Play className="h-6 w-6 text-muted-foreground" />
+                              )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                {isImg
+                                  ? <ImageIcon className="h-6 w-6 text-white" />
+                                  : <Play className="h-6 w-6 text-white" />}
+                              </div>
+                            </button>
+                          </TableCell>
+                          <TableCell className="font-medium">{video.title}</TableCell>
+                          <TableCell>
+                            {isImg ? (
+                              <Badge variant="secondary"><ImageIcon className="h-3 w-3 mr-1" />Image</Badge>
                             ) : (
-                              <Play className="h-6 w-6 text-muted-foreground" />
+                              <Badge variant="secondary"><Video className="h-3 w-3 mr-1" />Vidéo</Badge>
                             )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Play className="h-6 w-6 text-white" />
+                          </TableCell>
+                          <TableCell>
+                            {new Date(video.created_at).toLocaleDateString("fr-FR")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(video)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(video)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                          </button>
-                        </TableCell>
-                        <TableCell className="font-medium">{video.title}</TableCell>
-                        <TableCell>
-                          {new Date(video.created_at).toLocaleDateString("fr-FR")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(video)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(video)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -584,7 +697,7 @@ export default function Videos() {
         }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Modifier la vidéo</DialogTitle>
+              <DialogTitle>Modifier le média</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -593,33 +706,38 @@ export default function Videos() {
                   id="edit-title"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Titre de la vidéo"
+                  placeholder="Titre du média"
                 />
               </div>
 
               <div>
-                <Label>Vidéo</Label>
+                <Label>Fichier</Label>
                 <div className="mt-2">
                   <input
-                    ref={editVideoInputRef}
+                    ref={editMediaInputRef}
                     type="file"
-                    accept="video/*"
-                    onChange={handleVideoSelect}
+                    accept="image/*,video/*"
+                    onChange={handleMediaSelect}
                     className="hidden"
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => editVideoInputRef.current?.click()}
+                    onClick={() => editMediaInputRef.current?.click()}
                     className="w-full"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    {formVideoFile ? formVideoFile.name : "Changer la vidéo"}
+                    {formMediaFile ? formMediaFile.name : "Changer le fichier"}
                   </Button>
                 </div>
-                {selectedVideo && !formVideoFile && (
+                {selectedVideo && !formMediaFile && (
                   <p className="text-sm text-muted-foreground mt-2">
-                    Vidéo actuelle : conservée si aucune nouvelle vidéo n'est sélectionnée
+                    Média actuel : conservé si aucun nouveau fichier n'est sélectionné
+                  </p>
+                )}
+                {formMediaFile && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Type détecté : {formMediaType === "image" ? "Image" : "Vidéo"}
                   </p>
                 )}
               </div>
@@ -631,16 +749,16 @@ export default function Videos() {
                     <span className="text-sm">Upload en cours... {uploadProgress}%</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
                 </div>
               )}
 
-              <Button 
-                onClick={handleUpdate} 
+              <Button
+                onClick={handleUpdate}
                 className="w-full"
                 disabled={isUploading}
               >
@@ -657,22 +775,34 @@ export default function Videos() {
           </DialogContent>
         </Dialog>
 
-        {/* Video Player Dialog */}
+        {/* Media Player Dialog */}
         <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
           <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>{selectedVideo?.title}</DialogTitle>
             </DialogHeader>
-            {selectedVideo && (
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  src={selectedVideo.video_url}
-                  controls
-                  autoPlay
-                  className="w-full h-full"
-                />
+            {selectedVideo && (selectedVideo.media_type === "image" ? (
+              <div className="flex items-center justify-center bg-muted rounded-lg">
+                {selectedVideo.image_url && (
+                  <img
+                    src={selectedVideo.image_url}
+                    alt={selectedVideo.title}
+                    className="max-h-[70vh] w-auto rounded-lg object-contain"
+                  />
+                )}
               </div>
-            )}
+            ) : (
+              <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                {selectedVideo.video_url && (
+                  <video
+                    src={selectedVideo.video_url}
+                    controls
+                    autoPlay
+                    className="w-full h-full"
+                  />
+                )}
+              </div>
+            ))}
           </DialogContent>
         </Dialog>
       </div>

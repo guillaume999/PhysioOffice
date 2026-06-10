@@ -271,7 +271,8 @@ export function AddExerciceToSeanceDialog({
     if (!user) return;
     setLibraryLoading(true);
     try {
-      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      // Filtrer pour ne montrer que les vidéos (pas les images) dans ce contexte de sélection vidéo
+      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
       setLibraryVideos(data as unknown as VideoLibraryItem[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);

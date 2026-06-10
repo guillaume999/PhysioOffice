@@ -32,6 +32,8 @@ interface SeanceExercice {
     description: string | null;
     thumbnail_url: string | null;
     video_url: string | null;
+    image_url?: string | null;
+    media_type?: string | null;
   } | null;
 }
 
@@ -295,7 +297,13 @@ export default function PatientSessionView() {
               {seanceExercices.map((exercice, index) => {
                 const isCompleted = completedExercices.has(exercice.id);
                 const isExpanded = expandedExercice === exercice.id;
+                const isImageMedia = exercice.exercices?.media_type === "image";
                 const hasVideo = !!exercice.exercices?.video_url;
+                const hasImage = !!exercice.exercices?.image_url;
+                const hasMedia = isImageMedia ? hasImage : hasVideo;
+                const thumbnailSrc = isImageMedia
+                  ? exercice.exercices?.image_url
+                  : exercice.exercices?.thumbnail_url;
                 const hasDescription = !!(exercice.description || exercice.exercices?.description);
                 
                 return (
@@ -319,15 +327,15 @@ export default function PatientSessionView() {
                           <CheckCircle className="w-5 h-5" />
                         </Button>
                         
-                        {/* Thumbnail */}
-                        {exercice.exercices?.thumbnail_url ? (
+                        {/* Thumbnail (image or video) */}
+                        {thumbnailSrc ? (
                           <div className="relative flex-shrink-0">
-                            <img 
-                              src={exercice.exercices.thumbnail_url} 
-                              alt="" 
-                              className="w-16 h-16 rounded-lg object-cover"
+                            <img
+                              src={thumbnailSrc}
+                              alt=""
+                              className={`w-16 h-16 rounded-lg ${isImageMedia ? "object-contain bg-black/5" : "object-cover"}`}
                             />
-                            {hasVideo && (
+                            {hasMedia && !isImageMedia && (
                               <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
                                 <Play className="w-6 h-6 text-white" />
                               </div>
@@ -390,17 +398,21 @@ export default function PatientSessionView() {
                             </div>
                           )}
                           
-                          {/* Video button */}
-                          {hasVideo && (
-                            <Button 
+                          {/* Media button (image or video) */}
+                          {hasMedia && (
+                            <Button
                               className="w-full gap-2"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setVideoToPlay(exercice.exercices?.video_url || null);
+                                setVideoToPlay(
+                                  isImageMedia
+                                    ? exercice.exercices?.image_url || null
+                                    : exercice.exercices?.video_url || null
+                                );
                               }}
                             >
                               <Play className="w-4 h-4" />
-                              Voir la vidéo
+                              {isImageMedia ? "Voir l'image" : "Voir la vidéo"}
                             </Button>
                           )}
                           
@@ -436,7 +448,7 @@ export default function PatientSessionView() {
         </div>
       </div>
 
-      {/* Video Dialog */}
+      {/* Media Dialog (image or video) */}
       <Dialog open={!!videoToPlay} onOpenChange={() => setVideoToPlay(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden">
           <div className="relative">
@@ -448,7 +460,13 @@ export default function PatientSessionView() {
             >
               <X className="w-4 h-4" />
             </Button>
-            {videoToPlay && (
+            {videoToPlay && /\.(jpe?g|png|webp|gif|bmp|svg)(\?|$)/i.test(videoToPlay) ? (
+              <img
+                src={videoToPlay}
+                alt=""
+                className="w-full max-h-[80vh] object-contain bg-black"
+              />
+            ) : videoToPlay && (
               <video
                 src={videoToPlay}
                 controls

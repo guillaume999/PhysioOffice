@@ -52,6 +52,8 @@ interface ExerciceItemCardProps {
       description?: string | null;
       video_url: string | null;
       thumbnail_url: string | null;
+      image_url?: string | null;
+      media_type?: string | null;
       status?: string;
     } | null;
   };
@@ -106,7 +108,7 @@ export function ExerciceItemCard({
     let cancelled = false;
     (async () => {
       const [exData, pathoData] = await Promise.all([
-        pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,pathologie_tags" }),
+        pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type,pathologie_tags" }),
         pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" }),
       ]);
       if (cancelled) return;
@@ -135,11 +137,16 @@ export function ExerciceItemCard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  const thumbnailUrl = editValues.thumbnail_url || exercice.exercice?.thumbnail_url || null;
+  // Touch (sync forçage mount).
+  const exerciceMediaType = exercice.exercice?.media_type;
+  const exerciceImageUrl = exercice.exercice?.image_url || null;
+  const isExerciceImage = exerciceMediaType === "image";
+  const thumbnailUrl = isExerciceImage
+    ? exerciceImageUrl
+    : (editValues.thumbnail_url || exercice.exercice?.thumbnail_url || null);
   const videoUrl = editValues.video_url || exercice.exercice?.video_url || null;
   const exerciceName = editValues.name || exercice.exercice?.title || exercice.name || `Exercice ${index + 1}`;
-  const hasVideo = thumbnailUrl || videoUrl;
+  const hasVideo = thumbnailUrl || videoUrl || (isExerciceImage && exerciceImageUrl);
 
   // Original values for comparison
   const originalName = exercice.exercice?.title || exercice.name || "";
@@ -272,7 +279,8 @@ export function ExerciceItemCard({
     if (!user) return;
     setLibraryLoading(true);
     try {
-      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      // Filtrer pour ne montrer que les vidéos dans ce contexte
+      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
       setLibraryVideos(data as unknown as VideoLibraryItem[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);
@@ -443,25 +451,25 @@ export function ExerciceItemCard({
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      {/* Thumbnail with video - full width */}
+      {/* Thumbnail with media (image or video) - full width */}
       {hasVideo && !isEditing && (
         <div className="relative w-full aspect-video bg-muted">
           {thumbnailUrl ? (
-            <img 
-              src={thumbnailUrl} 
+            <img
+              src={thumbnailUrl}
               alt={exerciceName}
-              className="w-full h-full object-cover"
+              className={`w-full h-full ${isExerciceImage ? "object-contain bg-black/5" : "object-cover"}`}
             />
           ) : videoUrl ? (
-            <video 
+            <video
               src={videoUrl}
               className="w-full h-full object-cover"
               muted
             />
           ) : null}
-          <div 
+          <div
             className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors cursor-pointer"
-            onClick={() => videoUrl && setVideoModalOpen(true)}
+            onClick={() => (isExerciceImage ? exerciceImageUrl : videoUrl) && setVideoModalOpen(true)}
           >
             <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
               <Play className="w-6 h-6 text-primary fill-primary ml-0.5" />
@@ -875,19 +883,29 @@ export function ExerciceItemCard({
         )}
       </div>
 
-      {/* Video Modal */}
+      {/* Media Modal (image or video) */}
       <Dialog open={videoModalOpen} onOpenChange={setVideoModalOpen}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black">
-          <div className="relative w-full aspect-video">
-            {videoUrl && (
-              <video
-                src={videoUrl}
-                className="w-full h-full"
-                controls
-                autoPlay
+          {isExerciceImage && exerciceImageUrl ? (
+            <div className="relative w-full flex items-center justify-center">
+              <img
+                src={exerciceImageUrl}
+                alt={exerciceName}
+                className="max-h-[80vh] w-auto object-contain"
               />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="relative w-full aspect-video">
+              {videoUrl && (
+                <video
+                  src={videoUrl}
+                  className="w-full h-full"
+                  controls
+                  autoPlay
+                />
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

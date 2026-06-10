@@ -36,6 +36,8 @@ interface ExerciceType {
   created_at: string;
   video_url?: string | null;
   thumbnail_url?: string | null;
+  image_url?: string | null;
+  media_type?: string | null;
   pathologie_tags?: string[] | null;
   rejection_reason?: string | null;
 }
@@ -241,8 +243,16 @@ export function ExerciceDetailDialog({
             </div>
           )}
 
-          {/* Video Preview */}
-          {exercice.video_url && (
+          {/* Media Preview (image or video) */}
+          {exercice.media_type === "image" && exercice.image_url ? (
+            <div className="rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+              <img
+                src={exercice.image_url}
+                alt={exercice.title}
+                className="max-h-[60vh] w-auto object-contain"
+              />
+            </div>
+          ) : exercice.video_url ? (
             <div className="rounded-lg overflow-hidden bg-muted aspect-video">
               <video
                 src={exercice.video_url}
@@ -251,7 +261,7 @@ export function ExerciceDetailDialog({
                 poster={exercice.thumbnail_url || undefined}
               />
             </div>
-          )}
+          ) : null}
 
           {/* Description */}
           {exercice.description && (
