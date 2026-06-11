@@ -45,7 +45,6 @@ interface Exercice {
   code: string;
   title: string;
   description: string | null;
-  commentaire: string | null;
   pathologie_tags: string[];
   objectif_tags: string[];
   status: string;
@@ -89,7 +88,6 @@ export default function Exercices() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    commentaire: "",
     pathologie_tags: [] as string[],
     objectif_tags: [] as string[],
     mediaFile: null as File | null,
@@ -357,7 +355,6 @@ export default function Exercices() {
       await pb.collection("exercices").create({
           user: user.id, title: formData.title.trim(),
           description: formData.description.trim() || null,
-          commentaire: formData.commentaire.trim() || null,
           pathologie_tags: formData.pathologie_tags,
           objectif_tags: formData.objectif_tags,
           video: videoId,
@@ -445,7 +442,6 @@ export default function Exercices() {
 
       await pb.collection("exercices").update(selectedExercice.id, {
           title: formData.title.trim(), description: formData.description.trim() || null,
-          commentaire: formData.commentaire.trim() || null,
           pathologie_tags: formData.pathologie_tags,
           objectif_tags: formData.objectif_tags,
           video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
@@ -468,7 +464,6 @@ export default function Exercices() {
     setFormData({
       title: "",
       description: "",
-      commentaire: "",
       pathologie_tags: [],
       objectif_tags: [],
       mediaFile: null,
@@ -487,7 +482,6 @@ export default function Exercices() {
     setFormData({
       title: exercice.title,
       description: exercice.description || "",
-      commentaire: exercice.commentaire || "",
       pathologie_tags: exercice.pathologie_tags || [],
       objectif_tags: exercice.objectif_tags || [],
       mediaFile: null,
@@ -922,8 +916,8 @@ export default function Exercices() {
                         <span className="text-xs font-normal text-muted-foreground">Pathologie</span>
                       </div>
                     </TableHead>
+                    <TableHead>Objectifs</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Commentaires</TableHead>
                     <TableHead>Auteur / Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -964,22 +958,26 @@ export default function Exercices() {
                         </div>
                       </TableCell>
 
-                      {/* Description */}
+                      {/* Objectifs */}
                       <TableCell>
-                        {exercice.description ? (
-                          <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">
-                            {exercice.description}
-                          </p>
+                        {exercice.objectif_tags && exercice.objectif_tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {exercice.objectif_tags.map((tag) => (
+                              <Badge key={tag} variant="default" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
 
-                      {/* Commentaires */}
+                      {/* Description */}
                       <TableCell>
-                        {exercice.commentaire ? (
-                          <p className="text-sm text-muted-foreground italic line-clamp-2 max-w-xs">
-                            {exercice.commentaire}
+                        {exercice.description ? (
+                          <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">
+                            {exercice.description}
                           </p>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
@@ -1311,7 +1309,6 @@ function ExerciceThumbnail({
 interface ExerciceFormData {
   title: string;
   description: string;
-  commentaire: string;
   pathologie_tags: string[];
   objectif_tags: string[];
   mediaFile: File | null;
@@ -1486,23 +1483,36 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
       </div>
 
       <div className="space-y-2">
+        <Label>Objectifs</Label>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {formData.objectif_tags.map((tag) => (
+            <Badge key={tag} variant="default" className="gap-1">
+              {tag}
+              <X className="w-3 h-3 cursor-pointer" onClick={() => removeObjectif(tag)} />
+            </Badge>
+          ))}
+          {formData.objectif_tags.length === 0 && (
+            <span className="text-xs text-muted-foreground">Aucun objectif sélectionné</span>
+          )}
+        </div>
+        <TagReferenceSelect
+          type="objectif"
+          options={objectifs.filter((o) => !formData.objectif_tags.includes(o))}
+          userId={userId}
+          onSelect={addObjectif}
+          onReferenceChanged={onTagsChanged}
+          placeholder="Rechercher ou créer un objectif"
+          className="w-full"
+        />
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Description de l'exercice"
-          rows={3}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="commentaire">Commentaire</Label>
-        <Textarea
-          id="commentaire"
-          value={formData.commentaire}
-          onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
-          placeholder="Commentaire (notes internes, précisions...)"
           rows={3}
         />
       </div>
@@ -1527,30 +1537,6 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
           onSelect={addPathologie}
           onReferenceChanged={onTagsChanged}
           placeholder="Rechercher ou créer une pathologie"
-          className="w-full"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Objectifs</Label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {formData.objectif_tags.map((tag) => (
-            <Badge key={tag} variant="default" className="gap-1">
-              {tag}
-              <X className="w-3 h-3 cursor-pointer" onClick={() => removeObjectif(tag)} />
-            </Badge>
-          ))}
-          {formData.objectif_tags.length === 0 && (
-            <span className="text-xs text-muted-foreground">Aucun objectif sélectionné</span>
-          )}
-        </div>
-        <TagReferenceSelect
-          type="objectif"
-          options={objectifs.filter((o) => !formData.objectif_tags.includes(o))}
-          userId={userId}
-          onSelect={addObjectif}
-          onReferenceChanged={onTagsChanged}
-          placeholder="Rechercher ou créer un objectif"
           className="w-full"
         />
       </div>
