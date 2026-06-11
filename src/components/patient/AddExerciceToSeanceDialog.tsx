@@ -98,7 +98,7 @@ export function AddExerciceToSeanceDialog({
     setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch exercices (user's own exercices)
-    const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url" });
+    const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type" });
     setAvailableExercices(exData as unknown as Exercice[]);
 
     // Fetch pathologies for search

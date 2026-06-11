@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MediaThumb } from "@/components/MediaThumb";
 
 export interface ExerciceOption {
   id: string;
@@ -13,6 +14,8 @@ export interface ExerciceOption {
   description?: string | null;
   video_url?: string | null;
   thumbnail_url?: string | null;
+  image_url?: string | null;
+  media_type?: string | null;
 }
 
 interface Props {
@@ -79,9 +82,14 @@ export function SearchableExerciceTitleInput({
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-1 h-4 w-4 flex-shrink-0",
                         value === opt.title ? "opacity-100" : "opacity-0"
                       )}
+                    />
+                    <MediaThumb
+                      source={opt}
+                      alt={opt.title}
+                      className="w-12 h-8 mr-2"
                     />
                     {opt.code && (
                       <span className="font-mono text-xs uppercase text-muted-foreground mr-2">

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableCreatableSelect } from "./SearchableCreatableSelect";
 import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil, Calendar } from "lucide-react";
+import { MediaThumb } from "@/components/MediaThumb";
 import { format } from "date-fns";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
@@ -33,6 +34,7 @@ interface SeanceExerciceItem {
   series: number | null;
   ordre: number;
   video_url?: string | null;
+  thumbnail_url?: string | null;
   video_file?: File | null;
 }
 
@@ -181,7 +183,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       const publicUrl = pb.files.getURL(vRec, vRec.file as string);
       
       const updated = [...exercices];
-      updated[index] = { ...updated[index], video_url: publicUrl, video_file: null };
+      updated[index] = { ...updated[index], video_url: publicUrl, thumbnail_url: null, video_file: null };
       setExercices(updated);
       
       toast.success("Vidéo uploadée avec succès");
@@ -195,7 +197,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
 
   const removeVideo = (index: number) => {
     const updated = [...exercices];
-    updated[index] = { ...updated[index], video_url: null, video_file: null };
+    updated[index] = { ...updated[index], video_url: null, thumbnail_url: null, video_file: null };
     setExercices(updated);
   };
 
@@ -210,12 +212,14 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         updated[index].name = selectedEx.title;
         updated[index].description = selectedEx.description || "";
         updated[index].video_url = selectedEx.video_url || null;
+        updated[index].thumbnail_url = selectedEx.thumbnail_url || null;
       }
     }
-    
+
     // If switching to custom, clear the video_url from the linked exercise
     if (field === "exercice_id" && !value) {
       updated[index].video_url = null;
+      updated[index].thumbnail_url = null;
     }
     
     setExercices(updated);
@@ -487,8 +491,22 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
                                 <SelectItem value="custom">Personnalisé</SelectItem>
                                 {availableExercices.map(e => (
                                   <SelectItem key={e.id} value={e.id}>
-                                    <span className="font-mono text-xs uppercase text-muted-foreground mr-2">{e.code}</span>
-                                    {e.title}
+                                    <span className="flex items-center gap-2">
+                                      {e.thumbnail_url ? (
+                                        <img
+                                          src={e.thumbnail_url}
+                                          alt={e.title}
+                                          className="w-10 h-7 object-cover rounded flex-shrink-0"
+                                          loading="lazy"
+                                        />
+                                      ) : (
+                                        <span className="w-10 h-7 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                          <Video className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                        </span>
+                                      )}
+                                      <span className="font-mono text-xs uppercase text-muted-foreground">{e.code}</span>
+                                      <span className="truncate">{e.title}</span>
+                                    </span>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -520,7 +538,12 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
                           <Label className="text-xs">Vidéo</Label>
                           {ex.video_url ? (
                             <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                              <Video className="w-4 h-4 text-primary" />
+                              <MediaThumb
+                                source={{ video_url: ex.video_url, thumbnail_url: ex.thumbnail_url }}
+                                alt={ex.name || "Vidéo de l'exercice"}
+                                className="w-16 h-10"
+                                showPlayIcon
+                              />
                               <span className="text-sm flex-1 truncate">Vidéo ajoutée</span>
                               <Button
                                 type="button"
