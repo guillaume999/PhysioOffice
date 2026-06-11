@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   Users, Brain, FileText, Calendar, Dumbbell, ClipboardList,
-  Video, Activity, Newspaper, Megaphone, GraduationCap, BookOpen,
+  Video, Activity, Target, Newspaper, Megaphone, GraduationCap, BookOpen,
   Briefcase, Stethoscope, Globe,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -45,6 +45,7 @@ const sections: Section[] = [
       { title: "Séances", icon: ClipboardList, href: "/seance-type" },
       { title: "Vidéos", icon: Video, href: "/videos" },
       { title: "Pathologies", icon: Activity, href: "/pathologies" },
+      { title: "Objectifs", icon: Target, href: "/objectifs" },
     ],
   },
   {
@@ -83,7 +84,7 @@ export function SectionDock() {
   const leaveTimer = useRef<ReturnType<typeof setTimeout>>();
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
   const subRefs0 = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
-  const subRefs1 = useRef<(HTMLDivElement | null)[]>([null, null, null, null, null]);
+  const subRefs1 = useRef<(HTMLDivElement | null)[]>([null, null, null, null, null, null]);
   const subRefs2 = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
   const allSubRefs = [subRefs0, subRefs1, subRefs2];
 

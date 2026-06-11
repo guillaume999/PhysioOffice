@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone, BookOpen, Activity } from "lucide-react";
+import { Users, Brain, FileText, ArrowRight, Sparkles, ClipboardList, Calendar, Dumbbell, GraduationCap, Newspaper, Video, Megaphone, BookOpen, Activity, Target } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
@@ -24,6 +24,7 @@ const featureGroups = [
       { title: "Séances", description: "Créez et gérez vos séances de rééducation", icon: ClipboardList, href: "/seance-type", color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-500/10" },
       { title: "Vidéos", description: "Votre vidéothèque de techniques et exercices", icon: Video, href: "/videos", color: "from-red-500 to-orange-500", bgColor: "bg-red-500/10" },
       { title: "Pathologies & Traitements", description: "Liste de vos pathologies avec leur protocole de traitement", icon: Activity, href: "/pathologies", color: "from-fuchsia-500 to-pink-500", bgColor: "bg-fuchsia-500/10" },
+      { title: "Objectifs", description: "Gérez votre bibliothèque d'objectifs de rééducation", icon: Target, href: "/objectifs", color: "from-emerald-500 to-teal-500", bgColor: "bg-emerald-500/10" },
     ],
   },
   {

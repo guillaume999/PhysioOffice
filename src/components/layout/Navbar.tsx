@@ -7,7 +7,7 @@ import {
   LogOut, User, Shield,
   Briefcase, Stethoscope, Globe,
   Users, FileText, Calendar, Brain,
-  Dumbbell, ClipboardList, Video, Activity,
+  Dumbbell, ClipboardList, Video, Activity, Target,
   Newspaper, Megaphone, GraduationCap, BookOpen,
   ChevronDown,
 } from "lucide-react";
@@ -60,6 +60,7 @@ const navSections: NavSection[] = [
       { label: "Séances", href: "/seance-type", icon: ClipboardList },
       { label: "Vidéos", href: "/videos", icon: Video },
       { label: "Pathologies", href: "/pathologies", icon: Activity },
+      { label: "Objectifs", href: "/objectifs", icon: Target },
     ],
   },
   {

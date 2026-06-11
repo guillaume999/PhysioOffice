@@ -91,7 +91,6 @@ export default function PatientDetail() {
     seance_date: string | null;
     nom?: string | null;
     objectifs_principaux: string[];
-    objectifs_secondaires: string[];
     pathologies: string[];
   }[]>([]);
   const [bilanInitialData, setBilanInitialData] = useState<Record<string, any> | null>(null);
@@ -180,7 +179,6 @@ export default function PatientDetail() {
           seance_date: s.date_prevue || null,
           nom: s.nom || null,
           objectifs_principaux: s.objectif ? [s.objectif] : [],
-          objectifs_secondaires: [],
           pathologies: [],
         })));
         const bilansData = await pb.collection("patient_bilans").getFullList({

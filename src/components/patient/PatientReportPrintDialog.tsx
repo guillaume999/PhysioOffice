@@ -24,7 +24,6 @@ interface TraitementSeance {
   seance_date: string | null;
   nom?: string | null;
   objectifs_principaux: string[];
-  objectifs_secondaires: string[];
   pathologies: string[];
 }
 

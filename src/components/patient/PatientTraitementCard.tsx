@@ -270,8 +270,12 @@ export function PatientTraitementCard({
     setEditingSeance({
       // Don't pass id to create a new copy
       pathologies: seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie],
-      objectifs_principaux: seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal],
-      objectifs_secondaires: seance.seance_types.objectifs_secondaires || [],
+      // Fusionne principaux + secondaires (distinction supprimée)
+      objectifs_principaux: [...new Set([
+        ...(seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal]),
+        ...(seance.seance_types.objectifs_secondaires || []),
+      ].filter(Boolean))],
+      objectifs_secondaires: [],
       exercices: (seance.exercices || []).map(ex => ({
         id: ex.id,
         exercice_id: ex.exercice_id,
@@ -295,8 +299,12 @@ export function PatientTraitementCard({
     setEditingSeance({
       id: seance.seance_type_id, // Pass id to edit original
       pathologies: seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie],
-      objectifs_principaux: seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal],
-      objectifs_secondaires: seance.seance_types.objectifs_secondaires || [],
+      // Fusionne principaux + secondaires (distinction supprimée)
+      objectifs_principaux: [...new Set([
+        ...(seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal]),
+        ...(seance.seance_types.objectifs_secondaires || []),
+      ].filter(Boolean))],
+      objectifs_secondaires: [],
       exercices: (seance.exercices || []).map(ex => ({
         id: ex.id,
         exercice_id: ex.exercice_id,
@@ -386,8 +394,13 @@ export function PatientTraitementCard({
         // Create new seance_type
         const newSeance = await pb.collection("seance_types").create({
             user: user.id, pathologie: seanceTypes.pathologie, objectif_principal: seanceTypes.objectif_principal,
-            pathologies: seanceTypes.pathologies, objectifs_principaux: seanceTypes.objectifs_principaux,
-            objectifs_secondaires: seanceTypes.objectifs_secondaires, comment: seanceTypes.comment,
+            pathologies: seanceTypes.pathologies,
+            // Fusionne principaux + secondaires (distinction supprimée)
+            objectifs_principaux: [...new Set([
+              ...(seanceTypes.objectifs_principaux || []),
+              ...(seanceTypes.objectifs_secondaires || []),
+            ].filter(Boolean))],
+            objectifs_secondaires: [], comment: seanceTypes.comment,
             is_hidden_from_list: true, is_shared: false,
           });
 

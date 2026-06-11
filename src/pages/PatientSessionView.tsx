@@ -14,7 +14,6 @@ interface SeanceType {
   objectif_principal: string;
   pathologies?: string[];
   objectifs_principaux?: string[];
-  objectifs_secondaires?: string[];
 }
 
 interface SeanceExercice {

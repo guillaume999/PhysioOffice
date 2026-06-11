@@ -311,9 +311,10 @@ export default function SeanceType() {
           pathologie: seance.pathologie,
           pathologies: seance.pathologies || [],
           objectif_principal: seance.objectif_principal,
-          objectifs_principaux: seance.objectifs_principaux || [],
-          objectif_secondaire: seance.objectif_secondaire,
-          objectifs_secondaires: seance.objectifs_secondaires || [],
+          // Fusionne principaux + secondaires (distinction supprimée)
+          objectifs_principaux: getDisplayObjectifs(seance),
+          objectif_secondaire: null,
+          objectifs_secondaires: [],
           author_name: profileData?.pseudo || seance.author_name,
           is_shared: false,
           is_copy: seance.user_id !== user.id,
