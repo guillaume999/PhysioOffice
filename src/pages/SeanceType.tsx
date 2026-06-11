@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 
 interface SeanceExercice {
   id: string;
@@ -21,6 +22,10 @@ interface SeanceExercice {
   repetitions: number | null;
   duration_seconds: number | null;
   series: number;
+  force_1: number | null;
+  duration_seconds_2: number | null;
+  force_2: number | null;
+  comment: string | null;
   exercice_id: string | null;
   exercice?: {
     id: string;
@@ -72,6 +77,7 @@ export default function SeanceType() {
   const [editingSeance, setEditingSeance] = useState<any>(null);
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
+  const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -529,9 +535,23 @@ export default function SeanceType() {
                                         const exerciceName = ex.exercice?.title || ex.name || `Exercice ${i + 1}`;
                                         
                                         return (
-                                          <div 
-                                            key={ex.id} 
-                                            className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50"
+                                          <div
+                                            key={ex.id}
+                                            className="flex items-start gap-4 p-3 bg-muted/30 rounded-xl border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors"
+                                            onClick={() => setPreviewExercice({
+                                              id: ex.exercice?.id,
+                                              title: exerciceName,
+                                              description: ex.description,
+                                              video_url: videoUrl,
+                                              thumbnail_url: thumbnailUrl,
+                                              series: ex.series,
+                                              repetitions: ex.repetitions,
+                                              duration_seconds: ex.duration_seconds,
+                                              force_1: ex.force_1,
+                                              duration_seconds_2: ex.duration_seconds_2,
+                                              force_2: ex.force_2,
+                                              comment: ex.comment,
+                                            })}
                                           >
                                             {/* Order number */}
                                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -539,18 +559,18 @@ export default function SeanceType() {
                                             </div>
 
                                             {/* Thumbnail or Video - Clickable */}
-                                            <div 
+                                            <div
                                               className={`w-20 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative ${videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
-                                              onClick={() => videoUrl && setVideoToPlay(videoUrl)}
+                                              onClick={(e) => { if (videoUrl) { e.stopPropagation(); setVideoToPlay(videoUrl); } }}
                                             >
                                               {thumbnailUrl ? (
-                                                <img 
-                                                  src={thumbnailUrl} 
+                                                <img
+                                                  src={thumbnailUrl}
                                                   alt={exerciceName}
                                                   className="w-full h-full object-cover"
                                                 />
                                               ) : videoUrl ? (
-                                                <video 
+                                                <video
                                                   src={videoUrl}
                                                   className="w-full h-full object-cover"
                                                   muted
@@ -566,7 +586,7 @@ export default function SeanceType() {
                                                 </div>
                                               )}
                                             </div>
-                                            
+
                                             {/* Exercise info */}
                                             <div className="flex-1 min-w-0">
                                               <p className="font-semibold text-base truncate mb-2">{exerciceName}</p>
@@ -691,6 +711,13 @@ export default function SeanceType() {
             )}
           </CardContent>
         </Card>
+
+        {/* Exercise Preview Dialog */}
+        <ExercicePreviewDialog
+          exercice={previewExercice}
+          open={!!previewExercice}
+          onOpenChange={(open) => !open && setPreviewExercice(null)}
+        />
 
         {/* Form Dialog */}
         <SeanceFormDialog

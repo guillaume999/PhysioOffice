@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp, Play, Clock, RotateCcw } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 
 interface TraitementTest {
   id: string;
@@ -35,6 +35,10 @@ interface SeanceExercice {
   repetitions: number | null;
   duration_seconds: number | null;
   series: number | null;
+  force_1: number | null;
+  duration_seconds_2: number | null;
+  force_2: number | null;
+  comment: string | null;
   exercice_id: string | null;
   exercices?: {
     id: string;
@@ -95,12 +99,9 @@ export default function TraitementType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
-  const [testDetailDialog, setTestDetailDialog] = useState<TraitementTest | null>(null);
   const [expandedTraitements, setExpandedTraitements] = useState<Set<string>>(new Set());
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
-  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
-  const [selectedVideoTitle, setSelectedVideoTitle] = useState<string>("");
+  const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -388,12 +389,6 @@ export default function TraitementType() {
     });
   };
 
-  const openVideoDialog = (videoUrl: string, title: string) => {
-    setSelectedVideoUrl(videoUrl);
-    setSelectedVideoTitle(title);
-    setVideoDialogOpen(true);
-  };
-
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -507,7 +502,10 @@ export default function TraitementType() {
                     <Card key={traitement.id} className="overflow-hidden">
                       <CardContent className="p-4">
                         {/* Header - Always visible */}
-                        <div className="flex items-center justify-between gap-4">
+                        <div
+                          className="flex items-center justify-between gap-4 cursor-pointer"
+                          onClick={() => toggleExpand(traitement.id)}
+                        >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
                               {traitement.code}
@@ -523,24 +521,9 @@ export default function TraitementType() {
                               • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
                             </span>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleExpand(traitement.id)}
-                            className="gap-1 flex-shrink-0"
-                          >
-                            {isExpanded ? (
-                              <>
-                                <ChevronUp className="w-4 h-4" />
-                                Réduire
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown className="w-4 h-4" />
-                                Détails
-                              </>
-                            )}
-                          </Button>
+                          <div className="flex-shrink-0 text-muted-foreground">
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
                         </div>
 
                         {/* Expandable content */}
@@ -571,17 +554,14 @@ export default function TraitementType() {
                                           {traitement.tests.map((test, j) => (
                                             <tr
                                               key={test.id}
-                                              className={`${
-                                                test.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50' : ''
-                                              } transition-colors`}
-                                              onClick={() => {
-                                                if (test.exercices?.video_url) {
-                                                  openVideoDialog(
-                                                    test.exercices.video_url,
-                                                    test.exercices.title || `Test ${j + 1}`
-                                                  );
-                                                }
-                                              }}
+                                              className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                              onClick={() => setPreviewExercice({
+                                                id: test.exercices?.id,
+                                                title: test.exercices?.title || `Test ${j + 1}`,
+                                                description: test.exercices?.description || test.description,
+                                                video_url: test.exercices?.video_url,
+                                                thumbnail_url: test.exercices?.thumbnail_url,
+                                              })}
                                             >
                                               <td className="p-2">
                                                 {test.exercices?.thumbnail_url ? (
@@ -655,17 +635,21 @@ export default function TraitementType() {
                                                 {seance.exercices.map((exercice, j) => (
                                                   <div
                                                     key={exercice.id}
-                                                    className={`flex items-center gap-3 p-2 rounded-lg ${
-                                                      exercice.exercices?.video_url ? 'cursor-pointer hover:bg-muted/50' : 'bg-muted/20'
-                                                    }`}
-                                                    onClick={() => {
-                                                      if (exercice.exercices?.video_url) {
-                                                        openVideoDialog(
-                                                          exercice.exercices.video_url,
-                                                          exercice.name || exercice.exercices.title || `Exercice ${j + 1}`
-                                                        );
-                                                      }
-                                                    }}
+                                                    className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50"
+                                                    onClick={() => setPreviewExercice({
+                                                      id: exercice.exercices?.id,
+                                                      title: exercice.name || exercice.exercices?.title || `Exercice ${j + 1}`,
+                                                      description: exercice.exercices?.description || exercice.description,
+                                                      video_url: exercice.exercices?.video_url,
+                                                      thumbnail_url: exercice.exercices?.thumbnail_url,
+                                                      series: exercice.series,
+                                                      repetitions: exercice.repetitions,
+                                                      duration_seconds: exercice.duration_seconds,
+                                                      force_1: exercice.force_1,
+                                                      duration_seconds_2: exercice.duration_seconds_2,
+                                                      force_2: exercice.force_2,
+                                                      comment: exercice.comment,
+                                                    })}
                                                   >
                                                     {exercice.exercices?.thumbnail_url ? (
                                                       <div className="relative w-10 h-10 rounded overflow-hidden flex-shrink-0">
@@ -809,65 +793,12 @@ export default function TraitementType() {
           isHiddenFromList={false}
         />
 
-        {/* Test Detail Dialog */}
-        <Dialog open={!!testDetailDialog} onOpenChange={() => setTestDetailDialog(null)}>
-          <DialogContent className="max-w-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Détail du test</h3>
-            </div>
-            {testDetailDialog && (
-              <div className="space-y-4">
-                {testDetailDialog.exercices ? (
-                  <>
-                    {testDetailDialog.exercices.video_url ? (
-                      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                        <video
-                          src={testDetailDialog.exercices.video_url}
-                          controls
-                          className="w-full h-full object-contain"
-                          poster={testDetailDialog.exercices.thumbnail_url || undefined}
-                        />
-                      </div>
-                    ) : testDetailDialog.exercices.thumbnail_url ? (
-                      <img 
-                        src={testDetailDialog.exercices.thumbnail_url} 
-                        alt={testDetailDialog.exercices.title}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                    ) : null}
-                    <div>
-                      <h4 className="font-medium text-lg">{testDetailDialog.exercices.title}</h4>
-                      {testDetailDialog.exercices.description && (
-                        <p className="text-sm text-muted-foreground mt-2">{testDetailDialog.exercices.description}</p>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm">{testDetailDialog.description}</p>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Video Dialog */}
-        <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
-          <DialogContent className="max-w-3xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">{selectedVideoTitle}</h3>
-            </div>
-            {selectedVideoUrl && (
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  src={selectedVideoUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Exercise / Test Preview Dialog */}
+        <ExercicePreviewDialog
+          exercice={previewExercice}
+          open={!!previewExercice}
+          onOpenChange={(open) => !open && setPreviewExercice(null)}
+        />
       </div>
     </Layout>
   );

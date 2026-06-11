@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { ExercicePreviewDialog } from "@/components/exercice/ExercicePreviewDialog";
 import { SearchableCreatableSelect } from "@/components/seance/SearchableCreatableSelect";
 import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 import {
@@ -78,6 +79,7 @@ export default function Exercices() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
   const [exerciceToDelete, setExerciceToDelete] = useState<Exercice | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -475,6 +477,11 @@ export default function Exercices() {
       video_title: ""
     });
     setSelectedExercice(null);
+  };
+
+  const openPreviewDialog = (exercice: Exercice) => {
+    setSelectedExercice(exercice);
+    setPreviewDialogOpen(true);
   };
 
   const openEditDialog = (exercice: Exercice) => {
@@ -926,8 +933,8 @@ export default function Exercices() {
                   {filteredExercices.map((exercice) => (
                     <TableRow
                       key={exercice.id}
-                      onClick={() => canEdit(exercice) && openEditDialog(exercice)}
-                      className={canEdit(exercice) ? "cursor-pointer" : ""}
+                      onClick={() => openPreviewDialog(exercice)}
+                      className="cursor-pointer"
                     >
                       {/* Thumbnail */}
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -1082,6 +1089,16 @@ export default function Exercices() {
           )}
         </div>
       </div>
+
+      {/* Preview Dialog */}
+      <ExercicePreviewDialog
+        exercice={selectedExercice}
+        open={previewDialogOpen}
+        onOpenChange={(open) => {
+          setPreviewDialogOpen(open);
+          if (!open) setSelectedExercice(null);
+        }}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!exerciceToDelete} onOpenChange={(open) => !open && setExerciceToDelete(null)}>
