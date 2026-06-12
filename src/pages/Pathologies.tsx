@@ -99,6 +99,7 @@ export default function Pathologies() {
 
   const handleCreate = async () => {
     if (!user || !newName.trim()) return;
+    if (creating) return;
     setCreating(true);
     try {
       const pseudo = (pb.authStore.record as any)?.pseudo || null;

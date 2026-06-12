@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Save, X, Newspaper, Tag, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, Newspaper, Tag, Search, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -31,6 +31,7 @@ export function NewsManagement() {
   const { toast } = useToast();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   
   // Search and filter
@@ -108,6 +109,8 @@ export function NewsManagement() {
     const categoryToUse = useCustomCategory ? newCustomCategory.trim() : newCategory;
     if (!categoryToUse) return;
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const data = await pb.collection("news").create({
           title: newTitle, description: newDescription, category: categoryToUse,
@@ -129,6 +132,8 @@ export function NewsManagement() {
         description: "Impossible d'ajouter l'actualité.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -330,11 +335,11 @@ export function NewsManagement() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button 
-                  onClick={handleAddNews} 
-                  disabled={!newTitle.trim() || !newDescription.trim() || !getSelectedCategory()}
+                <Button
+                  onClick={handleAddNews}
+                  disabled={isSubmitting || !newTitle.trim() || !newDescription.trim() || !getSelectedCategory()}
                 >
-                  <Save className="w-4 h-4 mr-2" />
+                  {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Ajouter
                 </Button>
                 <Button variant="outline" onClick={() => setShowNewForm(false)}>

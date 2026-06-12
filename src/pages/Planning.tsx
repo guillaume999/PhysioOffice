@@ -68,6 +68,7 @@ export default function Planning() {
   const [sourceDate, setSourceDate] = useState<Date | undefined>(new Date());
   const [targetDate, setTargetDate] = useState<Date | undefined>(addDays(new Date(), 7));
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ===== Print options =====
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -159,6 +160,7 @@ export default function Planning() {
   };
 
   const handleCreateAppointment = async () => {
+    if (isSubmitting) return;
     if (!selectedSlot || !selectedPatientId) {
       toast({ title: "Erreur", description: "Veuillez sélectionner un patient", variant: "destructive" });
       return;
@@ -167,36 +169,41 @@ export default function Planning() {
     const startTime = setMinutes(setHours(selectedSlot.date, selectedSlot.time.hours), selectedSlot.time.minutes);
     const endTime = new Date(startTime.getTime() + duration * 60000);
 
-    if (editingAppointmentId) {
-      try {
-        await pb.collection("appointments").update(editingAppointmentId, {
-          patient: selectedPatientId,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          notes: appointmentNotes || null,
-        });
-        toast({ title: "Rendez-vous modifié" });
-        setIsDialogOpen(false);
-        setEditingAppointmentId(null);
-        fetchAppointments();
-      } catch (e: any) {
-        toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    setIsSubmitting(true);
+    try {
+      if (editingAppointmentId) {
+        try {
+          await pb.collection("appointments").update(editingAppointmentId, {
+            patient: selectedPatientId,
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            notes: appointmentNotes || null,
+          });
+          toast({ title: "Rendez-vous modifié" });
+          setIsDialogOpen(false);
+          setEditingAppointmentId(null);
+          fetchAppointments();
+        } catch (e: any) {
+          toast({ title: "Erreur", description: e.message, variant: "destructive" });
+        }
+      } else {
+        try {
+          await pb.collection("appointments").create({
+            user: user?.id,
+            patient: selectedPatientId,
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            notes: appointmentNotes || null,
+          });
+          toast({ title: "Rendez-vous créé" });
+          setIsDialogOpen(false);
+          fetchAppointments();
+        } catch (e: any) {
+          toast({ title: "Erreur", description: e.message, variant: "destructive" });
+        }
       }
-    } else {
-      try {
-        await pb.collection("appointments").create({
-          user: user?.id,
-          patient: selectedPatientId,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          notes: appointmentNotes || null,
-        });
-        toast({ title: "Rendez-vous créé" });
-        setIsDialogOpen(false);
-        fetchAppointments();
-      } catch (e: any) {
-        toast({ title: "Erreur", description: e.message, variant: "destructive" });
-      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -641,8 +648,13 @@ export default function Planning() {
                 />
               </div>
 
-              <Button onClick={handleCreateAppointment} className="w-full gradient-primary text-primary-foreground">
-                {editingAppointmentId ? "Enregistrer" : "Créer le rendez-vous"}
+              <Button onClick={handleCreateAppointment} disabled={isSubmitting} className="w-full gradient-primary text-primary-foreground">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : editingAppointmentId ? "Enregistrer" : "Créer le rendez-vous"}
               </Button>
             </div>
           )}

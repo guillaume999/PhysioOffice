@@ -59,6 +59,7 @@ export default function Patients() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("in_treatment");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sortColumn, setSortColumn] = useState<keyof Patient | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [formData, setFormData] = useState({ 
@@ -112,6 +113,8 @@ export default function Patients() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       // Prochain numéro = max + 1 (jamais réutilisé, padding 4 chiffres, cap 9999, propre à chaque praticien)
       const existing = await pb.collection("patients").getFullList({
@@ -148,6 +151,8 @@ export default function Patients() {
       fetchPatients();
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -277,7 +282,9 @@ export default function Patients() {
                       </Select>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full gradient-primary text-primary-foreground">Enregistrer</Button>
+                  <Button type="submit" disabled={isSubmitting} className="w-full gradient-primary text-primary-foreground">
+                    {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enregistrement...</> : "Enregistrer"}
+                  </Button>
                 </form>
               </DialogContent>
             </Dialog>

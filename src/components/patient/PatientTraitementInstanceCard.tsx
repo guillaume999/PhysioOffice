@@ -89,6 +89,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   const [pickerMode, setPickerMode] = useState<"seance" | "exercice">("seance");
   const [pickerSeanceId, setPickerSeanceId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (traitementId) fetchDetails();
@@ -184,6 +185,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   // Add a séance, blank (sourceId null) or copied from a seance_types model
   const addSeanceFromLibrary = async (sourceId: string | null) => {
     if (!traitement) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       let nom = "Nouvelle séance";
       let objectif = "";
@@ -212,10 +215,13 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       toast.success("Séance ajoutée");
       fetchDetails();
     } catch { toast.error("Erreur lors de l'ajout"); }
+    finally { setIsSubmitting(false); }
   };
 
   // Add an exercise to a séance, blank or copied from an exercices library record
   const addExerciceFromLibrary = async (seanceId: string, ordre: number, sourceId: string | null) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       let nom = "Nouvel exercice";
       let description = "";
@@ -232,6 +238,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       });
       fetchDetails();
     } catch { toast.error("Erreur lors de l'ajout"); }
+    finally { setIsSubmitting(false); }
   };
 
   const openSeancePicker = () => { setPickerMode("seance"); setPickerSeanceId(null); setPickerOpen(true); };
@@ -275,6 +282,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
 
   const addTest = async () => {
     if (!traitement) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await pb.collection("patient_traitement_tests").create({
         patient_traitement: traitement.id, source: null, nom: "Nouveau test", description: "",
@@ -282,6 +291,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       });
       fetchDetails();
     } catch { toast.error("Erreur lors de l'ajout"); }
+    finally { setIsSubmitting(false); }
   };
 
   // ── render ───────────────────────────────────────────────────────────────
@@ -362,7 +372,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                   </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={addTest}>
+              <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={addTest} disabled={isSubmitting}>
                 <Plus className="w-4 h-4" /> Ajouter un test
               </Button>
             </CollapsibleContent>
@@ -502,7 +512,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                             </Button>
                           </div>
                         ))}
-                        <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={() => openExercicePicker(s.id)}>
+                        <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={() => openExercicePicker(s.id)} disabled={isSubmitting}>
                           <Plus className="w-4 h-4" /> Ajouter un exercice
                         </Button>
                       </div>
@@ -512,7 +522,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
               );
             })}
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" className="flex-1 justify-start gap-2" onClick={openSeancePicker}>
+              <Button variant="outline" className="flex-1 justify-start gap-2" onClick={openSeancePicker} disabled={isSubmitting}>
                 <Plus className="w-4 h-4" /> Ajouter une séance
               </Button>
               <Button variant="outline" className="flex-1 justify-start gap-2"

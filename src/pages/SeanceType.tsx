@@ -75,6 +75,7 @@ export default function SeanceType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
@@ -270,6 +271,8 @@ export default function SeanceType() {
 
   const handleLike = async (seanceId: string, currentlyLiked: boolean) => {
     if (!user) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       if (currentlyLiked) {
@@ -281,6 +284,8 @@ export default function SeanceType() {
       fetchData();
     } catch (error) {
       console.error("Error toggling like:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -300,6 +305,8 @@ export default function SeanceType() {
 
   const duplicateSeance = async (seance: SeanceType) => {
     if (!user) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       const profileData = pb.authStore.record;
@@ -342,6 +349,8 @@ export default function SeanceType() {
     } catch (error) {
       console.error("Error duplicating seance:", error);
       toast.error("Erreur lors de la duplication");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -684,6 +693,7 @@ export default function SeanceType() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => duplicateSeance(seance)}
+                                    disabled={isSubmitting}
                                     className="gap-1"
                                   >
                                     <Copy className="w-3 h-3" />

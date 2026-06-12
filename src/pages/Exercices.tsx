@@ -83,7 +83,8 @@ export default function Exercices() {
   const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
   const [exerciceToDelete, setExerciceToDelete] = useState<Exercice | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -572,6 +573,8 @@ export default function Exercices() {
 
   const addToPlatform = async (exercice: Exercice) => {
     if (!user) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       // Create a copy for platform
@@ -590,6 +593,8 @@ export default function Exercices() {
     } catch (error) {
       console.error("Error adding to platform:", error);
       toast.error("Erreur lors de l'ajout à la plateforme");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -608,6 +613,8 @@ export default function Exercices() {
 
   const copyExercice = async (exercice: Exercice) => {
     if (!user) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       await pb.collection("exercices").create({
@@ -624,6 +631,8 @@ export default function Exercices() {
     } catch (error) {
       console.error("Error copying exercice:", error);
       toast.error("Erreur lors de la copie");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1022,6 +1031,7 @@ export default function Exercices() {
                               variant="ghost"
                               size="icon"
                               onClick={() => copyExercice(exercice)}
+                              disabled={isSubmitting}
                               title="Dupliquer"
                             >
                               <Copy className="w-4 h-4" />
@@ -1048,6 +1058,7 @@ export default function Exercices() {
                                   size="icon"
                                   className="text-purple-500"
                                   onClick={() => addToPlatform(exercice)}
+                                  disabled={isSubmitting}
                                   title="Ajouter à la plateforme"
                                 >
                                   <Shield className="w-4 h-4" />

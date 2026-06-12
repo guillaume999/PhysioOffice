@@ -99,6 +99,7 @@ export default function TraitementType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedTraitements, setExpandedTraitements] = useState<Set<string>>(new Set());
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
@@ -314,6 +315,8 @@ export default function TraitementType() {
 
   const duplicateTraitement = async (traitement: TraitementType) => {
     if (!user) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       // Create the traitement copy
@@ -355,6 +358,8 @@ export default function TraitementType() {
     } catch (error) {
       console.error("Error duplicating traitement:", error);
       toast.error("Erreur lors de la duplication");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -755,6 +760,7 @@ export default function TraitementType() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => duplicateTraitement(traitement)}
+                                    disabled={isSubmitting}
                                     className="gap-1"
                                   >
                                     <Copy className="w-3 h-3" />
