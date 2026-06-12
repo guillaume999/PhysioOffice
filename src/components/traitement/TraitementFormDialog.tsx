@@ -110,6 +110,8 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
   // Search and expansion state
   const [exerciceSearch, setExerciceSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
+  const [seancePathoFilter, setSeancePathoFilter] = useState<string>("all");
+  const [seanceObjectifFilter, setSeanceObjectifFilter] = useState<string>("all");
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [seanceExercices, setSeanceExercices] = useState<Record<string, SeanceExercice[]>>({});
   const [loadingSeanceExercices, setLoadingSeanceExercices] = useState<Set<string>>(new Set());
@@ -201,17 +203,29 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     return matchTitle || matchTags;
   });
 
-  // Filter seances by search
+  // Tags d'une séance (champs unifiés avec fallback legacy)
+  const getSeancePathoTags = (s: SeanceOption): string[] =>
+    (s.pathologies?.length ? s.pathologies : [s.pathologie]).filter(Boolean);
+  const getSeanceObjectifTags = (s: SeanceOption): string[] =>
+    (s.objectifs?.length ? s.objectifs : (s.objectifs_principaux?.length ? s.objectifs_principaux : [s.objectif_principal])).filter(Boolean);
+
+  // Filter seances by search + filtres pathologie/objectif
   const filteredSeances = availableSeances.filter(seance => {
+    const sPathos = getSeancePathoTags(seance);
+    const sObjs = getSeanceObjectifTags(seance);
+    if (seancePathoFilter !== "all" && !sPathos.includes(seancePathoFilter)) return false;
+    if (seanceObjectifFilter !== "all" && !sObjs.includes(seanceObjectifFilter)) return false;
     if (!seanceSearch.trim()) return true;
     const searchLower = seanceSearch.toLowerCase();
-    const matchPathologie = seance.pathologie.toLowerCase().includes(searchLower);
-    const matchPathologies = seance.pathologies?.some(p => p.toLowerCase().includes(searchLower));
-    const matchObjectif = seance.objectif_principal.toLowerCase().includes(searchLower);
-    const matchObjectifs = seance.objectifs_principaux?.some(o => o.toLowerCase().includes(searchLower));
-    const matchObjectifsUnifies = seance.objectifs?.some(o => o.toLowerCase().includes(searchLower));
-    return matchPathologie || matchPathologies || matchObjectif || matchObjectifs || matchObjectifsUnifies;
+    return (
+      sPathos.some(p => p.toLowerCase().includes(searchLower)) ||
+      sObjs.some(o => o.toLowerCase().includes(searchLower))
+    );
   });
+
+  // Options des filtres dérivées des séances disponibles
+  const seancePathoOptions = [...new Set(availableSeances.flatMap(getSeancePathoTags))].sort((a, b) => a.localeCompare(b, "fr"));
+  const seanceObjectifOptions = [...new Set(availableSeances.flatMap(getSeanceObjectifTags))].sort((a, b) => a.localeCompare(b, "fr"));
 
   const resetForm = () => {
     setPathologie("");
@@ -223,6 +237,8 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     setSelectedSeances([]);
     setExerciceSearch("");
     setSeanceSearch("");
+    setSeancePathoFilter("all");
+    setSeanceObjectifFilter("all");
     setExpandedSeances(new Set());
   };
 
@@ -720,6 +736,34 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                 className="pl-9"
               />
             </div>
+
+            {/* Filtres pathologie / objectif */}
+            {(seanceObjectifOptions.length > 0 || seancePathoOptions.length > 0) && (
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={seanceObjectifFilter} onValueChange={setSeanceObjectifFilter}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Objectif" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les objectifs</SelectItem>
+                    {seanceObjectifOptions.map((o) => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={seancePathoFilter} onValueChange={setSeancePathoFilter}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Pathologie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les pathologies</SelectItem>
+                    {seancePathoOptions.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Available seances */}
             <div className="max-h-64 overflow-y-auto border rounded-lg p-2 space-y-1">
