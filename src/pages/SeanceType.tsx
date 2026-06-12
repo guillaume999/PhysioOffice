@@ -564,7 +564,7 @@ export default function SeanceType() {
                             {pathologies.map((p, i) => (
                               <Badge key={i} variant="outline" className="text-base font-semibold px-3 py-1 flex-shrink-0">{p}</Badge>
                             ))}
-                            <span className="text-muted-foreground">-</span>
+                            {objectifs.length > 0 && <span className="text-muted-foreground">-</span>}
                             {objectifs.map((o, i) => (
                               <Badge key={i} variant="default" className="text-base font-semibold px-3 py-1 flex-shrink-0">{o}</Badge>
                             ))}

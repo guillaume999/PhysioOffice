@@ -57,13 +57,21 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
       if (mode === "seance") {
         const data = await pb.collection("seance_types").getFullList({
           filter: `user = "${user.id}"`, sort: "-created",
-          fields: "id,nom,pathologie,objectif_principal",
+          fields: "id,nom,pathologie,pathologies,objectif_principal,objectifs,objectifs_principaux",
         });
-        setItems(data.map((s: any) => ({
-          id: s.id,
-          title: s.objectif_principal || s.pathologie || s.nom || "Séance",
-          subtitle: s.pathologie || "",
-        })));
+        setItems(data.map((s: any) => {
+          const pathologies: string[] = Array.isArray(s.pathologies) && s.pathologies.length ? s.pathologies : (s.pathologie ? [s.pathologie] : []);
+          const objectifs: string[] = Array.isArray(s.objectifs) && s.objectifs.length
+            ? s.objectifs
+            : (Array.isArray(s.objectifs_principaux) && s.objectifs_principaux.length ? s.objectifs_principaux : (s.objectif_principal ? [s.objectif_principal] : []));
+          return {
+            id: s.id,
+            title: s.objectif_principal || s.pathologie || s.nom || "Séance",
+            subtitle: s.pathologie || "",
+            pathologie_tags: pathologies.filter(Boolean),
+            objectif_tags: objectifs.filter(Boolean),
+          };
+        }));
       } else {
         const data = await pb.collection("exercices").getFullList({
           filter: `(user = "${user.id}" || status = "shared")`, sort: "title",
@@ -137,7 +145,7 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
           <Input placeholder="Ou rechercher dans la bibliothèque..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
 
-        {mode === "exercice" && (
+        {(pathologieOptions.length > 0 || objectifOptions.length > 0) && (
           <div className="grid grid-cols-2 gap-2">
             <Select value={filterObjectif} onValueChange={setFilterObjectif}>
               <SelectTrigger className="h-9">
