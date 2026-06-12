@@ -10,6 +10,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
+import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/MultiSelectFilter";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 
@@ -58,6 +59,7 @@ interface TraitementSeance {
     pathologie: string;
     objectif_principal: string;
     pathologies?: string[];
+    objectifs?: string[];
     objectifs_principaux?: string[];
   } | null;
   exercices?: SeanceExercice[];
@@ -68,6 +70,7 @@ interface TraitementType {
   code: string;
   nom?: string | null;
   pathologie: string;
+  objectifs?: string[];
   description: string | null;
   author_name: string | null;
   is_shared: boolean;
@@ -81,7 +84,7 @@ interface TraitementType {
   is_used_by_patient?: boolean;
 }
 
-type FilterType = "mine" | "platform" | "shared";
+type FilterType = "mine" | "platform" | "shared"; // vues
 
 export default function TraitementType() {
   const { user } = useAuth();
@@ -95,6 +98,8 @@ export default function TraitementType() {
   // Filter and search state
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pathoFilter, setPathoFilter] = useState<string[]>([]);
+  const [objectifFilter, setObjectifFilter] = useState<string[]>([]);
 
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -112,7 +117,18 @@ export default function TraitementType() {
 
   useEffect(() => {
     applyFilters();
-  }, [traitements, filter, searchQuery, user, featuredTraitementIds]);
+  }, [traitements, filter, searchQuery, pathoFilter, objectifFilter, user, featuredTraitementIds]);
+
+  // Objectifs d'un traitement = ses propres objectifs + union des objectifs de ses séances
+  const getTraitementObjectifs = (t: TraitementType): string[] => {
+    const fromSeances = (t.seances || []).flatMap((s) => {
+      const st = s.seance_types;
+      if (!st) return [];
+      if (st.objectifs?.length) return st.objectifs;
+      return st.objectifs_principaux?.length ? st.objectifs_principaux : (st.objectif_principal ? [st.objectif_principal] : []);
+    });
+    return [...new Set([...(t.objectifs || []), ...fromSeances].filter(Boolean))];
+  };
 
   const applyFilters = () => {
     let result = [...traitements];
@@ -141,19 +157,47 @@ export default function TraitementType() {
       );
     }
 
-    // Apply search (including code)
+    // Recherche texte : nom / code / description / auteur
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (t) =>
           t.code?.toLowerCase().includes(query) ||
+          t.nom?.toLowerCase().includes(query) ||
           t.author_name?.toLowerCase().includes(query) ||
-          t.pathologie.toLowerCase().includes(query) ||
           t.description?.toLowerCase().includes(query)
       );
     }
 
+    // Filtre pathologies (OR entre les pathos sélectionnées, AND avec les autres filtres)
+    if (pathoFilter.length > 0) {
+      result = result.filter((t) => pathoFilter.includes(t.pathologie));
+    }
+
+    // Filtre objectifs : objectifs des séances du traitement (OR entre sélectionnés)
+    if (objectifFilter.length > 0) {
+      result = result.filter((t) =>
+        getTraitementObjectifs(t).some((o) => objectifFilter.includes(o))
+      );
+    }
+
     setFilteredTraitements(result);
+  };
+
+  // Options de filtre dérivées des traitements chargés
+  const pathoOptions = [...new Set(traitements.map((t) => t.pathologie))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+  const objectifOptions = [...new Set(traitements.flatMap((t) => getTraitementObjectifs(t)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+
+  const hasActiveFilters = searchQuery.trim() !== "" || pathoFilter.length > 0 || objectifFilter.length > 0;
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setPathoFilter([]);
+    setObjectifFilter([]);
+  };
+
+  const toggleTagFilter = (tag: string, list: string[], setList: (v: string[]) => void) => {
+    setList(list.includes(tag) ? list.filter((x) => x !== tag) : [...list, tag]);
   };
 
   const getFilterCounts = () => {
@@ -239,6 +283,7 @@ export default function TraitementType() {
     setEditingTraitement({
       id: traitement.id,
       pathologie: traitement.pathologie,
+      objectifs: traitement.objectifs || [],
       description: traitement.description,
       tests: (traitement.tests || []).map(t => ({
         id: t.id,
@@ -324,6 +369,7 @@ export default function TraitementType() {
           user: user.id,
           nom: traitement.nom || traitement.pathologie,
           pathologie: traitement.pathologie,
+          objectifs: traitement.objectifs || [],
           description: traitement.description,
           author_name: userPseudo || traitement.author_name,
           is_shared: false,
@@ -366,7 +412,8 @@ export default function TraitementType() {
   const getSeanceDisplay = (seance: TraitementSeance) => {
     if (!seance.seance_types) return "Séance";
     const pathologies = seance.seance_types.pathologies?.length ? seance.seance_types.pathologies : [seance.seance_types.pathologie];
-    const objectifs = seance.seance_types.objectifs_principaux?.length ? seance.seance_types.objectifs_principaux : [seance.seance_types.objectif_principal];
+    const st = seance.seance_types;
+    const objectifs = st.objectifs?.length ? st.objectifs : (st.objectifs_principaux?.length ? st.objectifs_principaux : [st.objectif_principal]);
     return `${pathologies[0]} - ${objectifs[0]}`;
   };
 
@@ -465,16 +512,56 @@ export default function TraitementType() {
                 </Button>
               </div>
 
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par pathologie, description ou auteur..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+              {/* Search + multi-filtres */}
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par nom, code, auteur..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                <MultiSelectFilter
+                  label="Pathologies"
+                  options={pathoOptions}
+                  selected={pathoFilter}
+                  onToggle={(tag) => toggleTagFilter(tag, pathoFilter, setPathoFilter)}
+                  onClear={() => setPathoFilter([])}
                 />
+
+                <MultiSelectFilter
+                  label="Objectifs"
+                  options={objectifOptions}
+                  selected={objectifFilter}
+                  onToggle={(tag) => toggleTagFilter(tag, objectifFilter, setObjectifFilter)}
+                  onClear={() => setObjectifFilter([])}
+                />
+
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="text-muted-foreground"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Réinitialiser
+                  </Button>
+                )}
               </div>
+            </div>
+
+            {/* Badges des filtres actifs */}
+            <div className="mt-3 empty:hidden">
+              <ActiveFilterBadges
+                pathoFilter={pathoFilter}
+                objectifFilter={objectifFilter}
+                onTogglePatho={(tag) => toggleTagFilter(tag, pathoFilter, setPathoFilter)}
+                onToggleObjectif={(tag) => toggleTagFilter(tag, objectifFilter, setObjectifFilter)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -516,6 +603,9 @@ export default function TraitementType() {
                               {traitement.code}
                             </Badge>
                             <Badge variant="outline" className="text-sm flex-shrink-0">{traitement.pathologie}</Badge>
+                            {(traitement.objectifs || []).map((o, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs flex-shrink-0">{o}</Badge>
+                            ))}
                             {traitement.is_copy && (
                               <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
                             )}
@@ -808,4 +898,4 @@ export default function TraitementType() {
       </div>
     </Layout>
   );
-}
+}

@@ -41,6 +41,7 @@ interface SeanceExerciceItem {
 interface SeanceFormData {
   id?: string;
   pathologies: string[];
+  objectifs?: string[];
   objectifs_principaux: string[];
   objectifs_secondaires?: string[];
   exercices: SeanceExerciceItem[];
@@ -85,11 +86,13 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       fetchOptions();
       if (seance) {
         setPathologies(seance.pathologies || []);
-        // Fusionne principaux + secondaires en une seule liste (dédupliquée)
-        const merged = [
-          ...(seance.objectifs_principaux || []),
-          ...(seance.objectifs_secondaires || []),
-        ];
+        // Nouveau champ unifié `objectifs`, fallback sur principaux + secondaires (dédupliqués)
+        const merged = seance.objectifs?.length
+          ? seance.objectifs
+          : [
+              ...(seance.objectifs_principaux || []),
+              ...(seance.objectifs_secondaires || []),
+            ];
         setObjectifs([...new Set(merged.filter(Boolean))]);
         setExercices(seance.exercices || []);
       } else {
@@ -256,6 +259,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         await pb.collection("seance_types").update(seance.id, {
             nom: pathologies[0] || objectifs[0] || "Séance",
             pathologies,
+            objectifs,
             objectifs_principaux: objectifs,
             objectifs_secondaires: [],
             pathologie: pathologies[0] || "",
@@ -307,6 +311,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
             user: user.id,
             nom: pathologies[0] || objectifs[0] || "Séance",
             pathologies,
+            objectifs,
             objectifs_principaux: objectifs,
             objectifs_secondaires: [],
             pathologie: pathologies[0] || "",

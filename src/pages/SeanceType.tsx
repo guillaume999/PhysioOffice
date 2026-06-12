@@ -10,6 +10,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
+import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/MultiSelectFilter";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
@@ -40,6 +41,7 @@ interface SeanceType {
   code: string;
   pathologie: string;
   pathologies: string[];
+  objectifs: string[];
   objectif_principal: string;
   objectifs_principaux: string[];
   objectif_secondaire: string | null;
@@ -58,7 +60,7 @@ interface SeanceType {
   user_liked?: boolean;
 }
 
-type FilterType = "mine" | "platform" | "shared";
+type FilterType = "mine" | "platform" | "shared"; // vues
 
 export default function SeanceType() {
   const { user } = useAuth();
@@ -71,6 +73,8 @@ export default function SeanceType() {
   // Filter and search state
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pathoFilter, setPathoFilter] = useState<string[]>([]);
+  const [objectifFilter, setObjectifFilter] = useState<string[]>([]);
 
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -88,7 +92,7 @@ export default function SeanceType() {
 
   useEffect(() => {
     applyFilters();
-  }, [seances, filter, searchQuery, user, featuredSeanceIds]);
+  }, [seances, filter, searchQuery, pathoFilter, objectifFilter, user, featuredSeanceIds]);
 
   const applyFilters = () => {
     let result = [...seances];
@@ -118,23 +122,42 @@ export default function SeanceType() {
       );
     }
 
-    // Apply search (including code)
+    // Recherche texte : code / auteur
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter((s) => {
-        const pathos = s.pathologies?.length > 0 ? s.pathologies : [s.pathologie];
-        const objs = getDisplayObjectifs(s);
+      result = result.filter((s) =>
+        s.code?.toLowerCase().includes(query) ||
+        s.author_name?.toLowerCase().includes(query)
+      );
+    }
 
-        return (
-          s.code?.toLowerCase().includes(query) ||
-          s.author_name?.toLowerCase().includes(query) ||
-          pathos.some(p => p.toLowerCase().includes(query)) ||
-          objs.some(o => o.toLowerCase().includes(query))
-        );
-      });
+    // Filtre pathologies (OR entre les pathos sélectionnées, AND avec les autres filtres)
+    if (pathoFilter.length > 0) {
+      result = result.filter((s) =>
+        getDisplayPathologies(s).some((tag) => pathoFilter.includes(tag))
+      );
+    }
+
+    // Filtre objectifs (OR entre les objectifs sélectionnés, AND avec les autres filtres)
+    if (objectifFilter.length > 0) {
+      result = result.filter((s) =>
+        getDisplayObjectifs(s).some((tag) => objectifFilter.includes(tag))
+      );
     }
 
     setFilteredSeances(result);
+  };
+
+  const hasActiveFilters = searchQuery.trim() !== "" || pathoFilter.length > 0 || objectifFilter.length > 0;
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setPathoFilter([]);
+    setObjectifFilter([]);
+  };
+
+  const toggleTagFilter = (tag: string, list: string[], setList: (v: string[]) => void) => {
+    setList(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
   };
 
   const getFilterCounts = () => {
@@ -197,6 +220,7 @@ export default function SeanceType() {
             original_id: seance.original ?? null,
             created_at: seance.created,
             pathologies: seance.pathologies || [],
+            objectifs: seance.objectifs || [],
             objectifs_principaux: seance.objectifs_principaux || [],
             objectifs_secondaires: seance.objectifs_secondaires || [],
             exercices: exercicesWithDetails,
@@ -227,6 +251,7 @@ export default function SeanceType() {
     setEditingSeance({
       id: seance.id,
       pathologies: seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie],
+      objectifs: getDisplayObjectifs(seance),
       objectifs_principaux: [...new Set([...principaux, ...secondaires].filter(Boolean))],
       objectifs_secondaires: [],
       exercices: (seance.exercices || []).map(ex => ({
@@ -317,6 +342,7 @@ export default function SeanceType() {
           nom: seance.pathologie || seance.objectif_principal || "Séance",
           pathologie: seance.pathologie,
           pathologies: seance.pathologies || [],
+          objectifs: getDisplayObjectifs(seance),
           objectif_principal: seance.objectif_principal,
           // Fusionne principaux + secondaires (distinction supprimée)
           objectifs_principaux: getDisplayObjectifs(seance),
@@ -359,10 +385,16 @@ export default function SeanceType() {
   };
 
   const getDisplayObjectifs = (seance: SeanceType) => {
+    // Nouveau champ unifié `objectifs`, fallback sur les champs legacy
+    if (seance.objectifs?.length > 0) return seance.objectifs.filter(Boolean);
     const principaux = seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : (seance.objectif_principal ? [seance.objectif_principal] : []);
     const secondaires = seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []);
     return [...new Set([...principaux, ...secondaires].filter(Boolean))];
   };
+
+  // Options de filtre dérivées des séances chargées
+  const pathoOptions = [...new Set(seances.flatMap((s) => getDisplayPathologies(s)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+  const objectifOptions = [...new Set(seances.flatMap((s) => getDisplayObjectifs(s)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
 
   const toggleExpand = (id: string) => {
     setExpandedSeances(prev => {
@@ -441,16 +473,56 @@ export default function SeanceType() {
                 </Button>
               </div>
 
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par auteur, pathologie ou objectif..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+              {/* Search + multi-filtres */}
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par code, auteur..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                <MultiSelectFilter
+                  label="Pathologies"
+                  options={pathoOptions}
+                  selected={pathoFilter}
+                  onToggle={(tag) => toggleTagFilter(tag, pathoFilter, setPathoFilter)}
+                  onClear={() => setPathoFilter([])}
                 />
+
+                <MultiSelectFilter
+                  label="Objectifs"
+                  options={objectifOptions}
+                  selected={objectifFilter}
+                  onToggle={(tag) => toggleTagFilter(tag, objectifFilter, setObjectifFilter)}
+                  onClear={() => setObjectifFilter([])}
+                />
+
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="text-muted-foreground"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Réinitialiser
+                  </Button>
+                )}
               </div>
+            </div>
+
+            {/* Badges des filtres actifs */}
+            <div className="mt-3 empty:hidden">
+              <ActiveFilterBadges
+                pathoFilter={pathoFilter}
+                objectifFilter={objectifFilter}
+                onTogglePatho={(tag) => toggleTagFilter(tag, pathoFilter, setPathoFilter)}
+                onToggleObjectif={(tag) => toggleTagFilter(tag, objectifFilter, setObjectifFilter)}
+              />
             </div>
           </CardContent>
         </Card>

@@ -33,6 +33,7 @@ interface SeanceOption {
   code: string;
   pathologie: string;
   pathologies: string[];
+  objectifs?: string[];
   objectif_principal: string;
   objectifs_principaux: string[];
 }
@@ -65,6 +66,7 @@ interface TraitementTest {
 interface TraitementFormData {
   id?: string;
   pathologie: string;
+  objectifs?: string[];
   description: string | null;
   tests: TraitementTest[];
   seances: TraitementSeanceItem[];
@@ -92,12 +94,15 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
   
   // Available options
   const [availablePathologies, setAvailablePathologies] = useState<string[]>([]);
+  const [availableObjectifs, setAvailableObjectifs] = useState<string[]>([]);
   const [availableSeances, setAvailableSeances] = useState<SeanceOption[]>([]);
   const [availableExercices, setAvailableExercices] = useState<ExerciceOption[]>([]);
-  
+
   // Form state
   const [pathologie, setPathologie] = useState("");
   const [newPathologie, setNewPathologie] = useState("");
+  const [objectifs, setObjectifs] = useState<string[]>([]);
+  const [newObjectif, setNewObjectif] = useState("");
   const [description, setDescription] = useState("");
   const [tests, setTests] = useState<TraitementTest[]>([]);
   const [selectedSeances, setSelectedSeances] = useState<TraitementSeanceItem[]>([]);
@@ -114,6 +119,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
       fetchOptions();
       if (traitement) {
         setPathologie(traitement.pathologie || "");
+        setObjectifs(traitement.objectifs || []);
         setDescription(traitement.description || "");
         setTests((traitement.tests || []).map(t => ({
           ...t,
@@ -139,12 +145,16 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
     setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
+    // Fetch objectifs (référentiel partagé avec les exercices et les séances)
+    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    setAvailableObjectifs([...new Set((objData as any[]).map((o: any) => o.name as string).filter(Boolean))]);
+
     // Fetch seances (user's own seances)
     const seancesData = await pb.collection("seance_types").getFullList({
       filter: `user = "${user.id}"`, sort: "-created",
-      fields: "id,code,pathologie,pathologies,objectif_principal,objectifs_principaux",
+      fields: "id,code,pathologie,pathologies,objectifs,objectif_principal,objectifs_principaux",
     });
-    setAvailableSeances(seancesData.map((s: any) => ({ ...s, code: s.code || '', pathologies: s.pathologies || [], objectifs_principaux: s.objectifs_principaux || [] })));
+    setAvailableSeances(seancesData.map((s: any) => ({ ...s, code: s.code || '', pathologies: s.pathologies || [], objectifs: s.objectifs || [], objectifs_principaux: s.objectifs_principaux || [] })));
 
     // Fetch exercices (user's own + platform exercices)
     const exercicesData = await pb.collection("exercices").getFullList({
@@ -199,18 +209,33 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     const matchPathologies = seance.pathologies?.some(p => p.toLowerCase().includes(searchLower));
     const matchObjectif = seance.objectif_principal.toLowerCase().includes(searchLower);
     const matchObjectifs = seance.objectifs_principaux?.some(o => o.toLowerCase().includes(searchLower));
-    return matchPathologie || matchPathologies || matchObjectif || matchObjectifs;
+    const matchObjectifsUnifies = seance.objectifs?.some(o => o.toLowerCase().includes(searchLower));
+    return matchPathologie || matchPathologies || matchObjectif || matchObjectifs || matchObjectifsUnifies;
   });
 
   const resetForm = () => {
     setPathologie("");
     setNewPathologie("");
+    setObjectifs([]);
+    setNewObjectif("");
     setDescription("");
     setTests([]);
     setSelectedSeances([]);
     setExerciceSearch("");
     setSeanceSearch("");
     setExpandedSeances(new Set());
+  };
+
+  const addObjectif = (value: string) => {
+    const v = value.trim();
+    if (v && !objectifs.includes(v)) {
+      setObjectifs([...objectifs, v]);
+    }
+    setNewObjectif("");
+  };
+
+  const removeObjectif = (tag: string) => {
+    setObjectifs(objectifs.filter((o) => o !== tag));
   };
 
   const addTest = (exercice: ExerciceOption) => {
@@ -263,11 +288,13 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
   };
 
   const getDisplayObjectifs = (seance: SeanceOption) => {
+    if (seance.objectifs?.length) return seance.objectifs;
     return seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : [seance.objectif_principal];
   };
 
   const handleSubmit = async () => {
     if (!user) return;
+    if (loading) return;
 
     const finalPathologie = newPathologie || pathologie;
 
@@ -283,6 +310,13 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         await pb.collection("pathologies").create({ user: user.id, name: newPathologie });
       }
 
+      // Save new objectifs in the shared reference collection
+      for (const obj of objectifs) {
+        if (!availableObjectifs.includes(obj)) {
+          await pb.collection("objectifs").create({ user: user.id, name: obj, type: "principal" });
+        }
+      }
+
       if (patientId) {
         // ── Patient instance mode ───────────────────────────────────────────
         // Create a patient_traitements record fully independent from any model,
@@ -293,6 +327,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
           praticien: user.id,
           nom: finalPathologie,
           pathologie: finalPathologie,
+          objectifs,
           description,
           statut: "actif",
           date_debut: new Date().toISOString(),
@@ -345,7 +380,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         toast.success("Traitement créé pour le patient");
       } else if (traitement?.id) {
         // Update existing traitement
-        await pb.collection("traitement_types").update(traitement.id, { nom: finalPathologie, pathologie: finalPathologie, description });
+        await pb.collection("traitement_types").update(traitement.id, { nom: finalPathologie, pathologie: finalPathologie, objectifs, description });
 
         // Delete old tests
         const oldTests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${traitement.id}"` });
@@ -381,6 +416,7 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
             user: user.id,
             nom: finalPathologie,
             pathologie: finalPathologie,
+            objectifs,
             description,
             author_name: userPseudo,
             is_shared: false,
@@ -466,6 +502,43 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
               placeholder="Rechercher ou créer une pathologie"
               className="w-full"
             />
+          </div>
+
+          {/* Objectifs (référentiel partagé avec les exercices et les séances) */}
+          <div className="space-y-2">
+            <Label>Objectifs</Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {objectifs.map((o, i) => (
+                <Badge key={i} variant="default" className="gap-1">
+                  {o}
+                  <X className="w-3 h-3 cursor-pointer" onClick={() => removeObjectif(o)} />
+                </Badge>
+              ))}
+              {objectifs.length === 0 && (
+                <span className="text-xs text-muted-foreground">Aucun objectif sélectionné</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <TagReferenceSelect
+                type="objectif"
+                options={availableObjectifs.filter((o) => !objectifs.includes(o))}
+                userId={user?.id || ""}
+                onSelect={addObjectif}
+                onReferenceChanged={fetchOptions}
+                placeholder="Rechercher un objectif"
+                className="flex-1"
+              />
+              <Input
+                placeholder="Ou créer un nouveau..."
+                value={newObjectif}
+                onChange={(e) => setNewObjectif(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addObjectif(newObjectif)}
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={() => addObjectif(newObjectif)}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Description */}
