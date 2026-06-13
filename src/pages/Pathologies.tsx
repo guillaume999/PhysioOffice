@@ -189,7 +189,7 @@ export default function Pathologies() {
             <div>
               <h1 className="text-3xl font-display font-bold">Pathologies & Traitements</h1>
               <p className="text-muted-foreground">
-                {pathologies.length} pathologie(s) — cliquez sur l'une d'elles pour gérer son protocole de traitement.
+                {counts.mine + counts.platform} pathologie(s) — cliquez sur l'une d'elles pour gérer son protocole de traitement.
               </p>
             </div>
           </div>
@@ -289,7 +289,7 @@ export default function Pathologies() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold">{p.name}</p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                        {p.author_name && <span>par {p.author_name}</span>}
+                        {p.author_name && filter !== "mine" && <span>par {p.author_name}</span>}
                         {p.traitement?.trim() && (
                           <span className="line-clamp-1">{p.traitement}</span>
                         )}
