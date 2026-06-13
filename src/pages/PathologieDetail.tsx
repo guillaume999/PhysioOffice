@@ -23,6 +23,7 @@ import DOMPurify from "dompurify";
 import { MediaThumb } from "@/components/MediaThumb";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 import { CopyExerciceToSeanceDialog } from "@/components/pathologie/CopyExerciceToSeanceDialog";
+import { LinkedTraitementDrawer } from "@/components/pathologie/LinkedTraitementDrawer";
 import {
   SECTIONS,
   SectionKey,
@@ -403,12 +404,15 @@ export default function PathologieDetail() {
 
               {linkedTraitements.length > 0 && (
                 <DetailDrawer title="Traitements liés">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="space-y-2">
                     {linkedTraitements.map((t) => (
-                      <Badge key={t.id} variant={t.is_platform ? "default" : "secondary"} className="gap-1.5">
-                        {t.is_platform ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                        {t.nom}
-                      </Badge>
+                      <LinkedTraitementDrawer
+                        key={t.id}
+                        id={t.id}
+                        nom={t.nom}
+                        isPlatform={t.is_platform}
+                        onOpenExercice={openExercice}
+                      />
                     ))}
                   </div>
                 </DetailDrawer>
