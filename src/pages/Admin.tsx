@@ -1452,7 +1452,7 @@ export default function Admin() {
                   <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
                     <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      En attente de validation ({pendingSeances.length})
+                      En attente de validation de partage ({pendingSeances.length})
                     </h3>
                     <div className="space-y-2">
                       {pendingSeances.map((s) => (
@@ -1828,7 +1828,7 @@ export default function Admin() {
                   <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
                     <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      En attente de validation ({pendingTraitements.length})
+                      En attente de validation de partage ({pendingTraitements.length})
                     </h3>
                     <div className="space-y-2">
                       {pendingTraitements.map((t) => (
@@ -2058,7 +2058,7 @@ export default function Admin() {
                   <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
                     <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      En attente de validation ({pendingExercices.length})
+                      En attente de validation de partage ({pendingExercices.length})
                     </h3>
                     <div className="space-y-2">
                       {pendingExercices.map((e) => (
