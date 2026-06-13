@@ -614,7 +614,7 @@ export default function TraitementType() {
                               par {traitement.user_id === user?.id ? "Moi" : (traitement.author_name || "Anonyme")}
                             </span>
                             {canShare && traitement.is_shared && !traitement.is_validated && (
-                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente</Badge>
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente de validation de partage</Badge>
                             )}
                             {canShare && traitement.is_refused && (
                               <Badge className="text-xs bg-red-500 flex-shrink-0">Partage refusé</Badge>
@@ -831,8 +831,14 @@ export default function TraitementType() {
                                         disabled={traitement.is_validated && traitement.is_shared}
                                       />
                                     )}
-                                    <span className="text-xs">
-                                      {traitement.is_shared && traitement.is_validated ? "Déjà partagé" : traitement.is_refused ? "Partage refusé" : "Partager"}
+                                    <span className="text-xs flex items-center gap-1">
+                                      {traitement.is_shared && traitement.is_validated
+                                        ? "Déjà partagé"
+                                        : traitement.is_refused
+                                        ? "Partage refusé"
+                                        : traitement.is_shared && !traitement.is_validated
+                                        ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                        : "Partager"}
                                     </span>
                                   </div>
                                 )}

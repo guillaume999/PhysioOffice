@@ -55,7 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        await pb.collection("users").authRefresh();
+        const auth = await pb.collection("users").authRefresh();
+        if (auth.record?.is_banned) pb.authStore.clear();
       } catch {
         pb.authStore.clear();
       } finally {
@@ -72,7 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
-      await pb.collection("users").authWithPassword(email, password);
+      const auth = await pb.collection("users").authWithPassword(email, password);
+      if (auth.record?.is_banned) {
+        pb.authStore.clear();
+        return { error: new Error("Votre compte a été banni. Contactez l'administrateur.") };
+      }
       return { error: null };
     } catch (e) {
       return { error: e as Error };
