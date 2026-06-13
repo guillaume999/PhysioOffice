@@ -982,10 +982,16 @@ try { await pb.collection("patient_bilans").update(bilanId, { bilan_date: date |
                           });
                         });
                         
-                        // Sort: items with dates first (chronologically), then items without dates
+                        // Sort: items with dates first (chronologically), then items without dates.
+                        // À date égale, le bilan intermédiaire passe avant la séance.
                         items.sort((a, b) => {
                           if (a.date && b.date) {
-                            return a.date.localeCompare(b.date);
+                            const cmp = a.date.localeCompare(b.date);
+                            if (cmp !== 0) return cmp;
+                            if (a.type !== b.type) {
+                              return a.type === 'bilan' ? -1 : 1;
+                            }
+                            return 0;
                           }
                           if (a.date && !b.date) return -1;
                           if (!a.date && b.date) return 1;

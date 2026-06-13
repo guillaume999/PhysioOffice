@@ -311,7 +311,13 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   ].sort((a, b) => {
     const da = a.date ? a.date.slice(0, 10) : "";
     const db = b.date ? b.date.slice(0, 10) : "";
-    if (da && db) return da.localeCompare(db);
+    if (da && db) {
+      const cmp = da.localeCompare(db);
+      if (cmp !== 0) return cmp;
+      // à date égale, le bilan intermédiaire passe avant la séance
+      if (a.kind !== b.kind) return a.kind === "bilan" ? -1 : 1;
+      return 0;
+    }
     if (da) return -1; // les éléments datés passent avant les non datés
     if (db) return 1;
     return 0;
