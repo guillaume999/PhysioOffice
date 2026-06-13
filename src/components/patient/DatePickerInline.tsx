@@ -47,7 +47,7 @@ export function DatePickerInline({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0"
+        className="w-[280px] p-0"
         align="start"
         onClick={(e) => e.stopPropagation()}
       >

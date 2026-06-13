@@ -12,6 +12,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
 import { parseJsonField, toIsoDate } from "@/lib/utils";
 import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
+import { DatePickerInline } from "@/components/patient/DatePickerInline";
 
 interface BilanEntry {
   id: string;
@@ -355,13 +356,12 @@ export default function PatientBilanInitial() {
           </div>
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <div className="flex items-center gap-2">
-              <Label htmlFor="bilan-initial-date" className="text-sm whitespace-nowrap">Date du bilan</Label>
-              <Input
-                id="bilan-initial-date"
-                type="date"
+              <Label className="text-sm whitespace-nowrap">Date du bilan</Label>
+              <DatePickerInline
                 value={bilanInitialDate}
-                onChange={(e) => setBilanInitialDate(e.target.value)}
-                className="w-40 h-9"
+                onChange={setBilanInitialDate}
+                placeholder="Date du bilan"
+                className="h-9 w-36"
               />
             </div>
             <Button variant="outline" onClick={handlePrint}>
@@ -440,11 +440,11 @@ export default function PatientBilanInitial() {
                 </div>
                 <div>
                   <Label>Date de naissance</Label>
-                  <Input
-                    type="date"
+                  <DatePickerInline
                     value={bilan.date_naissance}
-                    onChange={(e) => handleChange("date_naissance", e.target.value)}
-                    className="mt-1"
+                    onChange={(v) => handleChange("date_naissance", v)}
+                    placeholder="Date de naissance"
+                    className="mt-1 w-full"
                   />
                 </div>
               </div>

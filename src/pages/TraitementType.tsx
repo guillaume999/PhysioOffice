@@ -617,7 +617,7 @@ export default function TraitementType() {
                               <Badge variant="secondary" className="text-xs flex-shrink-0">En attente</Badge>
                             )}
                             {canShare && traitement.is_refused && (
-                              <Badge className="text-xs bg-red-500 flex-shrink-0">Refusé</Badge>
+                              <Badge className="text-xs bg-red-500 flex-shrink-0">Partage refusé</Badge>
                             )}
                             <span className="text-xs text-muted-foreground">
                               • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
