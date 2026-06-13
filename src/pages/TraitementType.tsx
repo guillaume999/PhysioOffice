@@ -73,6 +73,7 @@ interface TraitementType {
   is_shared: boolean;
   is_copy: boolean;
   is_validated: boolean;
+  is_refused?: boolean;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -281,7 +282,7 @@ export default function TraitementType() {
       return;
     }
     try {
-      await pb.collection("traitement_types").update(traitementId, { is_shared: !currentlyShared, is_validated: false });
+      await pb.collection("traitement_types").update(traitementId, { is_shared: !currentlyShared, is_validated: false, is_refused: false });
 
       toast.success(currentlyShared ? "Traitement non partagé" : "Traitement partagé (en attente de validation)");
       fetchData();
@@ -515,7 +516,7 @@ export default function TraitementType() {
                               <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
                             )}
                             <span className="text-xs text-muted-foreground truncate">
-                              par {traitement.author_name || "Anonyme"}
+                              par {traitement.user_id === user?.id ? "Moi" : (traitement.author_name || "Anonyme")}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
@@ -718,17 +719,28 @@ export default function TraitementType() {
                                 {/* Share status */}
                                 {canShare && (
                                   <div className="flex items-center gap-2">
-                                    <Checkbox
-                                      checked={traitement.is_shared}
-                                      onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
-                                      disabled={traitement.is_validated && traitement.is_shared}
-                                    />
-                                    <span className="text-xs">Partager</span>
+                                    {traitement.is_refused ? (
+                                      <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                        <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                      </div>
+                                    ) : (
+                                      <Checkbox
+                                        checked={traitement.is_shared}
+                                        onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
+                                        disabled={traitement.is_validated && traitement.is_shared}
+                                      />
+                                    )}
+                                    <span className="text-xs">
+                                      {traitement.is_shared && traitement.is_validated ? "Déjà partagé" : traitement.is_refused ? "Partage refusé" : "Partager"}
+                                    </span>
                                     {traitement.is_shared && traitement.is_validated && (
                                       <Badge className="text-xs bg-green-500">Validé</Badge>
                                     )}
                                     {traitement.is_shared && !traitement.is_validated && (
                                       <Badge variant="secondary" className="text-xs">En attente</Badge>
+                                    )}
+                                    {traitement.is_refused && (
+                                      <Badge className="text-xs bg-red-500">Refusé</Badge>
                                     )}
                                   </div>
                                 )}

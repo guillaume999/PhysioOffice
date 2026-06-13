@@ -48,6 +48,7 @@ interface SeanceType {
   is_shared: boolean;
   is_copy: boolean;
   is_validated: boolean;
+  is_refused?: boolean;
   is_hidden_from_list: boolean;
   original_id: string | null;
   user_id: string;
@@ -258,7 +259,7 @@ export default function SeanceType() {
       return;
     }
     try {
-      await pb.collection("seance_types").update(seanceId, { is_shared: !currentlyShared, is_validated: false });
+      await pb.collection("seance_types").update(seanceId, { is_shared: !currentlyShared, is_validated: false, is_refused: false });
       
       toast.success(currentlyShared ? "Séance non partagée" : "Séance partagée (en attente de validation)");
       fetchData();
@@ -474,7 +475,7 @@ export default function SeanceType() {
                     <Card key={seance.id} className="overflow-hidden">
                       <CardContent className="p-4">
                         {/* Header - Always visible */}
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center justify-between gap-4 cursor-pointer" onClick={() => toggleExpand(seance.id)}>
                           <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
                             <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
                               {seance.code}
@@ -490,7 +491,7 @@ export default function SeanceType() {
                               <Badge variant="secondary" className="text-xs flex-shrink-0">Copie</Badge>
                             )}
                             <span className="text-xs text-muted-foreground">
-                              par {seance.author_name || "Anonyme"}
+                              par {seance.user_id === user?.id ? "Moi" : (seance.author_name || "Anonyme")}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               • {seance.exercices?.length || 0} exercices
@@ -499,19 +500,13 @@ export default function SeanceType() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleExpand(seance.id)}
+                            onClick={(e) => { e.stopPropagation(); toggleExpand(seance.id); }}
                             className="gap-1 flex-shrink-0"
                           >
                             {expandedSeances.has(seance.id) ? (
-                              <>
-                                <ChevronUp className="w-4 h-4" />
-                                Réduire
-                              </>
+                              <ChevronUp className="w-4 h-4" />
                             ) : (
-                              <>
-                                <ChevronDown className="w-4 h-4" />
-                                Détails
-                              </>
+                              <ChevronDown className="w-4 h-4" />
                             )}
                           </Button>
                         </div>
@@ -651,17 +646,28 @@ export default function SeanceType() {
                                 {/* Share status */}
                                 {canShare && (
                                   <div className="flex items-center gap-2">
-                                    <Checkbox
-                                      checked={seance.is_shared}
-                                      onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
-                                      disabled={seance.is_validated && seance.is_shared}
-                                    />
-                                    <span className="text-xs">Partager</span>
+                                    {seance.is_refused ? (
+                                      <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                        <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                      </div>
+                                    ) : (
+                                      <Checkbox
+                                        checked={seance.is_shared}
+                                        onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
+                                        disabled={seance.is_validated && seance.is_shared}
+                                      />
+                                    )}
+                                    <span className="text-xs">
+                                      {seance.is_shared && seance.is_validated ? "Déjà partagé" : seance.is_refused ? "Partage refusé" : "Partager"}
+                                    </span>
                                     {seance.is_shared && seance.is_validated && (
                                       <Badge className="text-xs bg-green-500">Validé</Badge>
                                     )}
                                     {seance.is_shared && !seance.is_validated && (
                                       <Badge variant="secondary" className="text-xs">En attente</Badge>
+                                    )}
+                                    {seance.is_refused && (
+                                      <Badge className="text-xs bg-red-500">Refusé</Badge>
                                     )}
                                   </div>
                                 )}

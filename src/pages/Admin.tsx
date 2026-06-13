@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -19,6 +21,7 @@ import {
   Users,
   FileText,
   Search,
+  ChevronDown,
   Crown,
   Clock,
   Trash2,
@@ -68,6 +71,7 @@ interface SeanceType {
   author_name: string | null;
   is_shared: boolean;
   is_validated: boolean;
+  is_refused?: boolean;
   is_copy: boolean | null;
   original_id: string | null;
   user_id: string;
@@ -80,6 +84,7 @@ interface TraitementType {
   author_name: string | null;
   is_shared: boolean;
   is_validated: boolean;
+  is_refused?: boolean;
   is_copy: boolean | null;
   original_id: string | null;
   user_id: string;
@@ -206,8 +211,11 @@ export default function Admin() {
   });
   const [userSearch, setUserSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
+  const [seanceAuthorFilter, setSeanceAuthorFilter] = useState<string[]>([]);
   const [traitementSearch, setTraitementSearch] = useState("");
+  const [traitementAuthorFilter, setTraitementAuthorFilter] = useState<string[]>([]);
   const [exerciceSearch, setExerciceSearch] = useState("");
+  const [exerciceAuthorFilter, setExerciceAuthorFilter] = useState<string[]>([]);
   const [objectifSearch, setObjectifSearch] = useState("");
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
@@ -652,6 +660,58 @@ export default function Admin() {
     }
   };
 
+  const refuseTraitement = async (traitementId: string) => {
+    try {
+      await pb.collection("traitement_types").update(traitementId, { is_shared: false, is_validated: false, is_refused: true });
+      setTraitements(traitements.map(t =>
+        t.id === traitementId ? { ...t, is_shared: false, is_validated: false, is_refused: true } : t
+      ));
+      toast({ title: "Traitement refusé" });
+    } catch (error) {
+      console.error("Error refusing traitement:", error);
+      toast({ title: "Erreur", description: "Impossible de refuser le traitement.", variant: "destructive" });
+    }
+  };
+
+  const allowTraitement = async (traitementId: string) => {
+    try {
+      await pb.collection("traitement_types").update(traitementId, { is_shared: true, is_validated: true, is_refused: false });
+      setTraitements(traitements.map(t =>
+        t.id === traitementId ? { ...t, is_shared: true, is_validated: true, is_refused: false } : t
+      ));
+      toast({ title: "Traitement autorisé", description: "Le partage du traitement a été approuvé." });
+    } catch (error) {
+      console.error("Error allowing traitement:", error);
+      toast({ title: "Erreur", description: "Impossible d'autoriser le traitement.", variant: "destructive" });
+    }
+  };
+
+  const refuseSeance = async (seanceId: string) => {
+    try {
+      await pb.collection("seance_types").update(seanceId, { is_shared: false, is_validated: false, is_refused: true });
+      setSeances(seances.map(s =>
+        s.id === seanceId ? { ...s, is_shared: false, is_validated: false, is_refused: true } : s
+      ));
+      toast({ title: "Séance refusée" });
+    } catch (error) {
+      console.error("Error refusing seance:", error);
+      toast({ title: "Erreur", description: "Impossible de refuser la séance.", variant: "destructive" });
+    }
+  };
+
+  const allowSeance = async (seanceId: string) => {
+    try {
+      await pb.collection("seance_types").update(seanceId, { is_shared: true, is_validated: true, is_refused: false });
+      setSeances(seances.map(s =>
+        s.id === seanceId ? { ...s, is_shared: true, is_validated: true, is_refused: false } : s
+      ));
+      toast({ title: "Séance autorisée", description: "Le partage de la séance a été approuvé." });
+    } catch (error) {
+      console.error("Error allowing seance:", error);
+      toast({ title: "Erreur", description: "Impossible d'autoriser la séance.", variant: "destructive" });
+    }
+  };
+
   const deleteSeance = async (seanceId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette séance ?")) return;
 
@@ -1016,6 +1076,11 @@ export default function Admin() {
     return acc;
   }, {} as Record<string, number>);
 
+  // Unique author lists for filters
+  const seanceAuthors = [...new Set(seances.filter(s => !s.is_copy && s.author_name).map(s => s.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
+  const traitementAuthors = [...new Set(traitements.filter(t => !t.is_copy && t.author_name).map(t => t.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
+  const exerciceAuthors = [...new Set(exercices.filter(e => !e.is_copy && e.author_name).map(e => e.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
+
   // Filter out copies from seances (only show originals)
   const filteredSeances = seances
     .filter(s => !s.is_copy)
@@ -1023,7 +1088,8 @@ export default function Admin() {
       s.pathologie.toLowerCase().includes(seanceSearch.toLowerCase()) ||
       s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
       s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
-    );
+    )
+    .filter(s => seanceAuthorFilter.length === 0 || (s.author_name !== null && seanceAuthorFilter.includes(s.author_name)));
 
   // Filter out copies from traitements (only show originals)
   const filteredTraitements = traitements
@@ -1031,9 +1097,11 @@ export default function Admin() {
     .filter(t =>
       t.pathologie.toLowerCase().includes(traitementSearch.toLowerCase()) ||
       t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
-    );
+    )
+    .filter(t => traitementAuthorFilter.length === 0 || (t.author_name !== null && traitementAuthorFilter.includes(t.author_name)));
 
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
+  const pendingSeances = filteredSeances.filter(s => s.is_shared && !s.is_validated);
 
   // Calculate copy counts for each original exercice
   const exerciceCopyCounts = exercices.reduce((acc, e) => {
@@ -1049,7 +1117,8 @@ export default function Admin() {
     .filter(e =>
       e.title.toLowerCase().includes(exerciceSearch.toLowerCase()) ||
       e.author_name?.toLowerCase().includes(exerciceSearch.toLowerCase())
-    );
+    )
+    .filter(e => exerciceAuthorFilter.length === 0 || (e.author_name !== null && exerciceAuthorFilter.includes(e.author_name)));
 
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
   const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
@@ -1334,15 +1403,81 @@ export default function Admin() {
                 </div>
               </CardHeader>
               <CardContent>
+                {pendingSeances.length > 0 && (
+                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      En attente de validation ({pendingSeances.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingSeances.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                          <div>
+                            <p className="font-medium">{s.pathologie}</p>
+                            <p className="text-sm text-muted-foreground">{s.author_name || "Anonyme"}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => refuseSeance(s.id)}
+                              className="gap-1 border-red-500 text-red-500 hover:bg-red-50"
+                            >
+                              Refuser
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteSeance(s.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Pathologie</th>
                         <th className="text-left py-3 px-2">Objectif</th>
-                        <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">
+                          <div className="flex flex-col gap-1">
+                            <span>Auteur</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceAuthorFilter.length === 0 ? "Tous" : `${seanceAuthorFilter.length} sélectionné${seanceAuthorFilter.length > 1 ? "s" : ""}`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {seanceAuthors.map(a => (
+                                    <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox
+                                        checked={seanceAuthorFilter.includes(a)}
+                                        onCheckedChange={(checked) => setSeanceAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))}
+                                      />
+                                      {a}
+                                    </label>
+                                  ))}
+                                </div>
+                                {seanceAuthorFilter.length > 0 && (
+                                  <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceAuthorFilter([])}>
+                                    Tout effacer
+                                  </Button>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
+                        <th className="text-left py-3 px-2">Statut</th>
                         <th className="text-left py-3 px-2">Actions</th>
                         <th className="text-left py-3 px-2">Utilisateur</th>
                         <th className="text-left py-3 px-2">Consulté</th>
@@ -1367,13 +1502,39 @@ export default function Admin() {
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteSeance(s.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {s.is_refused ? (
+                              <Badge className="bg-red-500">Refusé</Badge>
+                            ) : s.is_shared ? (
+                              s.is_validated ? (
+                                <Badge className="bg-green-500">Partagé & Validé</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                              )
+                            ) : (
+                              <Badge variant="outline">Privé</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex gap-2">
+                              {s.is_refused && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => allowSeance(s.id)}
+                                  className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Autoriser
+                                </Button>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteSeance(s.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {getUserDisplayName(s.user_id)}
@@ -1442,6 +1603,14 @@ export default function Admin() {
                               Valider
                             </Button>
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => refuseTraitement(t.id)}
+                              className="gap-1 border-red-500 text-red-500 hover:bg-red-50"
+                            >
+                              Refuser
+                            </Button>
+                            <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => deleteTraitement(t.id)}
@@ -1459,7 +1628,37 @@ export default function Admin() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Pathologie</th>
-                        <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">
+                          <div className="flex flex-col gap-1">
+                            <span>Auteur</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {traitementAuthorFilter.length === 0 ? "Tous" : `${traitementAuthorFilter.length} sélectionné${traitementAuthorFilter.length > 1 ? "s" : ""}`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {traitementAuthors.map(a => (
+                                    <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox
+                                        checked={traitementAuthorFilter.includes(a)}
+                                        onCheckedChange={(checked) => setTraitementAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))}
+                                      />
+                                      {a}
+                                    </label>
+                                  ))}
+                                </div>
+                                {traitementAuthorFilter.length > 0 && (
+                                  <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setTraitementAuthorFilter([])}>
+                                    Tout effacer
+                                  </Button>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Statut</th>
@@ -1487,7 +1686,9 @@ export default function Admin() {
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            {t.is_shared ? (
+                            {t.is_refused ? (
+                              <Badge className="bg-red-500">Refusé</Badge>
+                            ) : t.is_shared ? (
                               t.is_validated ? (
                                 <Badge className="bg-green-500">Partagé & Validé</Badge>
                               ) : (
@@ -1505,13 +1706,26 @@ export default function Admin() {
                             />
                           </td>
                           <td className="py-3 px-2">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteTraitement(t.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                              {t.is_refused && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => allowTraitement(t.id)}
+                                  className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Autoriser
+                                </Button>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteTraitement(t.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
                             {getUserDisplayName(t.user_id)}
@@ -1649,7 +1863,37 @@ export default function Admin() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Titre</th>
-                        <th className="text-left py-3 px-2">Auteur</th>
+                        <th className="text-left py-3 px-2">
+                          <div className="flex flex-col gap-1">
+                            <span>Auteur</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {exerciceAuthorFilter.length === 0 ? "Tous" : `${exerciceAuthorFilter.length} sélectionné${exerciceAuthorFilter.length > 1 ? "s" : ""}`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {exerciceAuthors.map(a => (
+                                    <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox
+                                        checked={exerciceAuthorFilter.includes(a)}
+                                        onCheckedChange={(checked) => setExerciceAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))}
+                                      />
+                                      {a}
+                                    </label>
+                                  ))}
+                                </div>
+                                {exerciceAuthorFilter.length > 0 && (
+                                  <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setExerciceAuthorFilter([])}>
+                                    Tout effacer
+                                  </Button>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
                         <th className="text-left py-3 px-2">Statut</th>

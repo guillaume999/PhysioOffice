@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon } from "lucide-react";
@@ -682,80 +683,15 @@ export default function Exercices() {
     
     // For user's own exercises in "mine" filter
     if (filter === "mine" && exercice.user_id === user?.id) {
-      if (exercice.status === "pending") {
-        // Show cancel button for pending exercises
-        return (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleShare(exercice);
-            }}
-            className="h-7 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-          >
-            <X className="w-3 h-3 mr-1" />
-            Annuler partage
-          </Button>
-        );
-      }
-      
-      if (exercice.status === "withdrawal_requested") {
-        return (
-          <div className="flex flex-col gap-1">
-            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Retrait demandé</Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                cancelWithdrawalRequest(exercice);
-              }}
-              className="h-6 text-xs text-muted-foreground hover:text-foreground px-0"
-            >
-              Annuler la demande
-            </Button>
-          </div>
-        );
-      }
-
       if (exercice.status === "shared") {
-        return (
-          <div className="flex flex-col gap-1">
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                requestWithdrawal(exercice);
-              }}
-              className="h-6 text-xs"
-            >
-              Demander le retrait
-            </Button>
-          </div>
-        );
+        return null;
       }
-      
-      // Draft status - show share button if allowed
-      if (exercice.status === "draft" && !exercice.is_copy && userCanShare) {
-        return (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleShare(exercice);
-            }}
-            className="h-7 text-xs"
-          >
-            <Users className="w-3 h-3 mr-1" />
-            Partager
-          </Button>
-        );
+      if (exercice.status === "pending") {
+        return <Badge variant="secondary" className="text-xs">En attente</Badge>;
       }
-      
+      if (exercice.status === "withdrawal_requested") {
+        return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Retrait demandé</Badge>;
+      }
       return null;
     }
     
@@ -996,14 +932,34 @@ export default function Exercices() {
                         <div className="flex flex-col items-start gap-1">
                           {getStatusBadge(exercice)}
                           <span className="text-xs text-muted-foreground">
-                            {exercice.author_name || "-"}
+                            {exercice.user_id === user?.id ? "Moi" : (exercice.author_name || "-")}
                           </span>
                         </div>
                       </TableCell>
 
                       {/* Actions */}
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end items-center gap-1">
+                          {/* Share checkbox */}
+                          {filter === "mine" && exercice.user_id === user?.id && !exercice.is_copy && userCanShare && (
+                            <div className="flex items-center gap-1.5">
+                              {exercice.status === "rejected" ? (
+                                <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                  <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                </div>
+                              ) : (
+                                <Checkbox
+                                  checked={exercice.status !== "draft"}
+                                  onCheckedChange={() => toggleShare(exercice)}
+                                  disabled={exercice.status === "shared" || exercice.status === "withdrawal_requested"}
+                                />
+                              )}
+                              <span className="text-xs">
+                                {exercice.status === "shared" || exercice.status === "withdrawal_requested" ? "Déjà partagé" : exercice.status === "rejected" ? "Partage refusé" : "Partager"}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Edit */}
                           {canEdit(exercice) && (
                             <Button
