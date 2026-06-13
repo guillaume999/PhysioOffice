@@ -372,7 +372,7 @@ export function ExerciceDetailDialog({
                   className="gap-1"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  {exercice.status === "shared" ? "Invalider" : "Valider"}
+                  {exercice.status === "shared" ? "Ne pas partager" : "Partager"}
                 </Button>
 
                 {exercice.status === "pending" && !showRejectForm && (
