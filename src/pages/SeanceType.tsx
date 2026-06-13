@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -576,7 +576,7 @@ export default function SeanceType() {
                               par {seance.user_id === user?.id ? "Moi" : (seance.author_name || "Anonyme")}
                             </span>
                             {canShare && seance.is_shared && !seance.is_validated && (
-                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente</Badge>
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente de validation de partage</Badge>
                             )}
                             {canShare && seance.is_refused && (
                               <Badge className="text-xs bg-red-500 flex-shrink-0">Refusé</Badge>
@@ -745,8 +745,14 @@ export default function SeanceType() {
                                         disabled={seance.is_validated && seance.is_shared}
                                       />
                                     )}
-                                    <span className="text-xs">
-                                      {seance.is_shared && seance.is_validated ? "Déjà partagé" : seance.is_refused ? "Partage refusé" : "Partager"}
+                                    <span className="text-xs flex items-center gap-1">
+                                      {seance.is_shared && seance.is_validated
+                                        ? "Déjà partagé"
+                                        : seance.is_refused
+                                        ? "Partage refusé"
+                                        : seance.is_shared && !seance.is_validated
+                                        ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                        : "Partager"}
                                     </span>
                                   </div>
                                 )}

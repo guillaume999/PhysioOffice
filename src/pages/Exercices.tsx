@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown } from "lucide-react";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown, Clock } from "lucide-react";
 import { pb, getFileUrl } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -731,7 +731,7 @@ export default function Exercices() {
         return null;
       }
       if (exercice.status === "pending") {
-        return <Badge variant="secondary" className="text-xs">En attente</Badge>;
+        return <Badge variant="secondary" className="text-xs">En attente de validation de partage</Badge>;
       }
       if (exercice.status === "withdrawal_requested") {
         return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Retrait demandé</Badge>;
@@ -744,7 +744,7 @@ export default function Exercices() {
       case "shared":
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
       case "pending":
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente</Badge>;
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente de validation de partage</Badge>;
       default:
         return null;
     }
@@ -1211,8 +1211,14 @@ export default function Exercices() {
                                   disabled={exercice.status === "shared" || exercice.status === "withdrawal_requested"}
                                 />
                               )}
-                              <span className="text-xs">
-                                {exercice.status === "shared" || exercice.status === "withdrawal_requested" ? "Déjà partagé" : exercice.status === "rejected" ? "Partage refusé" : "Partager"}
+                              <span className="text-xs flex items-center gap-1">
+                                {exercice.status === "shared" || exercice.status === "withdrawal_requested"
+                                  ? "Déjà partagé"
+                                  : exercice.status === "rejected"
+                                  ? "Partage refusé"
+                                  : exercice.status === "pending"
+                                  ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                  : "Partager"}
                               </span>
                             </div>
                           )}

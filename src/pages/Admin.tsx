@@ -43,7 +43,12 @@ import {
   Undo2,
   Mail,
   Target,
+  Calendar as CalendarIcon,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
 import { PopupsManagement } from "@/components/admin/PopupsManagement";
@@ -212,6 +217,14 @@ export default function Admin() {
   const [userSearch, setUserSearch] = useState("");
   const [seanceSearch, setSeanceSearch] = useState("");
   const [seanceAuthorFilter, setSeanceAuthorFilter] = useState<string[]>([]);
+  const [seancePathologieFilter, setSeancePathologieFilter] = useState<string[]>([]);
+  const [seanceObjectifFilter, setSeanceObjectifFilter] = useState<string[]>([]);
+  const [seanceDateFromFilter, setSeanceDateFromFilter] = useState<Date | undefined>(undefined);
+  const [seanceDateToFilter, setSeanceDateToFilter] = useState<Date | undefined>(undefined);
+  const [seanceCopiesFilter, setSeanceCopiesFilter] = useState<"all" | "with" | "without">("all");
+  const [seanceStatusFilter, setSeanceStatusFilter] = useState<string[]>([]);
+  const [seanceUserFilter, setSeanceUserFilter] = useState<string[]>([]);
+  const [seanceConsultedFilter, setSeanceConsultedFilter] = useState<"all" | "consulted" | "not-consulted">("all");
   const [traitementSearch, setTraitementSearch] = useState("");
   const [traitementAuthorFilter, setTraitementAuthorFilter] = useState<string[]>([]);
   const [exerciceSearch, setExerciceSearch] = useState("");
@@ -295,7 +308,7 @@ export default function Admin() {
     // Fetch seances
     const seancesData = (
       await safeFetch("seance_types", () => pb.collection("seance_types").getFullList({ sort: "-created" }), [] as any[])
-    ).map((r: any) => ({ ...r, created_at: r.created }));
+    ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
     setSeances(seancesData as any);
 
     // Fetch traitements
@@ -305,13 +318,13 @@ export default function Admin() {
         () => pb.collection("traitement_types").getFullList({ sort: "-created" }),
         [] as any[],
       )
-    ).map((r: any) => ({ ...r, created_at: r.created }));
+    ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
     setTraitements(traitementsData as any);
 
     // Fetch exercices
     const exercicesData = (
       await safeFetch("exercices", () => pb.collection("exercices").getFullList({ sort: "-created" }), [] as any[])
-    ).map((r: any) => ({ ...r, created_at: r.created }));
+    ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
     setExercices(exercicesData as any);
 
     // Fetch objectifs (bibliothèque), + tags des exercices + champ objectifs des pathologies
@@ -699,6 +712,19 @@ export default function Admin() {
     }
   };
 
+  const revokeSeance = async (seanceId: string) => {
+    try {
+      await pb.collection("seance_types").update(seanceId, { is_shared: false, is_validated: false, is_refused: false });
+      setSeances(seances.map(s =>
+        s.id === seanceId ? { ...s, is_shared: false, is_validated: false, is_refused: false } : s
+      ));
+      toast({ title: "Partage révoqué", description: "La séance est repassée en statut privé." });
+    } catch (error) {
+      console.error("Error revoking seance:", error);
+      toast({ title: "Erreur", description: "Impossible de révoquer le partage.", variant: "destructive" });
+    }
+  };
+
   const allowSeance = async (seanceId: string) => {
     try {
       await pb.collection("seance_types").update(seanceId, { is_shared: true, is_validated: true, is_refused: false });
@@ -1081,6 +1107,17 @@ export default function Admin() {
   const traitementAuthors = [...new Set(traitements.filter(t => !t.is_copy && t.author_name).map(t => t.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
   const exerciceAuthors = [...new Set(exercices.filter(e => !e.is_copy && e.author_name).map(e => e.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
 
+  const seancePathologies = [...new Set(seances.filter(s => !s.is_copy).map(s => s.pathologie).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  const seanceObjectifs = [...new Set(seances.filter(s => !s.is_copy).map(s => s.objectif_principal).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  const seanceUserNames = [...new Set(seances.filter(s => !s.is_copy).map(s => getUserDisplayName(s.user_id)))].filter(n => n !== "Inconnu").sort((a, b) => a.localeCompare(b, "fr"));
+
+  const getSeanceStatus = (s: SeanceType) => {
+    if (s.is_refused) return "refuse";
+    if (s.is_shared && s.is_validated) return "valide";
+    if (s.is_shared && !s.is_validated) return "attente";
+    return "prive";
+  };
+
   // Filter out copies from seances (only show originals)
   const filteredSeances = seances
     .filter(s => !s.is_copy)
@@ -1089,7 +1126,15 @@ export default function Admin() {
       s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
       s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
     )
-    .filter(s => seanceAuthorFilter.length === 0 || (s.author_name !== null && seanceAuthorFilter.includes(s.author_name)));
+    .filter(s => seanceAuthorFilter.length === 0 || (s.author_name !== null && seanceAuthorFilter.includes(s.author_name)))
+    .filter(s => seancePathologieFilter.length === 0 || seancePathologieFilter.includes(s.pathologie))
+    .filter(s => seanceObjectifFilter.length === 0 || seanceObjectifFilter.includes(s.objectif_principal))
+    .filter(s => !seanceDateFromFilter || s.created_at.slice(0, 10) >= format(seanceDateFromFilter, "yyyy-MM-dd"))
+    .filter(s => !seanceDateToFilter || s.created_at.slice(0, 10) <= format(seanceDateToFilter, "yyyy-MM-dd"))
+    .filter(s => seanceCopiesFilter === "all" || (seanceCopiesFilter === "with" ? (seanceCopyCounts[s.id] || 0) > 0 : (seanceCopyCounts[s.id] || 0) === 0))
+    .filter(s => seanceStatusFilter.length === 0 || seanceStatusFilter.includes(getSeanceStatus(s)))
+    .filter(s => seanceUserFilter.length === 0 || seanceUserFilter.includes(getUserDisplayName(s.user_id)))
+    .filter(s => seanceConsultedFilter === "all" || (seanceConsultedFilter === "consulted" ? consultedSeanceIds.has(s.id) : !consultedSeanceIds.has(s.id)));
 
   // Filter out copies from traitements (only show originals)
   const filteredTraitements = traitements
@@ -1151,42 +1196,42 @@ export default function Admin() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          <Card>
+          <Card className="bg-primary/5 border-primary/20">
             <CardContent className="p-4 text-center">
               <Users className="w-6 h-6 mx-auto text-primary mb-2" />
               <p className="text-2xl font-bold">{stats.totalUsers}</p>
               <p className="text-xs text-muted-foreground">Utilisateurs</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-purple-500/10 border-purple-500/20">
             <CardContent className="p-4 text-center">
               <Crown className="w-6 h-6 mx-auto text-purple-500 mb-2" />
               <p className="text-2xl font-bold">{stats.premiumUsers}</p>
               <p className="text-xs text-muted-foreground">Premium</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-blue-500/10 border-blue-500/20">
             <CardContent className="p-4 text-center">
               <Sparkles className="w-6 h-6 mx-auto text-blue-500 mb-2" />
               <p className="text-2xl font-bold">{stats.basicUsers}</p>
               <p className="text-xs text-muted-foreground">Basic</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-yellow-500/10 border-yellow-500/20">
             <CardContent className="p-4 text-center">
               <Clock className="w-6 h-6 mx-auto text-yellow-500 mb-2" />
               <p className="text-2xl font-bold">{stats.trialUsers}</p>
               <p className="text-xs text-muted-foreground">En essai</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-muted/60 border-muted-foreground/20">
             <CardContent className="p-4 text-center">
               <CreditCard className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
               <p className="text-2xl font-bold">{stats.freeUsers}</p>
               <p className="text-xs text-muted-foreground">Gratuit</p>
             </CardContent>
           </Card>
-          <Card className={stats.pendingExercices > 0 || stats.pendingTraitements > 0 ? "border-orange-500" : ""}>
+          <Card className={stats.pendingExercices > 0 || stats.pendingTraitements > 0 ? "bg-orange-500/10 border-orange-500" : "bg-muted/30"}>
             <CardContent className="p-4 text-center">
               <ClipboardList className="w-6 h-6 mx-auto text-orange-500 mb-2" />
               <p className="text-2xl font-bold">{stats.pendingTraitements + stats.pendingExercices}</p>
@@ -1442,15 +1487,70 @@ export default function Admin() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-2">Pathologie</th>
-                        <th className="text-left py-3 px-2">Objectif</th>
-                        <th className="text-left py-3 px-2">
+                        <th className="text-left py-3 px-2 align-top">
                           <div className="flex flex-col gap-1">
-                            <span>Auteur</span>
+                            <span>Pathologie</span>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
-                                  {seanceAuthorFilter.length === 0 ? "Tous" : `${seanceAuthorFilter.length} sélectionné${seanceAuthorFilter.length > 1 ? "s" : ""}`}
+                                  {seancePathologieFilter.length === 0 ? "Tous" : `${seancePathologieFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-52 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {seancePathologies.map(p => (
+                                    <label key={p} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={seancePathologieFilter.includes(p)} onCheckedChange={(checked) => setSeancePathologieFilter(prev => checked ? [...prev, p] : prev.filter(x => x !== p))} />
+                                      {p}
+                                    </label>
+                                  ))}
+                                </div>
+                                {seancePathologieFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeancePathologieFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Objectif</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceObjectifFilter.length === 0 ? "Tous" : `${seanceObjectifFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-52 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {seanceObjectifs.map(o => (
+                                    <label key={o} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={seanceObjectifFilter.includes(o)} onCheckedChange={(checked) => setSeanceObjectifFilter(prev => checked ? [...prev, o] : prev.filter(x => x !== o))} />
+                                      {o}
+                                    </label>
+                                  ))}
+                                </div>
+                                {seanceObjectifFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceObjectifFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help underline decoration-dotted">Auteur</span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs text-xs">
+                                  Pseudo saisi lors de la création de la séance — figé à ce moment-là, même si l'utilisateur change de pseudo ensuite.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceAuthorFilter.length === 0 ? "Tous" : `${seanceAuthorFilter.length} sél.`}
                                   <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
@@ -1458,29 +1558,169 @@ export default function Admin() {
                                 <div className="space-y-1 max-h-60 overflow-y-auto">
                                   {seanceAuthors.map(a => (
                                     <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
-                                      <Checkbox
-                                        checked={seanceAuthorFilter.includes(a)}
-                                        onCheckedChange={(checked) => setSeanceAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))}
-                                      />
+                                      <Checkbox checked={seanceAuthorFilter.includes(a)} onCheckedChange={(checked) => setSeanceAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))} />
                                       {a}
                                     </label>
                                   ))}
                                 </div>
-                                {seanceAuthorFilter.length > 0 && (
-                                  <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceAuthorFilter([])}>
-                                    Tout effacer
-                                  </Button>
+                                {seanceAuthorFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceAuthorFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Créé le</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  <CalendarIcon className="w-3 h-3 mr-1 opacity-60" />
+                                  {seanceDateFromFilter && seanceDateToFilter
+                                    ? `${format(seanceDateFromFilter, "dd/MM")}–${format(seanceDateToFilter, "dd/MM")}`
+                                    : seanceDateFromFilter
+                                    ? `Dès ${format(seanceDateFromFilter, "dd/MM/yy")}`
+                                    : seanceDateToFilter
+                                    ? `≤ ${format(seanceDateToFilter, "dd/MM/yy")}`
+                                    : "Tous"}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <div className="flex justify-between items-center px-4 pt-3 pb-2 border-b gap-8">
+                                  <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-foreground">Du</p>
+                                    <p className="text-sm text-muted-foreground mt-0.5">{seanceDateFromFilter ? format(seanceDateFromFilter, "d MMMM yyyy", { locale: fr }) : "—"}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-foreground">Au</p>
+                                    <p className="text-sm text-muted-foreground mt-0.5">{seanceDateToFilter ? format(seanceDateToFilter, "d MMMM yyyy", { locale: fr }) : "—"}</p>
+                                  </div>
+                                </div>
+                                <Calendar
+                                  mode="range"
+                                  selected={{ from: seanceDateFromFilter, to: seanceDateToFilter }}
+                                  onSelect={(range) => {
+                                    setSeanceDateFromFilter(range?.from);
+                                    setSeanceDateToFilter(range?.to);
+                                  }}
+                                  numberOfMonths={2}
+                                  locale={fr}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                                {(seanceDateFromFilter || seanceDateToFilter) && (
+                                  <div className="px-3 pb-3">
+                                    <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={() => { setSeanceDateFromFilter(undefined); setSeanceDateToFilter(undefined); }}>Effacer les dates</Button>
+                                  </div>
                                 )}
                               </PopoverContent>
                             </Popover>
                           </div>
                         </th>
-                        <th className="text-left py-3 px-2">Créé le</th>
-                        <th className="text-left py-3 px-2">Copies</th>
-                        <th className="text-left py-3 px-2">Statut</th>
-                        <th className="text-left py-3 px-2">Actions</th>
-                        <th className="text-left py-3 px-2">Utilisateur</th>
-                        <th className="text-left py-3 px-2">Consulté</th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Copies</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceCopiesFilter === "all" ? "Tous" : seanceCopiesFilter === "with" ? "Avec" : "Sans"}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-40 p-2" align="start">
+                                <div className="space-y-1">
+                                  {([["all", "Tous"], ["with", "Avec copies"], ["without", "Sans copies"]] as const).map(([val, lbl]) => (
+                                    <label key={val} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <input type="radio" name="seanceCopiesFilter" checked={seanceCopiesFilter === val} onChange={() => setSeanceCopiesFilter(val)} />
+                                      {lbl}
+                                    </label>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Statut du partage</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceStatusFilter.length === 0 ? "Tous" : `${seanceStatusFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1">
+                                  {([["prive", "Privé"], ["attente", "En attente"], ["valide", "Partagé & Validé"], ["refuse", "Refusé"]] as const).map(([val, lbl]) => (
+                                    <label key={val} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={seanceStatusFilter.includes(val)} onCheckedChange={(checked) => setSeanceStatusFilter(prev => checked ? [...prev, val] : prev.filter(x => x !== val))} />
+                                      {lbl}
+                                    </label>
+                                  ))}
+                                </div>
+                                {seanceStatusFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceStatusFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">Actions</th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help underline decoration-dotted">Utilisateur</span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs text-xs">
+                                  Nom actuel du compte propriétaire de la séance — mis à jour si l'utilisateur modifie son profil.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceUserFilter.length === 0 ? "Tous" : `${seanceUserFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {seanceUserNames.map(u => (
+                                    <label key={u} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={seanceUserFilter.includes(u)} onCheckedChange={(checked) => setSeanceUserFilter(prev => checked ? [...prev, u] : prev.filter(x => x !== u))} />
+                                      {u}
+                                    </label>
+                                  ))}
+                                </div>
+                                {seanceUserFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setSeanceUserFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Consulté</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {seanceConsultedFilter === "all" ? "Tous" : seanceConsultedFilter === "consulted" ? "Consulté" : "Non consulté"}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-44 p-2" align="start">
+                                <div className="space-y-1">
+                                  {([["all", "Tous"], ["consulted", "Consulté"], ["not-consulted", "Non consulté"]] as const).map(([val, lbl]) => (
+                                    <label key={val} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <input type="radio" name="seanceConsultedFilter" checked={seanceConsultedFilter === val} onChange={() => setSeanceConsultedFilter(val)} />
+                                      {lbl}
+                                    </label>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1525,6 +1765,16 @@ export default function Admin() {
                                 >
                                   <CheckCircle className="w-4 h-4" />
                                   Autoriser
+                                </Button>
+                              )}
+                              {s.is_shared && s.is_validated && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => revokeSeance(s.id)}
+                                  className="gap-1 border-orange-500 text-orange-600 hover:bg-orange-50"
+                                >
+                                  Révoquer
                                 </Button>
                               )}
                               <Button
@@ -1661,7 +1911,7 @@ export default function Admin() {
                         </th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
-                        <th className="text-left py-3 px-2">Statut</th>
+                        <th className="text-left py-3 px-2">Statut du partage</th>
                         <th className="text-left py-3 px-2">Validé</th>
                         <th className="text-left py-3 px-2">Actions</th>
                         <th className="text-left py-3 px-2">Utilisateur</th>
@@ -1896,7 +2146,7 @@ export default function Admin() {
                         </th>
                         <th className="text-left py-3 px-2">Créé le</th>
                         <th className="text-left py-3 px-2">Copies</th>
-                        <th className="text-left py-3 px-2">Statut</th>
+                        <th className="text-left py-3 px-2">Statut du partage</th>
                         <th className="text-left py-3 px-2">Plateforme</th>
                         <th className="text-left py-3 px-2">Consulté</th>
                       </tr>

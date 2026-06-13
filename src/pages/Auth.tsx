@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { pb } from "@/integrations/pocketbase/client";
-import { Loader2, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Loader2, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Email invalide").max(255, "Email trop long");
@@ -29,6 +29,7 @@ export default function Auth() {
   const [lastName, setLastName] = useState("");
   const [pseudo, setPseudo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; pseudo?: string }>({});
 
   const { signIn, signUp, user } = useAuth();
@@ -190,10 +191,19 @@ export default function Auth() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      id="password" type="password" placeholder="••••••••" value={password}
+                      id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password}
                       onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }}
-                      className={`pl-10 ${errors.password ? "border-destructive" : ""}`}
+                      className={`pl-10 pr-10 ${errors.password ? "border-destructive" : ""}`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                   {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
                 </div>
