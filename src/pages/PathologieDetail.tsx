@@ -1,137 +1,147 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { ArrowLeft, Loader2, Save, Trash2, X, Shield, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
+  ArrowLeft,
+  Loader2,
+  Pencil,
+  Shield,
+  User as UserIcon,
+  Dumbbell,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
+import { MediaThumb } from "@/components/MediaThumb";
+import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
+import { CopyExerciceToSeanceDialog } from "@/components/pathologie/CopyExerciceToSeanceDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ChevronsUpDown, Search } from "lucide-react";
+  SECTIONS,
+  SectionKey,
+  emptySections,
+  looksLikeHtml,
+  parseDescription,
+  parseKineItems,
+  type KineItem,
+} from "@/lib/pathologie";
 
 interface TraitementOption {
   id: string;
   nom: string;
-  pathologie: string | null;
-  user_id: string;
   is_platform: boolean;
 }
 
-const CATEGORIES = [
-  "Traumatologie",
-  "Orthopédie",
-  "Neurologie",
-  "Rhumatologie",
-  "Cardiovasculaire",
-  "Respiratoire",
-  "Psychiatrie",
-  "Gériatrie",
-  "Urologie",
-  "Dermatologie",
-  "Pédiatrie",
-  "Gynécologie",
-  "Médecine interne",
-  "Chirurgie",
-];
-
-// Sections internes structurées du champ `description` (Markdown).
-// Ordre = ordre d'affichage et de stockage.
-const SECTIONS = [
-  { key: "traitement_kine", label: "Traitement kiné" },
-  { key: "bilan", label: "Bilan" },
-  { key: "description", label: "Description" },
-  { key: "traitement_orthopedique", label: "Traitement orthopédique" },
-  { key: "traitement_chirurgical", label: "Traitement chirurgical" },
-  { key: "complications", label: "Complications" },
-  { key: "contre_indications", label: "Contre-indications" },
-  { key: "evolution_delais", label: "Évolution & délais" },
-  { key: "mots_cles", label: "Mots-clés" },
-] as const;
-
-type SectionKey = (typeof SECTIONS)[number]["key"];
-
-// Construit le Markdown final à partir du dictionnaire de sections.
-function buildDescription(sections: Record<SectionKey, string>): string {
-  return SECTIONS.map(({ key, label }) => {
-    const content = (sections[key] || "").trim();
-    return `## ${label}\n${content}`;
-  }).join("\n\n");
+// Affiche du contenu mis en forme (HTML assaini) ou, pour le texte legacy,
+// du texte brut en préservant les sauts de ligne.
+function RichText({ value }: { value: string }) {
+  if (looksLikeHtml(value)) {
+    return (
+      <div
+        className="prose prose-sm dark:prose-invert max-w-none text-sm"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }}
+      />
+    );
+  }
+  return <p className="text-sm whitespace-pre-wrap break-words">{value}</p>;
 }
 
-// Parse un Markdown structuré en ses sections. Tolérant : ce qui ne matche pas
-// va dans la première section. Cherche les headings de niveau 2.
-function parseDescription(md: string): Record<SectionKey, string> {
-  const empty = SECTIONS.reduce((acc, s) => ({ ...acc, [s.key]: "" }),
-    {} as Record<SectionKey, string>);
-  if (!md) return empty;
-
-  const labelToKey = new Map<string, SectionKey>(
-    SECTIONS.map((s) => [s.label.toLowerCase(), s.key])
+// Bloc repliable (tiroir) avec titre, pour la vue détail.
+function DetailDrawer({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="rounded-md border">
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
+        <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-3 pb-3">{children}</CollapsibleContent>
+    </Collapsible>
   );
+}
 
-  const lines = md.split(/\r?\n/);
-  let current: SectionKey | null = null;
-  const buffers: Record<SectionKey, string[]> = SECTIONS.reduce(
-    (acc, s) => ({ ...acc, [s.key]: [] }),
-    {} as Record<SectionKey, string[]>
-  );
-  const preamble: string[] = [];
-
-  for (const line of lines) {
-    const m = line.match(/^##\s+(.+?)\s*$/);
-    if (m) {
-      const key = labelToKey.get(m[1].trim().toLowerCase());
-      if (key) {
-        current = key;
-        continue;
-      }
-    }
-    if (current) buffers[current].push(line);
-    else preamble.push(line);
-  }
-
-  // Si rien n'a été reconnu et qu'il y a du contenu en préambule, le mettre
-  // dans la première section "description".
-  if (
-    preamble.join("").trim().length > 0 &&
-    Object.values(buffers).every((b) => b.length === 0)
-  ) {
-    buffers.description = preamble;
-  }
-
-  return SECTIONS.reduce(
-    (acc, s) => ({ ...acc, [s.key]: buffers[s.key].join("\n").trim() }),
-    {} as Record<SectionKey, string>
+// Rendu lecture seule d'une section en liste de blocs : blocs texte en
+// sous-tiroirs (titre + contenu), exercices en cartes (vignette + code + titre
+// + tags) ouvrant l'aperçu, comme sur la page Exercices.
+function ItemsView({
+  items,
+  exById,
+  onOpenExercice,
+}: {
+  items: KineItem[];
+  exById: Map<string, ExercicePreview>;
+  onOpenExercice: (ex: ExercicePreview) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((it, i) => {
+        if (it.type === "text") {
+          return (
+            <Collapsible key={i} className="rounded-md border">
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+                <span className="text-sm font-medium">{it.title?.trim() || "Texte"}</span>
+                <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-3 pb-3">
+                <RichText value={it.value} />
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        }
+        const ex = exById.get(it.id);
+        if (!ex) {
+          return (
+            <div key={i} className="flex items-center gap-1.5 px-1 text-sm">
+              <Dumbbell className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="italic text-muted-foreground">Exercice introuvable</span>
+            </div>
+          );
+        }
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onOpenExercice(ex)}
+            className="flex w-full items-center gap-3 rounded-md border p-2 text-left transition-colors hover:bg-muted/50"
+          >
+            <MediaThumb source={ex} alt={ex.title} className="w-14 h-10 shrink-0" showPlayIcon />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                {ex.code && (
+                  <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50">
+                    {ex.code}
+                  </Badge>
+                )}
+                <span className="truncate text-sm font-medium">{ex.title}</span>
+              </div>
+              {ex.pathologie_tags && ex.pathologie_tags.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {ex.pathologie_tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -140,44 +150,20 @@ export default function PathologieDetail() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [categorie, setCategorie] = useState<string>("");
-  const [objectifs, setObjectifs] = useState("");
-  const [sections, setSections] = useState<Record<SectionKey, string>>(() =>
-    SECTIONS.reduce(
-      (acc, s) => ({ ...acc, [s.key]: "" }),
-      {} as Record<SectionKey, string>
-    )
-  );
-  // Champ legacy `traitement` (texte libre) — conservé pour rétrocompat.
+  const [sections, setSections] = useState<Record<SectionKey, string>>(emptySections);
+  const [itemsBySection, setItemsBySection] = useState<Partial<Record<SectionKey, KineItem[]>>>({});
   const [traitement, setTraitement] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  // Visibilité : un admin peut basculer is_shared + is_validated en un clic.
-  // Pour un user non-admin propriétaire, seul is_shared est piloté (validation reste à un admin).
   const [isShared, setIsShared] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
-  // Visibilité plateforme (admin-only) : si true, la pathologie est masquée à tous les non-admins
-  // — n'apparaît dans aucun des filtres (Mes, Plateforme, Partagés). Les admins la voient toujours.
-  const [isHiddenFromList, setIsHiddenFromList] = useState(false);
-  // Pathologie plateforme : présente dans featured_pathologies → masque le toggle is_shared
-  // (la visibilité aux non-admins est gérée par is_hidden_from_list).
-  const [isPlatform, setIsPlatform] = useState(false);
-  // État initial chargé en BDD : sert à détecter "user non-admin modifie une patho déjà
-  // validée" pour reset is_shared+is_validated à la sauvegarde (re-proposition obligatoire).
-  const initialShareState = useRef<{ shared: boolean; validated: boolean }>({ shared: false, validated: false });
 
-  // Auteur de la fiche : seul lui (ou un admin) peut modifier.
-  // Les pathologies plateforme sont donc en lecture seule pour les autres utilisateurs.
   const [ownerId, setOwnerId] = useState<string>("");
   const [authorName, setAuthorName] = useState<string>("");
   const isOwner = !!user && !!ownerId && user.id === ownerId;
   const canEdit = isOwner || isAdmin;
   const readOnly = !canEdit;
 
-  // Ordre des pathologies issues de la liste source (Mes/Plateforme/Partagés filtrés).
-  // Stocké en sessionStorage par la page Pathologies au moment de l'ouverture du détail.
-  // Permet la navigation prev/next entre les pathologies du même contexte.
   const [navOrder, setNavOrder] = useState<string[]>([]);
   useEffect(() => {
     const raw = sessionStorage.getItem("pathologies_nav_ctx");
@@ -191,10 +177,23 @@ export default function PathologieDetail() {
     }
   }, []);
 
-  // Liaisons traitement_types
-  const [linkedIds, setLinkedIds] = useState<string[]>([]);
-  const [availableTraitements, setAvailableTraitements] = useState<TraitementOption[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [linkedTraitements, setLinkedTraitements] = useState<TraitementOption[]>([]);
+  const [exById, setExById] = useState<Map<string, ExercicePreview>>(new Map());
+  const [previewEx, setPreviewEx] = useState<ExercicePreview | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [copyEx, setCopyEx] = useState<ExercicePreview | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+
+  const openExercice = (ex: ExercicePreview) => {
+    setPreviewEx(ex);
+    setPreviewOpen(true);
+  };
+
+  const copyExercice = (ex: ExercicePreview) => {
+    setPreviewOpen(false);
+    setCopyEx(ex);
+    setCopyOpen(true);
+  };
 
   useEffect(() => {
     if (id && user) load();
@@ -209,62 +208,76 @@ export default function PathologieDetail() {
       const rec = r as any;
       setName(rec.name || "");
       setCategorie(rec.categorie || "");
-      setObjectifs(rec.objectifs || "");
       setTraitement(rec.traitement || "");
-      setSections(parseDescription(rec.description || ""));
-      setLinkedIds(Array.isArray(rec.traitement_types) ? rec.traitement_types : []);
       setOwnerId(rec.user || "");
       setAuthorName(rec.author_name || "");
       setIsShared(!!rec.is_shared);
       setIsValidated(!!rec.is_validated);
-      setIsHiddenFromList(!!rec.is_hidden_from_list);
-      initialShareState.current = { shared: !!rec.is_shared, validated: !!rec.is_validated };
 
-      // Détection plateforme : un id présent dans featured_pathologies.
-      try {
-        const fp = await pb.collection("featured_pathologies").getFullList({
-          filter: `pathologie = "${id}"`,
-          fields: "id",
-        });
-        setIsPlatform((fp as any[]).length > 0);
-      } catch {
-        setIsPlatform(false);
+      // Split sections : texte simple vs liste de blocs (JSON).
+      const parsed = parseDescription(rec.description || "");
+      const texts = { ...parsed };
+      const itemsMap: Partial<Record<SectionKey, KineItem[]>> = {};
+      const exIds = new Set<string>();
+      for (const s of SECTIONS) {
+        if (s.mode !== "text") {
+          const its = parseKineItems(parsed[s.key]);
+          itemsMap[s.key] = its;
+          its.forEach((it) => {
+            if (it.type === "exercice") exIds.add(it.id);
+          });
+          texts[s.key] = "";
+        }
       }
+      setSections(texts);
+      setItemsBySection(itemsMap);
 
-      // Charge les traitements disponibles : ceux de l'utilisateur + ceux de la plateforme
-      const [mine, featured] = await Promise.all([
-        pb.collection("traitement_types").getFullList({
-          filter: `user = "${user.id}"`,
-          fields: "id,nom,pathologie,user",
-        }),
-        pb.collection("featured_traitements").getFullList({
-          fields: "traitement_type",
-        }).catch(() => [] as any[]),
+      const linkedIds: string[] = Array.isArray(rec.traitement_types) ? rec.traitement_types : [];
+      const exIdList = [...exIds];
+
+      const [traits, exs] = await Promise.all([
+        linkedIds.length
+          ? pb.collection("traitement_types").getFullList({
+              filter: linkedIds.map((tid) => `id = "${tid}"`).join(" || "),
+              fields: "id,nom,user",
+            })
+          : Promise.resolve([] as any[]),
+        exIdList.length
+          ? pb.collection("exercices").getFullList({
+              filter: exIdList.map((eid) => `id = "${eid}"`).join(" || "),
+              fields:
+                "id,code,title,description,video_url,thumbnail_url,image_url,media_type,pathologie_tags,objectif_tags,user,author_name",
+            }).catch(() => [] as any[])
+          : Promise.resolve([] as any[]),
       ]);
 
-      const platformIds = (featured as any[]).map((f) => f.traitement_type).filter(Boolean);
-      const platformRecords = platformIds.length
-        ? await pb.collection("traitement_types").getFullList({
-            filter: platformIds.map((tid) => `id = "${tid}"`).join(" || "),
-            fields: "id,nom,pathologie,user",
+      setLinkedTraitements(
+        linkedIds
+          .map((tid) => {
+            const t = (traits as any[]).find((x) => x.id === tid);
+            if (!t) return null;
+            return { id: t.id, nom: t.nom || "Sans nom", is_platform: t.user !== user.id };
           })
-        : [];
+          .filter((t): t is TraitementOption => !!t)
+      );
 
-      const mineOpts: TraitementOption[] = (mine as any[]).map((t) => ({
-        id: t.id,
-        nom: t.nom || "Sans nom",
-        pathologie: t.pathologie || null,
-        user_id: t.user,
-        is_platform: false,
-      }));
-      const platformOpts: TraitementOption[] = (platformRecords as any[]).map((t) => ({
-        id: t.id,
-        nom: t.nom || "Sans nom",
-        pathologie: t.pathologie || null,
-        user_id: t.user,
-        is_platform: true,
-      }));
-      setAvailableTraitements([...mineOpts, ...platformOpts]);
+      const m = new Map<string, ExercicePreview>();
+      for (const e of exs as any[])
+        m.set(e.id, {
+          id: e.id,
+          code: e.code || "",
+          title: e.title || "Sans titre",
+          description: e.description || null,
+          video_url: e.video_url || null,
+          thumbnail_url: e.thumbnail_url || null,
+          image_url: e.image_url || null,
+          media_type: e.media_type || null,
+          pathologie_tags: Array.isArray(e.pathologie_tags) ? e.pathologie_tags : [],
+          objectif_tags: Array.isArray(e.objectif_tags) ? e.objectif_tags : [],
+          author_name: e.author_name || null,
+          user_id: e.user || null,
+        });
+      setExById(m);
     } catch (e) {
       console.error(e);
       toast.error("Pathologie introuvable");
@@ -272,100 +285,6 @@ export default function PathologieDetail() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSave = async () => {
-    if (!id || !name.trim()) {
-      toast.error("Le nom est requis");
-      return;
-    }
-    setSaving(true);
-    try {
-      await pb.collection("pathologies").update(id, {
-        name: name.trim(),
-        categorie: categorie || "",
-        objectifs: objectifs.trim(),
-        description: buildDescription(sections),
-        traitement,
-        traitement_types: linkedIds,
-        // Workflow validation : si user non-admin modifie une patho qui était déjà
-        // is_shared+is_validated, on remet les deux à false (la copie validée existante
-        // est conservée intacte côté Admin, mais l'original doit être re-proposé).
-        ...(() => {
-          const wasValidatedShared = initialShareState.current.shared && initialShareState.current.validated;
-          if (!isAdmin && wasValidatedShared) {
-            return { is_shared: false, is_validated: false };
-          }
-          // Admin : is_shared est piloté par lui ; is_validated est géré dans la section Admin (toggle dédié à venir).
-          return { is_shared: isShared, is_validated: isValidated };
-        })(),
-        // Toggle admin-only "masqué aux non-admins". Le Switch n'est rendu que pour isAdmin,
-        // donc isHiddenFromList reste sur la valeur chargée pour un non-admin.
-        is_hidden_from_list: isHiddenFromList,
-      });
-      // Si on a reset is_shared/is_validated, on synchronise l'UI locale + la ref.
-      if (!isAdmin && initialShareState.current.shared && initialShareState.current.validated) {
-        setIsShared(false);
-        setIsValidated(false);
-        initialShareState.current = { shared: false, validated: false };
-      }
-      toast.success("Enregistré");
-    } catch (e) {
-      console.error(e);
-      toast.error("Erreur lors de l'enregistrement");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Autosave d'un sous-ensemble de champs (utilisé par les toggles).
-  // Met à jour la BDD immédiatement sans bloquer l'UI principal.
-  const saveField = async (patch: Record<string, unknown>) => {
-    if (!id) return;
-    try {
-      await pb.collection("pathologies").update(id, patch);
-      toast.success("Enregistré");
-    } catch (e) {
-      console.error(e);
-      toast.error("Erreur d'enregistrement");
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!id) return;
-    try {
-      await pb.collection("pathologies").delete(id);
-      toast.success("Pathologie supprimée");
-      navigate("/pathologies");
-    } catch (e) {
-      console.error(e);
-      toast.error("Erreur lors de la suppression");
-    }
-  };
-
-  const setSection = (key: SectionKey, value: string) =>
-    setSections((prev) => ({ ...prev, [key]: value }));
-
-  // Maps utiles
-  const traitementsById = useMemo(() => {
-    const m = new Map<string, TraitementOption>();
-    for (const t of availableTraitements) m.set(t.id, t);
-    return m;
-  }, [availableTraitements]);
-
-  const linkedTraitements = linkedIds
-    .map((tid) => traitementsById.get(tid))
-    .filter((t): t is TraitementOption => !!t);
-
-  const addLinkById = (tid: string) => {
-    if (!linkedIds.includes(tid)) setLinkedIds([...linkedIds, tid]);
-  };
-
-  const minePicker = availableTraitements.filter((t) => !t.is_platform && !linkedIds.includes(t.id));
-  const platformPicker = availableTraitements.filter((t) => t.is_platform && !linkedIds.includes(t.id));
-
-  const removeLink = (tid: string) => {
-    setLinkedIds(linkedIds.filter((x) => x !== tid));
   };
 
   if (!user) {
@@ -378,54 +297,54 @@ export default function PathologieDetail() {
     );
   }
 
-  // Sections renseignées en premier dans l'accordéon
-  const filledKeys = SECTIONS.filter((s) => (sections[s.key] || "").trim().length > 0).map(
-    (s) => s.key
+  const currentIdx = id ? navOrder.indexOf(id) : -1;
+  const prevId = currentIdx > 0 ? navOrder[currentIdx - 1] : null;
+  const nextId = currentIdx >= 0 && currentIdx < navOrder.length - 1 ? navOrder[currentIdx + 1] : null;
+
+  // Sections à afficher (non vides), dans l'ordre.
+  const visibleSections = SECTIONS.filter((s) =>
+    s.mode === "text" ? (sections[s.key] || "").trim().length > 0 : (itemsBySection[s.key] || []).length > 0
   );
+
+  const isEmpty =
+    visibleSections.length === 0 && !traitement.trim() && linkedTraitements.length === 0;
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {(() => {
-          const currentIdx = id ? navOrder.indexOf(id) : -1;
-          const prevId = currentIdx > 0 ? navOrder[currentIdx - 1] : null;
-          const nextId = currentIdx >= 0 && currentIdx < navOrder.length - 1 ? navOrder[currentIdx + 1] : null;
-          return (
-            <div className="flex items-center justify-between mb-4">
-              <Button variant="ghost" onClick={() => navigate("/pathologies")} className="gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Retour
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" onClick={() => navigate("/pathologies")} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Retour
+          </Button>
+          {navOrder.length > 1 && currentIdx >= 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!prevId}
+                onClick={() => prevId && navigate(`/pathologies/${prevId}`)}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Précédente
               </Button>
-              {navOrder.length > 1 && currentIdx >= 0 && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!prevId}
-                    onClick={() => prevId && navigate(`/pathologies/${prevId}`)}
-                    className="gap-1"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Précédente
-                  </Button>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {currentIdx + 1} / {navOrder.length}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!nextId}
-                    onClick={() => nextId && navigate(`/pathologies/${nextId}`)}
-                    className="gap-1"
-                  >
-                    Suivante
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {currentIdx + 1} / {navOrder.length}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!nextId}
+                onClick={() => nextId && navigate(`/pathologies/${nextId}`)}
+                className="gap-1"
+              >
+                Suivante
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
-          );
-        })()}
+          )}
+        </div>
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -435,298 +354,83 @@ export default function PathologieDetail() {
           <Card>
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
-                <CardTitle>Pathologie</CardTitle>
-                {readOnly && (
-                  <Badge variant="outline" className="gap-1.5">
-                    <Shield className="w-3 h-3" />
-                    Lecture seule {authorName ? `(${authorName})` : ""}
-                  </Badge>
+                <div className="space-y-1.5">
+                  <CardTitle className="text-2xl">{name || "Pathologie"}</CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {categorie && <Badge variant="secondary">{categorie}</Badge>}
+                    {readOnly ? (
+                      <Badge variant="outline" className="gap-1.5">
+                        <Shield className="w-3 h-3" />
+                        Lecture seule {authorName ? `(${authorName})` : ""}
+                      </Badge>
+                    ) : (
+                      isShared && (
+                        <Badge variant="outline" className="gap-1.5">
+                          {isValidated ? "Partagée" : "En attente de validation"}
+                        </Badge>
+                      )
+                    )}
+                  </div>
+                </div>
+                {canEdit && (
+                  <Button onClick={() => navigate(`/pathologies/${id}/edit`)} className="gap-2 shrink-0">
+                    <Pencil className="w-4 h-4" />
+                    Modifier
+                  </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom *</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nom de la pathologie"
-                  disabled={readOnly}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="categorie">Catégorie</Label>
-                  <Select value={categorie} onValueChange={setCategorie} disabled={readOnly}>
-                    <SelectTrigger id="categorie">
-                      <SelectValue placeholder="Choisir une catégorie…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="objectifs">Objectifs</Label>
-                  <Input
-                    id="objectifs"
-                    value={objectifs}
-                    onChange={(e) => setObjectifs(e.target.value)}
-                    placeholder="Ex. récupération de l'amplitude, indolence…"
-                    disabled={readOnly}
-                  />
-                </div>
-              </div>
-
-              {!isPlatform && (
-              <div className="flex items-start justify-between gap-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <Label htmlFor="is-shared" className="text-sm font-medium">
-                    Visible par les autres utilisateurs
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {isAdmin
-                      ? "Marque la pathologie comme partagée. La validation se fait dans la section Admin (création d'une copie publique)."
-                      : "Soumet la pathologie au partage. Un administrateur doit ensuite la valider."}
-                  </p>
-                  {isShared && !isValidated && !isAdmin && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      En attente de validation par un administrateur.
-                    </p>
-                  )}
-                </div>
-                <Switch
-                  id="is-shared"
-                  checked={isShared}
-                  onCheckedChange={(v) => {
-                    setIsShared(v);
-                    // is_validated n'est plus couplé : il sera piloté par un toggle admin dédié
-                    // dans la section Admin (qui déclenchera aussi la duplication en partagé).
-                    saveField({ is_shared: v });
-                  }}
-                  disabled={readOnly}
-                />
-              </div>
-              )}
-
-              {isAdmin && (
-                <div className="flex items-start justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/20 p-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="is-visible-non-admin" className="text-sm font-medium flex items-center gap-1.5">
-                      <Shield className="w-3 h-3" />
-                      Visible pour les non-admins
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Contrôle admin. Désactivé → cette pathologie est masquée à tous les utilisateurs non-admins
-                      (n'apparaît dans aucun onglet : Mes, PhysioOffice, Partagés). Les admins continuent de la voir.
-                    </p>
-                  </div>
-                  <Switch
-                    id="is-visible-non-admin"
-                    checked={!isHiddenFromList}
-                    onCheckedChange={(v) => {
-                      const hidden = !v;
-                      setIsHiddenFromList(hidden);
-                      saveField({ is_hidden_from_list: hidden });
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Description structurée</Label>
-                <p className="text-xs text-muted-foreground">
-                  Sections enregistrées dans le champ <code>description</code>.
-                </p>
-                <Accordion
-                  type="multiple"
-                  defaultValue={filledKeys.length ? filledKeys : ["description"]}
-                  className="border rounded-md"
-                >
-                  {SECTIONS.map(({ key, label }) => (
-                    <AccordionItem key={key} value={key}>
-                      <AccordionTrigger className="px-3 text-sm font-medium">
-                        <span className="flex items-center gap-2">
-                          {label}
-                          {(sections[key] || "").trim() && (
-                            <Badge variant="outline" className="text-[10px] py-0">
-                              rempli
-                            </Badge>
-                          )}
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-3 pb-3">
-                        <Textarea
-                          value={sections[key]}
-                          onChange={(e) => setSection(key, e.target.value)}
-                          placeholder={
-                            key === "mots_cles"
-                              ? "genou, ligament, post-op"
-                              : `Saisir ${label.toLowerCase()}…`
-                          }
-                          rows={key === "mots_cles" ? 2 : 6}
-                          className={key === "mots_cles" ? "" : "min-h-[120px]"}
-                          disabled={readOnly}
-                        />
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="traitement">Notes libres (legacy)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Champ <code>traitement</code> historique, conservé pour compatibilité.
-                </p>
-                <Textarea
-                  id="traitement"
-                  value={traitement}
-                  onChange={(e) => setTraitement(e.target.value)}
-                  placeholder="Notes libres, à migrer progressivement vers la description structurée."
-                  rows={6}
-                  disabled={readOnly}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Traitements liés</Label>
-                <p className="text-xs text-muted-foreground">
-                  Vos traitements types personnels et ceux de la plateforme rattachés à cette pathologie.
-                </p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {linkedTraitements.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">Aucun traitement lié</span>
+            <CardContent className="space-y-3">
+              {visibleSections.map(({ key, label, mode }) => (
+                <DetailDrawer key={key} title={label}>
+                  {mode === "text" ? (
+                    <RichText value={sections[key]} />
                   ) : (
-                    linkedTraitements.map((t) => (
-                      <Badge
-                        key={t.id}
-                        variant={t.is_platform ? "default" : "secondary"}
-                        className="gap-1.5"
-                        title={t.is_platform ? "Traitement plateforme" : "Votre traitement"}
-                      >
+                    <ItemsView
+                      items={itemsBySection[key] || []}
+                      exById={exById}
+                      onOpenExercice={openExercice}
+                    />
+                  )}
+                </DetailDrawer>
+              ))}
+
+              {traitement.trim() && (
+                <DetailDrawer title="Notes">
+                  <RichText value={traitement} />
+                </DetailDrawer>
+              )}
+
+              {linkedTraitements.length > 0 && (
+                <DetailDrawer title="Traitements liés">
+                  <div className="flex flex-wrap gap-2">
+                    {linkedTraitements.map((t) => (
+                      <Badge key={t.id} variant={t.is_platform ? "default" : "secondary"} className="gap-1.5">
                         {t.is_platform ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
                         {t.nom}
-                        <X
-                          className="w-3 h-3 cursor-pointer hover:opacity-70"
-                          onClick={() => removeLink(t.id)}
-                        />
                       </Badge>
-                    ))
-                  )}
-                </div>
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between font-normal text-muted-foreground"
-                      disabled={readOnly}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Search className="w-3 h-3" />
-                        Lier un traitement type…
-                      </span>
-                      <ChevronsUpDown className="w-3 h-3 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Rechercher un traitement…" />
-                      <CommandList>
-                        <CommandEmpty>Aucun traitement disponible.</CommandEmpty>
-                        {minePicker.length > 0 && (
-                          <CommandGroup heading="Mes traitements">
-                            {minePicker.map((t) => (
-                              <CommandItem
-                                key={t.id}
-                                value={`mine ${t.nom} ${t.pathologie || ""} ${t.id}`}
-                                onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
-                              >
-                                <UserIcon className="w-3 h-3 mr-2 text-muted-foreground" />
-                                <span className="flex-1">{t.nom}</span>
-                                {t.pathologie && (
-                                  <Badge variant="outline" className="ml-2 text-xs">{t.pathologie}</Badge>
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                        {platformPicker.length > 0 && (
-                          <CommandGroup heading="Plateforme">
-                            {platformPicker.map((t) => (
-                              <CommandItem
-                                key={t.id}
-                                value={`platform ${t.nom} ${t.pathologie || ""} ${t.id}`}
-                                onSelect={() => { addLinkById(t.id); setPickerOpen(false); }}
-                              >
-                                <Shield className="w-3 h-3 mr-2 text-primary" />
-                                <span className="flex-1">{t.nom}</span>
-                                {t.pathologie && (
-                                  <Badge variant="outline" className="ml-2 text-xs">{t.pathologie}</Badge>
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    ))}
+                  </div>
+                </DetailDrawer>
+              )}
 
-
-              {readOnly ? (
-                <div className="pt-2 text-xs text-muted-foreground">
-                  Cette pathologie appartient à la plateforme. Vous pouvez la consulter mais seul son auteur ou un administrateur peut la modifier.
-                </div>
-              ) : (
-                <div className="flex justify-between gap-2 pt-2">
-                  <Button
-                    variant="ghost"
-                    className="text-destructive gap-2"
-                    onClick={() => setConfirmDelete(true)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Supprimer
-                  </Button>
-                  <Button onClick={handleSave} disabled={saving || !name.trim()} className="gap-2">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Enregistrer
-                  </Button>
-                </div>
+              {isEmpty && (
+                <p className="text-sm text-muted-foreground italic">
+                  Aucune information renseignée.
+                  {canEdit && " Cliquez sur « Modifier » pour compléter la fiche."}
+                </p>
               )}
             </CardContent>
           </Card>
         )}
 
-        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer cette pathologie ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                « {name} » sera supprimée. Les exercices, séances et traitements qui l'utilisent comme tag
-                conserveront le tag tel quel.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={handleDelete}
-              >
-                Supprimer
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ExercicePreviewDialog
+          exercice={previewEx}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          onCopyToSeance={copyExercice}
+        />
+        <CopyExerciceToSeanceDialog exercice={copyEx} open={copyOpen} onOpenChange={setCopyOpen} />
       </div>
     </Layout>
   );

@@ -23,6 +23,7 @@ import TraitementType from "./pages/TraitementType";
 import SeanceType from "./pages/SeanceType";
 import Pathologies from "./pages/Pathologies";
 import PathologieDetail from "./pages/PathologieDetail";
+import PathologieEdit from "./pages/PathologieEdit";
 import Objectifs from "./pages/Objectifs";
 import Exercices from "./pages/Exercices";
 import Videos from "./pages/Videos";
@@ -76,6 +77,7 @@ const App = () => (
             <Route path="/seance-type" element={<ProtectedRoute><SeanceType /></ProtectedRoute>} />
             <Route path="/pathologies" element={<ProtectedRoute><Pathologies /></ProtectedRoute>} />
             <Route path="/pathologies/:id" element={<ProtectedRoute><PathologieDetail /></ProtectedRoute>} />
+            <Route path="/pathologies/:id/edit" element={<ProtectedRoute><PathologieEdit /></ProtectedRoute>} />
             <Route path="/objectifs" element={<ProtectedRoute><Objectifs /></ProtectedRoute>} />
             <Route path="/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
             {/* Admin-only */}
