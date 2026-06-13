@@ -295,7 +295,7 @@ export function ExerciceDetailDialog({
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-muted-foreground" />
               <span className="text-muted-foreground">Auteur:</span>
-              <span>{exercice.author_name || "Anonyme"}</span>
+              <span>{exercice.user_id === user?.id ? "Moi" : (exercice.author_name || "Anonyme")}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />

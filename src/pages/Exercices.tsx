@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon } from "lucide-react";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown } from "lucide-react";
 import { pb, getFileUrl } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -88,6 +89,15 @@ export default function Exercices() {
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [filterTitre, setFilterTitre] = useState("");
+  const [filterTitreOpen, setFilterTitreOpen] = useState(false);
+  const [filterPathologie, setFilterPathologie] = useState<string[]>([]);
+  const [filterObjectifs, setFilterObjectifs] = useState<string[]>([]);
+  const [filterDescription, setFilterDescription] = useState("");
+  const [filterDescriptionOpen, setFilterDescriptionOpen] = useState(false);
+  const [filterAuteur, setFilterAuteur] = useState<string[]>([]);
+  const [filterStatut, setFilterStatut] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -110,7 +120,7 @@ export default function Exercices() {
 
   useEffect(() => {
     applyFilters();
-  }, [exercices, filter, searchQuery, user, featuredExerciceIds]);
+  }, [exercices, filter, searchQuery, user, featuredExerciceIds, filterTitre, filterPathologie, filterObjectifs, filterDescription, filterAuteur, filterStatut]);
 
   const applyFilters = () => {
     let result = [...exercices];
@@ -157,6 +167,31 @@ export default function Exercices() {
           e.pathologie_tags.some(tag => tag.toLowerCase().includes(query)) ||
           e.author_name?.toLowerCase().includes(query)
       );
+    }
+
+    // Column-level filters
+    if (filterTitre.trim()) {
+      const q = filterTitre.toLowerCase();
+      result = result.filter(e => e.title.toLowerCase().includes(q));
+    }
+    if (filterPathologie.length > 0) {
+      result = result.filter(e => filterPathologie.some(p => e.pathologie_tags.includes(p)));
+    }
+    if (filterObjectifs.length > 0) {
+      result = result.filter(e => filterObjectifs.some(o => (e.objectif_tags || []).includes(o)));
+    }
+    if (filterDescription.trim()) {
+      const q = filterDescription.toLowerCase();
+      result = result.filter(e => e.description?.toLowerCase().includes(q));
+    }
+    if (filterAuteur.length > 0) {
+      result = result.filter(e => {
+        if (filterAuteur.includes("Moi") && e.user_id === user?.id) return true;
+        return e.author_name !== null && filterAuteur.includes(e.author_name);
+      });
+    }
+    if (filterStatut.length > 0) {
+      result = result.filter(e => filterStatut.includes(e.status));
     }
 
     setFilteredExercices(result);
@@ -722,6 +757,52 @@ export default function Exercices() {
     return exercice.user_id === user?.id || isAdmin;
   };
 
+  // Exercises after applying the active tab filter only (no column filters) — used to populate filter option lists
+  const tabFilteredExercices = (() => {
+    const userCopiedOriginalIds = exercices
+      .filter((e) => e.is_copy && e.user_id === user?.id && e.original_id)
+      .map((e) => e.original_id);
+    let result = [...exercices];
+    if (filter === "shared") {
+      result = result.filter((e) => !userCopiedOriginalIds.includes(e.id));
+    }
+    if (filter === "mine") {
+      result = result.filter((e) => {
+        if (e.user_id !== user?.id) return false;
+        if (e.original_id && !e.is_copy) return false;
+        if ((e as any).deleted_by_author) return false;
+        return true;
+      });
+    } else if (filter === "platform") {
+      result = result.filter((e) => featuredExerciceIds.includes(e.id));
+    } else if (filter === "shared") {
+      result = result.filter((e) =>
+        (e.status === "shared" || e.status === "withdrawal_requested") &&
+        !featuredExerciceIds.includes(e.id) &&
+        !(e as any).deleted_by_author
+      );
+    }
+    return result;
+  })();
+
+  const allPathoTags = [...new Set(tabFilteredExercices.flatMap(e => e.pathologie_tags))].sort((a, b) => a.localeCompare(b, "fr"));
+  const allObjectifTags = [...new Set(tabFilteredExercices.flatMap(e => e.objectif_tags || []))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+  const allAuthors = [...new Set(tabFilteredExercices.map(e =>
+    e.user_id === user?.id ? "Moi" : e.author_name
+  ).filter((a): a is string => Boolean(a)))].sort((a, b) => {
+    if (a === "Moi") return -1;
+    if (b === "Moi") return 1;
+    return a.localeCompare(b, "fr");
+  });
+  const statusLabels: Record<string, string> = {
+    draft: "Brouillon",
+    pending: "En attente",
+    shared: "Partagé",
+    withdrawal_requested: "Retrait demandé",
+    rejected: "Refusé",
+  };
+  const allStatuses = [...new Set(tabFilteredExercices.map(e => e.status))].filter(s => s in statusLabels && s !== "draft");
+
   if (!user) {
     return (
       <Layout>
@@ -839,14 +920,6 @@ export default function Exercices() {
                 </div>
               </CardContent>
             </Card>
-          ) : filteredExercices.length === 0 ? (
-            <Card className="glass">
-              <CardContent className="py-12">
-                <p className="text-center text-muted-foreground">
-                  Aucun exercice trouvé
-                </p>
-              </CardContent>
-            </Card>
           ) : (
             <Card className="glass overflow-hidden">
               <Table>
@@ -854,19 +927,193 @@ export default function Exercices() {
                   <TableRow>
                     <TableHead className="w-28">Média</TableHead>
                     <TableHead>
-                      <div className="flex flex-col leading-tight">
-                        <span>Titre</span>
-                        <span className="text-xs font-normal text-muted-foreground">Pathologie</span>
+                      <div className="flex items-start gap-4">
+                        <div className="flex flex-col gap-1">
+                          <span>Titre</span>
+                          <Popover open={filterTitreOpen} onOpenChange={setFilterTitreOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                                {filterTitre ? `"${filterTitre.length > 7 ? filterTitre.slice(0, 7) + "…" : filterTitre}"` : "Tous"}
+                                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-52 p-2" align="start">
+                              <Input
+                                placeholder="Filtrer par titre..."
+                                value={filterTitre}
+                                onChange={(e) => {
+                                  setFilterTitre(e.target.value);
+                                  if (!e.target.value) setFilterTitreOpen(false);
+                                }}
+                                className="h-7 text-xs"
+                                autoFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-normal text-muted-foreground">Pathologie</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                                {filterPathologie.length === 0 ? "Toutes" : `${filterPathologie.length} sél.`}
+                                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2" align="start">
+                              <div className="space-y-1 max-h-60 overflow-y-auto">
+                                {allPathoTags.map(p => (
+                                  <label key={p} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                    <Checkbox
+                                      checked={filterPathologie.includes(p)}
+                                      onCheckedChange={(checked) => setFilterPathologie(prev => checked ? [...prev, p] : prev.filter(x => x !== p))}
+                                    />
+                                    {p}
+                                  </label>
+                                ))}
+                                {allPathoTags.length === 0 && <p className="text-xs text-muted-foreground px-1">Aucune pathologie</p>}
+                              </div>
+                              {filterPathologie.length > 0 && (
+                                <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setFilterPathologie([])}>
+                                  Tout effacer
+                                </Button>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     </TableHead>
-                    <TableHead>Objectifs</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Auteur</TableHead>
-                    <TableHead className="text-right">Actions / Statut</TableHead>
+                    <TableHead>
+                      <div className="flex flex-col gap-1">
+                        <span>Objectifs</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                              {filterObjectifs.length === 0 ? "Tous" : `${filterObjectifs.length} sél.`}
+                              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2" align="start">
+                            <div className="space-y-1 max-h-60 overflow-y-auto">
+                              {allObjectifTags.map(o => (
+                                <label key={o} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                  <Checkbox
+                                    checked={filterObjectifs.includes(o)}
+                                    onCheckedChange={(checked) => setFilterObjectifs(prev => checked ? [...prev, o] : prev.filter(x => x !== o))}
+                                  />
+                                  {o}
+                                </label>
+                              ))}
+                              {allObjectifTags.length === 0 && <p className="text-xs text-muted-foreground px-1">Aucun objectif</p>}
+                            </div>
+                            {filterObjectifs.length > 0 && (
+                              <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setFilterObjectifs([])}>
+                                Tout effacer
+                              </Button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex flex-col gap-1">
+                        <span>Description</span>
+                        <Popover open={filterDescriptionOpen} onOpenChange={setFilterDescriptionOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                              {filterDescription ? `"${filterDescription.length > 7 ? filterDescription.slice(0, 7) + "…" : filterDescription}"` : "Toutes"}
+                              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-52 p-2" align="start">
+                            <Input
+                              placeholder="Filtrer par description..."
+                              value={filterDescription}
+                              onChange={(e) => {
+                                setFilterDescription(e.target.value);
+                                if (!e.target.value) setFilterDescriptionOpen(false);
+                              }}
+                              className="h-7 text-xs"
+                              autoFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex flex-col gap-1">
+                        <span>Auteur</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                              {filterAuteur.length === 0 ? "Tous" : `${filterAuteur.length} sél.`}
+                              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2" align="start">
+                            <div className="space-y-1 max-h-60 overflow-y-auto">
+                              {allAuthors.map(a => (
+                                <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                  <Checkbox
+                                    checked={filterAuteur.includes(a)}
+                                    onCheckedChange={(checked) => setFilterAuteur(prev => checked ? [...prev, a] : prev.filter(x => x !== a))}
+                                  />
+                                  {a}
+                                </label>
+                              ))}
+                              {allAuthors.length === 0 && <p className="text-xs text-muted-foreground px-1">Aucun auteur</p>}
+                            </div>
+                            {filterAuteur.length > 0 && (
+                              <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setFilterAuteur([])}>
+                                Tout effacer
+                              </Button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex flex-col gap-1 items-end">
+                        <span>Actions / Statut</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-6 text-xs font-normal px-2 justify-between w-28">
+                              {filterStatut.length === 0 ? "Tous" : `${filterStatut.length} sél.`}
+                              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2" align="end">
+                            <div className="space-y-1">
+                              {allStatuses.map(s => (
+                                <label key={s} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                  <Checkbox
+                                    checked={filterStatut.includes(s)}
+                                    onCheckedChange={(checked) => setFilterStatut(prev => checked ? [...prev, s] : prev.filter(x => x !== s))}
+                                  />
+                                  {statusLabels[s] ?? s}
+                                </label>
+                              ))}
+                              {allStatuses.length === 0 && <p className="text-xs text-muted-foreground px-1">Aucun statut</p>}
+                            </div>
+                            {filterStatut.length > 0 && (
+                              <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setFilterStatut([])}>
+                                Tout effacer
+                              </Button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredExercices.map((exercice) => (
+                  {filteredExercices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                        Aucun exercice trouvé
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredExercices.map((exercice) => (
                     <TableRow
                       key={exercice.id}
                       onClick={() => openPreviewDialog(exercice)}

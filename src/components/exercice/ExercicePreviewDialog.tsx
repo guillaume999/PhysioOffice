@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Play, Image as ImageIcon } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 export interface ExercicePreview {
   id?: string;
@@ -14,6 +15,7 @@ export interface ExercicePreview {
   pathologie_tags?: string[];
   objectif_tags?: string[];
   author_name?: string | null;
+  user_id?: string | null;
   // Séance metrics
   series?: number | null;
   repetitions?: number | null;
@@ -31,6 +33,8 @@ interface ExercicePreviewDialogProps {
 }
 
 export function ExercicePreviewDialog({ exercice, open, onOpenChange }: ExercicePreviewDialogProps) {
+  const { user } = useAuth();
+
   if (!exercice) return null;
 
   const isImage = exercice.media_type === "image";
@@ -159,8 +163,10 @@ export function ExercicePreviewDialog({ exercice, open, onOpenChange }: Exercice
           )}
 
           {/* Author */}
-          {exercice.author_name && (
-            <p className="text-xs text-muted-foreground">Par {exercice.author_name}</p>
+          {(exercice.author_name || exercice.user_id) && (
+            <p className="text-xs text-muted-foreground">
+              Par {exercice.user_id && exercice.user_id === user?.id ? "moi" : (exercice.author_name || "")}
+            </p>
           )}
         </div>
       </DialogContent>
