@@ -518,6 +518,12 @@ export default function TraitementType() {
                             <span className="text-xs text-muted-foreground truncate">
                               par {traitement.user_id === user?.id ? "Moi" : (traitement.author_name || "Anonyme")}
                             </span>
+                            {canShare && traitement.is_shared && !traitement.is_validated && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente</Badge>
+                            )}
+                            {canShare && traitement.is_refused && (
+                              <Badge className="text-xs bg-red-500 flex-shrink-0">Refusé</Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               • {traitement.tests?.length || 0} tests • {traitement.seances?.length || 0} séances
                             </span>
@@ -733,15 +739,6 @@ export default function TraitementType() {
                                     <span className="text-xs">
                                       {traitement.is_shared && traitement.is_validated ? "Déjà partagé" : traitement.is_refused ? "Partage refusé" : "Partager"}
                                     </span>
-                                    {traitement.is_shared && traitement.is_validated && (
-                                      <Badge className="text-xs bg-green-500">Validé</Badge>
-                                    )}
-                                    {traitement.is_shared && !traitement.is_validated && (
-                                      <Badge variant="secondary" className="text-xs">En attente</Badge>
-                                    )}
-                                    {traitement.is_refused && (
-                                      <Badge className="text-xs bg-red-500">Refusé</Badge>
-                                    )}
                                   </div>
                                 )}
 
