@@ -942,8 +942,8 @@ export default function Exercices() {
                     </TableHead>
                     <TableHead>Objectifs</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Auteur / Statut</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Auteur</TableHead>
+                    <TableHead className="text-right">Actions / Statut</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1008,20 +1008,17 @@ export default function Exercices() {
                         )}
                       </TableCell>
 
-                      {/* Author / Status */}
+                      {/* Author */}
                       <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          {getStatusBadge(exercice)}
-                          <span className="text-xs text-muted-foreground">
-                            {exercice.user_id === user?.id ? "Moi" : (exercice.author_name || "-")}
-                          </span>
-                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {exercice.user_id === user?.id ? "Moi" : (exercice.author_name || "-")}
+                        </span>
                       </TableCell>
 
-                      {/* Actions */}
+                      {/* Actions / Statut */}
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end items-center gap-1">
-                          {/* Share checkbox */}
+                          {/* Share status */}
                           {filter === "mine" && exercice.user_id === user?.id && !exercice.is_copy && userCanShare && (
                             <div className="flex items-center gap-1.5">
                               {exercice.status === "rejected" ? (

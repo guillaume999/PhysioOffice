@@ -575,6 +575,12 @@ export default function SeanceType() {
                             <span className="text-xs text-muted-foreground">
                               par {seance.user_id === user?.id ? "Moi" : (seance.author_name || "Anonyme")}
                             </span>
+                            {canShare && seance.is_shared && !seance.is_validated && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">En attente</Badge>
+                            )}
+                            {canShare && seance.is_refused && (
+                              <Badge className="text-xs bg-red-500 flex-shrink-0">Refusé</Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               • {seance.exercices?.length || 0} exercices
                             </span>
@@ -742,15 +748,6 @@ export default function SeanceType() {
                                     <span className="text-xs">
                                       {seance.is_shared && seance.is_validated ? "Déjà partagé" : seance.is_refused ? "Partage refusé" : "Partager"}
                                     </span>
-                                    {seance.is_shared && seance.is_validated && (
-                                      <Badge className="text-xs bg-green-500">Validé</Badge>
-                                    )}
-                                    {seance.is_shared && !seance.is_validated && (
-                                      <Badge variant="secondary" className="text-xs">En attente</Badge>
-                                    )}
-                                    {seance.is_refused && (
-                                      <Badge className="text-xs bg-red-500">Refusé</Badge>
-                                    )}
                                   </div>
                                 )}
 
