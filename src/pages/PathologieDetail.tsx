@@ -57,7 +57,7 @@ function RichText({ value }: { value: string }) {
 // Bloc repliable (tiroir) avec titre, pour la vue détail.
 function DetailDrawer({
   title,
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: {
   title: string;
