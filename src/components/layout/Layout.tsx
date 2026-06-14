@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { DevUserSwitcher } from "@/components/dev/DevUserSwitcher";
 
 interface LayoutProps {
   children: ReactNode;
@@ -23,6 +24,7 @@ export function Layout({ children }: LayoutProps) {
         <Footer />
       </div>
       <MobileBottomNav />
+      <DevUserSwitcher />
     </div>
   );
 }
