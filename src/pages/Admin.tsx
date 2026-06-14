@@ -242,6 +242,9 @@ export default function Admin() {
   const [exerciceStatusFilter, setExerciceStatusFilter] = useState<string[]>([]);
   const [exerciceConsultedFilter, setExerciceConsultedFilter] = useState<"all" | "consulted" | "not-consulted">("all");
   const [objectifSearch, setObjectifSearch] = useState("");
+  const [objectifLetterFilter, setObjectifLetterFilter] = useState("");
+  const [objectifSourceFilter, setObjectifSourceFilter] = useState<string[]>([]);
+  const [objectifUserFilter, setObjectifUserFilter] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
 
@@ -1208,9 +1211,15 @@ export default function Admin() {
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
   const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
 
-  const filteredObjectifs = objectifs.filter(o =>
-    o.name.toLowerCase().includes(objectifSearch.toLowerCase())
-  );
+  const objectifUserNames = [...new Set(objectifs.filter(o => o.user_id).map(o => getUserDisplayName(o.user_id!)))].filter(n => n !== "Inconnu").sort((a, b) => a.localeCompare(b, "fr"));
+
+  const filteredObjectifs = objectifs.filter(o => {
+    if (!o.name.toLowerCase().includes(objectifSearch.toLowerCase())) return false;
+    if (objectifLetterFilter && !o.name.toUpperCase().startsWith(objectifLetterFilter)) return false;
+    if (objectifSourceFilter.length > 0 && !objectifSourceFilter.includes(o.source)) return false;
+    if (objectifUserFilter.length > 0 && !objectifUserFilter.includes(getUserDisplayName(o.user_id ?? ""))) return false;
+    return true;
+  });
 
   if (authLoading || adminLoading || loading) {
     return (
@@ -2563,7 +2572,7 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle>Bibliothèque d'objectifs ({objectifs.length})</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Agrégation de la collection <code className="px-1 py-0.5 bg-muted rounded text-xs">objectifs</code>, des tags d'objectifs des exercices et des objectifs des pathologies.
+                  Regroupement de tous les objectifs issus des exercices et des pathologies.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2588,13 +2597,83 @@ export default function Admin() {
                     className="pl-10"
                   />
                 </div>
+                <div className="flex w-full gap-0.5">
+                  {["Tous", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((letter) => {
+                    const value = letter === "Tous" ? "" : letter;
+                    const active = objectifLetterFilter === value;
+                    const hasItems = letter === "Tous" || objectifs.some(o => o.name.toUpperCase().startsWith(letter));
+                    return (
+                      <button
+                        key={letter}
+                        onClick={() => setObjectifLetterFilter(value)}
+                        disabled={!hasItems}
+                        className={[
+                          "flex-1 py-1.5 text-xs font-medium transition-all rounded-full border",
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : hasItems
+                              ? "bg-background text-foreground border-border hover:bg-muted"
+                              : "bg-transparent text-muted-foreground/35 border-border/30 cursor-not-allowed",
+                        ].join(" ")}
+                      >
+                        {letter}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2">Objectif</th>
-                        <th className="text-left py-3 px-2">Origine</th>
-                        <th className="text-left py-3 px-2">Utilisateur</th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Origine</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {objectifSourceFilter.length === 0 ? "Tous" : `${objectifSourceFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1">
+                                  {([["objectifs", "Bibliothèque"], ["exercices", "Exercice"], ["pathologies", "Pathologie"]] as const).map(([val, lbl]) => (
+                                    <label key={val} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={objectifSourceFilter.includes(val)} onCheckedChange={(checked) => setObjectifSourceFilter(prev => checked ? [...prev, val] : prev.filter(x => x !== val))} />
+                                      {lbl}
+                                    </label>
+                                  ))}
+                                </div>
+                                {objectifSourceFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setObjectifSourceFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                        <th className="text-left py-3 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span>Utilisateur</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
+                                  {objectifUserFilter.length === 0 ? "Tous" : `${objectifUserFilter.length} sél.`}
+                                  <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" align="start">
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {objectifUserNames.map(u => (
+                                    <label key={u} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
+                                      <Checkbox checked={objectifUserFilter.includes(u)} onCheckedChange={(checked) => setObjectifUserFilter(prev => checked ? [...prev, u] : prev.filter(x => x !== u))} />
+                                      {u}
+                                    </label>
+                                  ))}
+                                </div>
+                                {objectifUserFilter.length > 0 && <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => setObjectifUserFilter([])}>Tout effacer</Button>}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
                         <th className="text-left py-3 px-2 w-24">Actions</th>
                       </tr>
                     </thead>
