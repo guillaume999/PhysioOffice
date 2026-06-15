@@ -44,6 +44,8 @@ import {
   Mail,
   Target,
   Calendar as CalendarIcon,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -194,6 +196,12 @@ export default function Admin() {
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch { return new Set(); }
   });
+  const [archivedMessageIds, setArchivedMessageIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("admin_archived_messages");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
   const [selectedExercice, setSelectedExercice] = useState<ExerciceType | null>(null);
   const [exerciceDialogOpen, setExerciceDialogOpen] = useState(false);
   const [subscriptionLimits, setSubscriptionLimits] = useState<SubscriptionLimit[]>([]);
@@ -247,6 +255,9 @@ export default function Admin() {
   const [objectifUserFilter, setObjectifUserFilter] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(true);
+  const [seanceDateSort, setSeanceDateSort] = useState<"asc" | "desc">("desc");
+  const [traitementDateSort, setTraitementDateSort] = useState<"asc" | "desc">("desc");
+  const [exerciceDateSort, setExerciceDateSort] = useState<"asc" | "desc">("desc");
 
   // Certificat model form state
   const [newModelTitle, setNewModelTitle] = useState("");
@@ -949,6 +960,21 @@ export default function Admin() {
     }
   };
 
+  const toggleMessageArchived = (msgId: string) => {
+    setArchivedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(msgId)) {
+        next.delete(msgId);
+      } else {
+        next.add(msgId);
+      }
+      try {
+        localStorage.setItem("admin_archived_messages", JSON.stringify([...next]));
+      } catch { }
+      return next;
+    });
+  };
+
   const toggleTraitementConsulted = (traitementId: string, isCurrentlyConsulted: boolean) => {
     if (!user) return;
     setConsultedTraitementIds(prev => {
@@ -1153,7 +1179,11 @@ export default function Admin() {
     .filter(s => seanceCopiesFilter === "all" || (seanceCopiesFilter === "with" ? (seanceCopyCounts[s.id] || 0) > 0 : (seanceCopyCounts[s.id] || 0) === 0))
     .filter(s => seanceStatusFilter.length === 0 || seanceStatusFilter.includes(getSeanceStatus(s)))
     .filter(s => seanceUserFilter.length === 0 || seanceUserFilter.includes(getUserDisplayName(s.user_id)))
-    .filter(s => seanceConsultedFilter === "all" || (seanceConsultedFilter === "consulted" ? consultedSeanceIds.has(s.id) : !consultedSeanceIds.has(s.id)));
+    .filter(s => seanceConsultedFilter === "all" || (seanceConsultedFilter === "consulted" ? consultedSeanceIds.has(s.id) : !consultedSeanceIds.has(s.id)))
+    .sort((a, b) => {
+      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return seanceDateSort === "asc" ? diff : -diff;
+    });
 
   const getTraitementStatus = (t: TraitementType) => {
     if (t.is_refused) return "refuse";
@@ -1176,7 +1206,11 @@ export default function Admin() {
     .filter(t => traitementCopiesFilter === "all" || (traitementCopiesFilter === "with" ? (traitementCopyCounts[t.id] || 0) > 0 : (traitementCopyCounts[t.id] || 0) === 0))
     .filter(t => traitementStatusFilter.length === 0 || traitementStatusFilter.includes(getTraitementStatus(t)))
     .filter(t => traitementUserFilter.length === 0 || traitementUserFilter.includes(getUserDisplayName(t.user_id)))
-    .filter(t => traitementConsultedFilter === "all" || (traitementConsultedFilter === "consulted" ? consultedTraitementIds.has(t.id) : !consultedTraitementIds.has(t.id)));
+    .filter(t => traitementConsultedFilter === "all" || (traitementConsultedFilter === "consulted" ? consultedTraitementIds.has(t.id) : !consultedTraitementIds.has(t.id)))
+    .sort((a, b) => {
+      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return traitementDateSort === "asc" ? diff : -diff;
+    });
 
   const pendingTraitements = filteredTraitements.filter(t => t.is_shared && !t.is_validated);
   const pendingSeances = filteredSeances.filter(s => s.is_shared && !s.is_validated);
@@ -1206,7 +1240,11 @@ export default function Admin() {
       if (exerciceStatusFilter.includes('brouillon') && !knownStatuses.includes(e.status)) return true;
       return exerciceStatusFilter.includes(e.status);
     })
-    .filter(e => exerciceConsultedFilter === "all" || (exerciceConsultedFilter === "consulted" ? consultedExerciceIds.has(e.id) : !consultedExerciceIds.has(e.id)));
+    .filter(e => exerciceConsultedFilter === "all" || (exerciceConsultedFilter === "consulted" ? consultedExerciceIds.has(e.id) : !consultedExerciceIds.has(e.id)))
+    .sort((a, b) => {
+      const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return exerciceDateSort === "asc" ? diff : -diff;
+    });
 
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
   const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
@@ -1343,8 +1381,8 @@ export default function Admin() {
             <TabsTrigger value="messages" className="relative flex items-center gap-2">
               <Mail className="w-4 h-4" />
               Messages
-              {contactMessages.length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{contactMessages.length}</Badge>
+              {contactMessages.filter(m => !archivedMessageIds.has(m.id)).length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{contactMessages.filter(m => !archivedMessageIds.has(m.id)).length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -1619,7 +1657,13 @@ export default function Admin() {
                         </th>
                         <th className="text-left py-3 px-2 align-top">
                           <div className="flex flex-col gap-1">
-                            <span>Créé le</span>
+                            <button
+                              onClick={() => setSeanceDateSort(prev => prev === "desc" ? "asc" : "desc")}
+                              className="flex items-center gap-1 hover:text-primary transition-colors font-semibold text-left"
+                            >
+                              Créé le
+                              {seanceDateSort === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
+                            </button>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
@@ -1992,7 +2036,13 @@ export default function Admin() {
                         </th>
                         <th className="text-left py-3 px-2 align-top">
                           <div className="flex flex-col gap-1">
-                            <span>Créé le</span>
+                            <button
+                              onClick={() => setTraitementDateSort(prev => prev === "desc" ? "asc" : "desc")}
+                              className="flex items-center gap-1 hover:text-primary transition-colors font-semibold text-left"
+                            >
+                              Créé le
+                              {traitementDateSort === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
+                            </button>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
@@ -2383,7 +2433,13 @@ export default function Admin() {
                         </th>
                         <th className="text-left py-3 px-2 align-top">
                           <div className="flex flex-col gap-1">
-                            <span>Créé le</span>
+                            <button
+                              onClick={() => setExerciceDateSort(prev => prev === "desc" ? "asc" : "desc")}
+                              className="flex items-center gap-1 hover:text-primary transition-colors font-semibold text-left"
+                            >
+                              Créé le
+                              {exerciceDateSort === "desc" ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
+                            </button>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-7 text-xs font-normal w-36 justify-between">
@@ -3016,14 +3072,15 @@ export default function Admin() {
           <TabsContent value="messages">
             <Card>
               <CardHeader>
-                <CardTitle>Messages de contact ({contactMessages.length})</CardTitle>
+                <CardTitle>Messages de contact ({contactMessages.filter(m => !archivedMessageIds.has(m.id)).length})</CardTitle>
               </CardHeader>
-              <CardContent>
-                {contactMessages.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">Aucun message reçu.</p>
+              <CardContent className="space-y-8">
+                {/* Active messages */}
+                {contactMessages.filter(m => !archivedMessageIds.has(m.id)).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">Aucun nouveau message.</p>
                 ) : (
                   <div className="space-y-4">
-                    {contactMessages.map((msg) => (
+                    {contactMessages.filter(m => !archivedMessageIds.has(m.id)).map((msg) => (
                       <div key={msg.id} className="border rounded-lg p-4 space-y-2">
                         <div className="flex items-start justify-between gap-4">
                           <div className="space-y-1 min-w-0">
@@ -3036,22 +3093,87 @@ export default function Admin() {
                           </div>
                           <div className="flex flex-col items-end gap-2 shrink-0">
                             <p className="text-xs text-muted-foreground">{formatDateTime(msg.created)}</p>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={async () => {
-                                if (!confirm("Supprimer ce message ?")) return;
-                                try {
-                                  await pb.collection("contact_messages").delete(msg.id);
-                                  setContactMessages(prev => prev.filter(m => m.id !== msg.id));
-                                  toast({ title: "Message supprimé" });
-                                } catch (e: any) {
-                                  toast({ title: "Erreur", description: e.message, variant: "destructive" });
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleMessageArchived(msg.id)}
+                                className="gap-1"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                Lu
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={async () => {
+                                  if (!confirm("Supprimer ce message ?")) return;
+                                  try {
+                                    await pb.collection("contact_messages").delete(msg.id);
+                                    setContactMessages(prev => prev.filter(m => m.id !== msg.id));
+                                    toast({ title: "Message supprimé" });
+                                  } catch (e: any) {
+                                    toast({ title: "Erreur", description: e.message, variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Archived messages */}
+                {contactMessages.filter(m => archivedMessageIds.has(m.id)).length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-muted-foreground flex items-center gap-2 border-t pt-6">
+                      <CheckCircle className="w-4 h-4" />
+                      Messages archivés ({contactMessages.filter(m => archivedMessageIds.has(m.id)).length})
+                    </h3>
+                    {contactMessages.filter(m => archivedMessageIds.has(m.id)).map((msg) => (
+                      <div key={msg.id} className="border rounded-lg p-4 space-y-2 opacity-60">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <p className="font-medium">{msg.name || "—"}</p>
+                            <p className="text-sm text-muted-foreground">{msg.email}</p>
+                            {msg.subject && (
+                              <p className="text-sm font-medium text-foreground/80">{msg.subject}</p>
+                            )}
+                            <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <p className="text-xs text-muted-foreground">{formatDateTime(msg.created)}</p>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleMessageArchived(msg.id)}
+                                className="gap-1"
+                              >
+                                <Undo2 className="w-4 h-4" />
+                                Non lu
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={async () => {
+                                  if (!confirm("Supprimer ce message ?")) return;
+                                  try {
+                                    await pb.collection("contact_messages").delete(msg.id);
+                                    setContactMessages(prev => prev.filter(m => m.id !== msg.id));
+                                    toast({ title: "Message supprimé" });
+                                  } catch (e: any) {
+                                    toast({ title: "Erreur", description: e.message, variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>

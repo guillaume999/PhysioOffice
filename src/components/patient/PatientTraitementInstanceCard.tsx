@@ -303,11 +303,12 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   // Flux chronologique : séances + bilans triés par date, éléments sans date à la fin.
   type TimelineItem =
     | { kind: "seance"; date: string | null; seance: InstanceSeance }
-    | { kind: "bilan"; date: string | null; bilan: InstanceBilan };
+    | { kind: "bilan"; date: string | null; bilan: InstanceBilan }
+    | { kind: "pending-bilan" };
 
-  const timeline: TimelineItem[] = [
-    ...traitement.seances.map((s): TimelineItem => ({ kind: "seance", date: s.date_prevue, seance: s })),
-    ...traitement.bilans.map((b): TimelineItem => ({ kind: "bilan", date: b.bilan_date, bilan: b })),
+  const sortedItems = [
+    ...traitement.seances.map((s) => ({ kind: "seance" as const, date: s.date_prevue, seance: s })),
+    ...traitement.bilans.map((b) => ({ kind: "bilan" as const, date: b.bilan_date, bilan: b })),
   ].sort((a, b) => {
     const da = a.date ? a.date.slice(0, 10) : "";
     const db = b.date ? b.date.slice(0, 10) : "";
@@ -322,6 +323,18 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
     if (db) return 1;
     return 0;
   });
+
+  // Insert the pending bilan just before the last séance
+  const timeline: TimelineItem[] = [];
+  if (traitement.seances.length > 0) {
+    const lastSeanceIdx = sortedItems.reduce((last, item, i) => item.kind === "seance" ? i : last, -1);
+    for (let i = 0; i < sortedItems.length; i++) {
+      if (i === lastSeanceIdx) timeline.push({ kind: "pending-bilan" });
+      timeline.push(sortedItems[i]);
+    }
+  } else {
+    timeline.push(...sortedItems);
+  }
 
   return (
     <Card className="overflow-hidden border-primary/20">
@@ -390,17 +403,48 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
               Séances & bilans ({traitement.seances.length} séance{traitement.seances.length > 1 ? "s" : ""}, {traitement.bilans.length} bilan{traitement.bilans.length > 1 ? "s" : ""})
             </p>
             {timeline.map((item) => {
+              if (item.kind === "pending-bilan") {
+                return (
+                  <div
+                    key="pending-bilan"
+                    className="flex flex-wrap items-center justify-between gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-dashed border-amber-400 dark:border-amber-600 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                    onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800/50 flex items-center justify-center flex-shrink-0">
+                        <ClipboardCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm text-amber-700 dark:text-amber-400">Bilan intermédiaire</p>
+                        <p className="text-xs text-amber-600/70 dark:text-amber-500">À compléter si nécessaire</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-amber-500 font-mono px-2 py-1 rounded border border-amber-300 dark:border-amber-600 bg-amber-100 dark:bg-amber-900/50">---</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-800/50"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}`); }}
+                        title="Compléter le bilan">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
               if (item.kind === "bilan") {
                 const b = item.bilan;
                 return (
-                  <div key={`bilan-${b.id}`} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div
+                    key={`bilan-${b.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20 cursor-pointer hover:bg-primary/10 transition-colors"
+                    onClick={() => navigate(`/patients/${patientId}/bilan-intermediaire?pt=${traitement.id}&bilan=${b.id}`)}
+                  >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                         <ClipboardCheck className="w-4 h-4 text-primary" />
                       </div>
                       <p className="font-medium text-sm text-primary">Bilan intermédiaire</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <DatePickerInline
                         value={toDateInput(b.bilan_date)}
                         onChange={(v) => updateBilan(b.id, { bilan_date: v || null })}

@@ -245,7 +245,7 @@ export default function Journal() {
     <Layout>
       <div className="space-y-4 sm:space-y-6 px-1 sm:px-0">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm -mx-1 sm:mx-0 px-1 sm:px-0 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"

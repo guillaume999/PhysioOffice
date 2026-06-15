@@ -209,7 +209,7 @@ export default function PatientBilanIntermediaire() {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center gap-4 mb-8">
+        <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm -mx-4 px-4 py-3 mb-8 flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -372,6 +372,7 @@ export default function PatientBilanIntermediaire() {
           </Card>
         </div>
       </div>
+
     </Layout>
   );
 }
