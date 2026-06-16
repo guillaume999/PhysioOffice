@@ -128,7 +128,8 @@ export default function Pathologies() {
     .filter((p) => p.is_copy && p.user_id === user?.id && p.original_id)
     .map((p) => p.original_id);
 
-  const filtered = pathologies.filter((p) => {
+  const filtered = pathologies
+    .filter((p) => {
     // Visibilité globale : les non-admins ne voient jamais les pathologies marquées is_hidden_from_list.
     if (!isAdmin && p.is_hidden_from_list) return false;
 
@@ -151,7 +152,8 @@ export default function Pathologies() {
     }
 
     return true;
-  });
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
 
   // Pour les non-admins, on exclut les pathologies masquées (is_hidden_from_list) des compteurs.
   const visibleForCounts = pathologies.filter((p) => isAdmin || !p.is_hidden_from_list);
