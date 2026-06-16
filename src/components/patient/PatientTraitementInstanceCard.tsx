@@ -13,6 +13,16 @@ import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import { AddFromLibraryDialog } from "@/components/patient/AddFromLibraryDialog";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface InstanceExercice {
   id: string;
@@ -90,6 +100,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   const [pickerSeanceId, setPickerSeanceId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
 
   useEffect(() => {
     if (traitementId) fetchDetails();
@@ -379,9 +390,28 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
               </SelectContent>
             </Select>
           </div>
-          <Button variant="ghost" size="icon" onClick={onRemove} className="text-destructive h-8 w-8" title="Retirer le traitement">
+          <Button variant="ghost" size="icon" onClick={() => setConfirmRemoveOpen(true)} className="text-destructive h-8 w-8" title="Retirer le traitement">
             <X className="w-4 h-4" />
           </Button>
+          <AlertDialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Retirer ce traitement ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Le traitement et tout son contenu (séances, exercices, tests, bilans) seront définitivement supprimés. Cette action est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={onRemove}
+                >
+                  Retirer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <div className="mt-2 text-xs text-muted-foreground">
