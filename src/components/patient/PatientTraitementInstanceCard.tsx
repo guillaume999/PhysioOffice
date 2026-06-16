@@ -275,6 +275,36 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
     catch { toast.error("Erreur lors de la suppression"); }
   };
 
+  // Déplace un exercice vers le haut/bas dans sa séance et persiste le champ ordre.
+  const moveExercice = async (seanceId: string, exId: string, dir: "up" | "down") => {
+    if (!traitement) return;
+    const seance = traitement.seances.find((s) => s.id === seanceId);
+    if (!seance) return;
+    const idx = seance.exercices.findIndex((e) => e.id === exId);
+    if (idx === -1) return;
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= seance.exercices.length) return;
+
+    const reordered = [...seance.exercices];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    const withOrdre = reordered.map((e, i) => ({ ...e, ordre: i }));
+
+    setTraitement({
+      ...traitement,
+      seances: traitement.seances.map((s) => s.id !== seanceId ? s : { ...s, exercices: withOrdre }),
+    });
+
+    try {
+      await Promise.all([
+        pb.collection("patient_seance_exercices").update(withOrdre[idx].id, { ordre: idx }),
+        pb.collection("patient_seance_exercices").update(withOrdre[swapIdx].id, { ordre: swapIdx }),
+      ]);
+    } catch {
+      toast.error("Erreur lors du réordonnancement");
+      fetchDetails();
+    }
+  };
+
   const deleteTest = async (testId: string) => {
     try { await pb.collection("patient_traitement_tests").delete(testId); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
@@ -523,8 +553,20 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                     </div>
                     <CollapsibleContent>
                       <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
-                        {s.exercices.map((ex) => (
+                        {s.exercices.map((ex, exIdx) => (
                           <div key={ex.id} className="flex items-start gap-2 p-2 bg-background/60 rounded border">
+                            <div className="flex flex-col mt-0.5">
+                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Monter"
+                                disabled={exIdx === 0}
+                                onClick={() => moveExercice(s.id, ex.id, "up")}>
+                                <ChevronUp className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Descendre"
+                                disabled={exIdx === s.exercices.length - 1}
+                                onClick={() => moveExercice(s.id, ex.id, "down")}>
+                                <ChevronDown className="w-4 h-4" />
+                              </Button>
+                            </div>
                             <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" className="mt-1" />
                             <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                               {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
