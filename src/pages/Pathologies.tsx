@@ -4,17 +4,20 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Activity, ArrowRight, Loader2, User, Shield, Users } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { parseDescription, parseMotsCles } from "@/lib/pathologie";
 
 interface Pathologie {
   id: string;
   name: string;
   traitement: string | null;
   user_id: string;
+  mots_cles: string[];
   is_shared?: boolean;
   is_validated?: boolean;
   is_copy?: boolean;
@@ -63,7 +66,7 @@ export default function Pathologies() {
       // Pathologies — toutes celles visibles par cet utilisateur (siennes + partagées)
       const data = await pb.collection("pathologies").getFullList({
         sort: "name",
-        fields: "id,user,name,traitement,is_shared,is_validated,is_copy,is_hidden_from_list,original,author_name",
+        fields: "id,user,name,traitement,description,is_shared,is_validated,is_copy,is_hidden_from_list,original,author_name",
       });
 
       // Featured pathologies (plateforme) — la collection peut ne pas exister encore
@@ -81,6 +84,7 @@ export default function Pathologies() {
           name: r.name,
           traitement: r.traitement || null,
           user_id: r.user,
+          mots_cles: parseMotsCles(parseDescription(r.description || "").mots_cles),
           is_shared: !!r.is_shared,
           is_validated: !!r.is_validated,
           is_copy: !!r.is_copy,
@@ -148,7 +152,10 @@ export default function Pathologies() {
     // Search
     if (search.trim()) {
       const q = search.toLowerCase();
-      if (!p.name.toLowerCase().includes(q) && !(p.author_name || "").toLowerCase().includes(q)) return false;
+      const inName = p.name.toLowerCase().includes(q);
+      const inAuthor = (p.author_name || "").toLowerCase().includes(q);
+      const inMotsCles = p.mots_cles.some((m) => m.toLowerCase().includes(q));
+      if (!inName && !inAuthor && !inMotsCles) return false;
     }
 
     return true;
@@ -235,7 +242,7 @@ export default function Pathologies() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher par nom ou auteur..."
+                  placeholder="Rechercher par nom, auteur ou mot-clé..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10"
@@ -290,7 +297,14 @@ export default function Pathologies() {
                     className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{p.name}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="font-semibold">{p.name}</p>
+                        {p.mots_cles.map((m) => (
+                          <Badge key={m} variant="secondary" className="text-xs font-normal">
+                            {m}
+                          </Badge>
+                        ))}
+                      </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                         {p.author_name && filter !== "mine" && <span>par {p.author_name}</span>}
                         {p.traitement?.trim() && (
