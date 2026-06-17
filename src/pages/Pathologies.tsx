@@ -5,7 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Activity, ArrowRight, Loader2, User, Shield, Users } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Search, Activity, ArrowRight, Loader2, User, Shield, Users, Trash2 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -38,6 +48,8 @@ export default function Pathologies() {
   const [filter, setFilter] = useState<FilterType>("mine");
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Pathologie | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Restaure l'onglet et la recherche à partir de sessionStorage si on revient d'un détail.
   useEffect(() => {
@@ -124,6 +136,22 @@ export default function Pathologies() {
       toast.error("Erreur lors de la création");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await pb.collection("pathologies").delete(deleteTarget.id);
+      setPathologies((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      toast.success("Pathologie supprimée");
+      setDeleteTarget(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -277,48 +305,92 @@ export default function Pathologies() {
               <p className="text-center text-muted-foreground py-8">Aucune pathologie.</p>
             ) : (
               <div className="grid gap-2">
-                {filtered.map((p) => (
-                  <button
+                {filtered.map((p) => {
+                  const canDelete = isAdmin || p.user_id === user?.id;
+                  return (
+                  <div
                     key={p.id}
-                    onClick={() => {
-                      // Sauvegarde le contexte (onglet, recherche, ordre des ids visibles)
-                      // pour permettre au détail d'offrir la navigation prev/next et au retour
-                      // de restaurer le bon onglet.
-                      sessionStorage.setItem(
-                        "pathologies_nav_ctx",
-                        JSON.stringify({
-                          filter,
-                          search,
-                          orderedIds: filtered.map((x) => x.id),
-                        })
-                      );
-                      navigate(`/pathologies/${p.id}`);
-                    }}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors text-left"
+                    className="flex items-center gap-1 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <p className="font-semibold">{p.name}</p>
-                        {p.mots_cles.map((m) => (
-                          <Badge key={m} variant="secondary" className="text-xs font-normal">
-                            {m}
-                          </Badge>
-                        ))}
+                    <button
+                      onClick={() => {
+                        // Sauvegarde le contexte (onglet, recherche, ordre des ids visibles)
+                        // pour permettre au détail d'offrir la navigation prev/next et au retour
+                        // de restaurer le bon onglet.
+                        sessionStorage.setItem(
+                          "pathologies_nav_ctx",
+                          JSON.stringify({
+                            filter,
+                            search,
+                            orderedIds: filtered.map((x) => x.id),
+                          })
+                        );
+                        navigate(`/pathologies/${p.id}`);
+                      }}
+                      className="flex items-center justify-between gap-2 flex-1 min-w-0 p-4 text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="font-semibold">{p.name}</p>
+                          {p.mots_cles.map((m) => (
+                            <Badge key={m} variant="secondary" className="text-xs font-normal">
+                              {m}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                          {p.author_name && filter !== "mine" && <span>par {p.author_name}</span>}
+                          {p.traitement?.trim() && (
+                            <span className="line-clamp-1">{p.traitement}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                        {p.author_name && filter !== "mine" && <span>par {p.author_name}</span>}
-                        {p.traitement?.trim() && (
-                          <span className="line-clamp-1">{p.traitement}</span>
-                        )}
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  </button>
-                ))}
+                      <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(p)}
+                        aria-label={`Supprimer ${p.name}`}
+                        className="text-destructive hover:text-destructive flex-shrink-0 mr-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer la pathologie ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                « {deleteTarget?.name} » sera définitivement supprimée, avec son protocole de
+                traitement. Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
