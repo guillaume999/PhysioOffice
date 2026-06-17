@@ -42,6 +42,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { KineEditor, type ExerciceOption } from "@/components/pathologie/KineEditor";
 import { RichTextEditor } from "@/components/pathologie/RichTextEditor";
+import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
 import DOMPurify from "dompurify";
 import {
   CATEGORIES,
@@ -51,6 +52,8 @@ import {
   buildSectionsDescription,
   parseDescription,
   parseKineItems,
+  parseMotsCles,
+  serializeMotsCles,
   type KineItem,
 } from "@/lib/pathologie";
 
@@ -87,6 +90,7 @@ export default function PathologieEdit() {
   const [linkedIds, setLinkedIds] = useState<string[]>([]);
   const [availableTraitements, setAvailableTraitements] = useState<TraitementOption[]>([]);
   const [availableExercices, setAvailableExercices] = useState<ExerciceOption[]>([]);
+  const [objectifOptions, setObjectifOptions] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -184,6 +188,8 @@ export default function PathologieEdit() {
           is_platform: e.status === "shared" && e.user !== user.id,
         }))
       );
+
+      await reloadObjectifs();
     } catch (e) {
       console.error(e);
       toast.error("Pathologie introuvable");
@@ -219,8 +225,50 @@ export default function PathologieEdit() {
     }
   };
 
+  // Liste des objectifs (bibliothèque) servant d'options aux mots-clés.
+  const reloadObjectifs = async () => {
+    if (!user) return;
+    try {
+      const data = await pb.collection("objectifs").getFullList({
+        filter: `user = "${user.id}"`,
+        fields: "name",
+        sort: "name",
+      });
+      setObjectifOptions([
+        ...new Set((data as any[]).map((o) => o.name).filter(Boolean)),
+      ]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const setSection = (key: SectionKey, value: string) =>
     setSections((prev) => ({ ...prev, [key]: value }));
+
+  // Tags mots-clés courants (noms d'objectifs) dérivés de la section texte.
+  const motsClesTags = useMemo(() => parseMotsCles(sections.mots_cles), [sections.mots_cles]);
+
+  // Sauvegarde dédiée des mots-clés (stockés en texte dans la section mots_cles).
+  const saveMotsCles = (tags: string[]) => {
+    const value = serializeMotsCles(tags);
+    const nextSections = { ...sections, mots_cles: value };
+    setSections(nextSections);
+    const cleaned = (Object.keys(nextSections) as SectionKey[]).reduce(
+      (acc, k) => ({ ...acc, [k]: DOMPurify.sanitize(nextSections[k] || "") }),
+      {} as Record<SectionKey, string>
+    );
+    saveField(
+      { description: buildSectionsDescription(cleaned, cleanItemsBySection(itemsBySection)) },
+      { contentChange: true }
+    );
+  };
+
+  const addObjectif = (value: string) => {
+    if (!value || motsClesTags.includes(value)) return;
+    saveMotsCles([...motsClesTags, value]);
+  };
+  const removeObjectif = (tag: string) =>
+    saveMotsCles(motsClesTags.filter((t) => t !== tag));
 
   // Désinfecte (DOMPurify) le HTML des sections texte + blocs avant stockage.
   const cleanSections = (): Record<SectionKey, string> =>
@@ -543,18 +591,47 @@ export default function PathologieEdit() {
                 {SECTIONS.map(({ key, label, mode }) => (
                   <TabsContent key={key} value={key} className="mt-4 space-y-2">
                     {mode === "text" ? (
-                      <>
-                        <Label>{label}</Label>
-                        <RichTextEditor
-                          value={sections[key]}
-                          onChange={(html) => setSection(key, html)}
-                          onBlur={saveSection}
-                          placeholder={
-                            key === "mots_cles" ? "genou, ligament, post-op" : `Saisir ${label.toLowerCase()}…`
-                          }
-                          minHeight={key === "mots_cles" ? 80 : 260}
-                        />
-                      </>
+                      key === "mots_cles" ? (
+                        <>
+                          <Label>{label}</Label>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {motsClesTags.map((tag) => (
+                              <Badge key={tag} variant="default" className="gap-1">
+                                {tag}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => removeObjectif(tag)}
+                                />
+                              </Badge>
+                            ))}
+                            {motsClesTags.length === 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                Aucun objectif sélectionné
+                              </span>
+                            )}
+                          </div>
+                          <TagReferenceSelect
+                            type="objectif"
+                            options={objectifOptions.filter((o) => !motsClesTags.includes(o))}
+                            userId={user.id}
+                            onSelect={addObjectif}
+                            onReferenceChanged={reloadObjectifs}
+                            placeholder="Rechercher ou créer un objectif"
+                            className="w-full"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Label>{label}</Label>
+                          <RichTextEditor
+                            value={sections[key]}
+                            onChange={(html) => setSection(key, html)}
+                            onBlur={saveSection}
+                            placeholder={`Saisir ${label.toLowerCase()}…`}
+                            minHeight={260}
+                          />
+                        </>
+                      )
                     ) : (
                       <KineEditor
                         items={itemsBySection[key] || []}

@@ -134,6 +134,36 @@ export function parseDescription(md: string): Record<SectionKey, string> {
   );
 }
 
+// Parse la section "Mots-clés" en liste de tags (noms d'objectifs).
+// Tolérant : JSON (array) ou texte legacy séparé par virgules / points-virgules /
+// sauts de ligne. Les éventuelles balises HTML legacy sont retirées.
+export function parseMotsCles(raw: string): string[] {
+  const t = (raw || "").trim();
+  if (!t) return [];
+  try {
+    const parsed = JSON.parse(t);
+    if (Array.isArray(parsed)) {
+      return [...new Set(parsed.map((x) => String(x).trim()).filter(Boolean))];
+    }
+  } catch {
+    /* pas du JSON : texte legacy */
+  }
+  const text = t.replace(/<[^>]*>/g, " ");
+  return [
+    ...new Set(
+      text
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+// Sérialise une liste de tags mots-clés pour stockage (texte lisible).
+export function serializeMotsCles(tags: string[]): string {
+  return [...new Set(tags.map((t) => t.trim()).filter(Boolean))].join(", ");
+}
+
 // Parse le contenu brut de la section "Traitement kiné" en liste d'éléments.
 // Format : JSON (array d'items). Rétrocompat : tout texte non-JSON est converti
 // en un unique bloc texte.

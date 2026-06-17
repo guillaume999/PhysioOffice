@@ -31,6 +31,7 @@ import {
   looksLikeHtml,
   parseDescription,
   parseKineItems,
+  parseMotsCles,
   type KineItem,
 } from "@/lib/pathologie";
 
@@ -385,7 +386,17 @@ export default function PathologieDetail() {
               {visibleSections.map(({ key, label, mode }) => (
                 <DetailDrawer key={key} title={label}>
                   {mode === "text" ? (
-                    <RichText value={sections[key]} />
+                    key === "mots_cles" ? (
+                      <div className="flex flex-wrap gap-2">
+                        {parseMotsCles(sections[key]).map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <RichText value={sections[key]} />
+                    )
                   ) : (
                     <ItemsView
                       items={itemsBySection[key] || []}
