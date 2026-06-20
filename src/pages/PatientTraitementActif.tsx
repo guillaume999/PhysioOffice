@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CalendarPlus, Plus, ChevronsDown, LayoutList, PanelsLeftBottom } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Loader2, CalendarPlus, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { PatientTraitementInstanceCard } from "@/components/patient/PatientTraitementInstanceCard";
 import { PatientTraitementInstanceCardV2 } from "@/components/patient/PatientTraitementInstanceCardV2";
 import { SelectTraitementDialog } from "@/components/patient/SelectTraitementDialog";
 import { TraitementFormDialog } from "@/components/traitement/TraitementFormDialog";
@@ -20,7 +18,6 @@ export default function PatientTraitementActif() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const [patientName, setPatientName] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTraitementId, setActiveTraitementId] = useState<string | null>(null);
@@ -28,17 +25,6 @@ export default function PatientTraitementActif() {
   const [createTraitementDialogOpen, setCreateTraitementDialogOpen] = useState(false);
   const [quickApptOpen, setQuickApptOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [drawerView, setDrawerView] = useState<boolean>(() => {
-    try { return localStorage.getItem("traitementActifView") === "drawer"; } catch { return false; }
-  });
-
-  const toggleDrawerView = () => {
-    setDrawerView((v) => {
-      const next = !v;
-      try { localStorage.setItem("traitementActifView", next ? "drawer" : "classic"); } catch { /* ignore */ }
-      return next;
-    });
-  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -127,7 +113,7 @@ export default function PatientTraitementActif() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-1 sm:px-4 py-4 md:py-8 ${drawerView ? "max-w-6xl" : "max-w-4xl"}`}>
+      <div className="container mx-auto px-1 sm:px-4 py-4 md:py-8 max-w-6xl">
         <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm -mx-1 sm:-mx-4 px-1 sm:px-4 py-3 mb-6 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${id}`)}>
             <ArrowLeft className="w-5 h-5" />
@@ -136,18 +122,6 @@ export default function PatientTraitementActif() {
             <h1 className="text-lg md:text-2xl font-display font-bold">Traitement actif</h1>
             <p className="text-sm text-muted-foreground">{patientName}</p>
           </div>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={toggleDrawerView} title="Changer de vue">
-                  {drawerView ? <LayoutList className="w-4 h-4" /> : <PanelsLeftBottom className="w-4 h-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {drawerView ? "Vue classique (liste déroulante)" : "Vue tiroir (master-détail)"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           <Button onClick={() => setQuickApptOpen(true)} size="sm" className="gap-2">
             <CalendarPlus className="w-4 h-4" />
             <span className="hidden sm:inline">Ajouter des rendez-vous</span>
@@ -165,45 +139,14 @@ export default function PatientTraitementActif() {
 
         <div className="flex gap-3">
           <div className="flex-1">
-            {drawerView ? (
-              <PatientTraitementInstanceCardV2
-                key={`v2-${activeTraitementId}-${refreshKey}`}
-                traitementId={activeTraitementId}
-                patientId={id || ""}
-                praticienId={user?.id || ""}
-                onRemove={handleRemoveTraitement}
-              />
-            ) : (
-              <PatientTraitementInstanceCard
-                key={`${activeTraitementId}-${refreshKey}`}
-                traitementId={activeTraitementId}
-                patientId={id || ""}
-                praticienId={user?.id || ""}
-                onRemove={handleRemoveTraitement}
-              />
-            )}
-            <div ref={bottomRef} />
+            <PatientTraitementInstanceCardV2
+              key={`v2-${activeTraitementId}-${refreshKey}`}
+              traitementId={activeTraitementId}
+              patientId={id || ""}
+              praticienId={user?.id || ""}
+              onRemove={handleRemoveTraitement}
+            />
           </div>
-          {activeTraitementId && !drawerView && (
-            <div className="shrink-0 self-stretch">
-              <div className="sticky top-20">
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        className="h-11 w-11 rounded-full shadow"
-                        onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-                      >
-                        <ChevronsDown className="w-5 h-5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" className="bg-primary text-primary-foreground">Aller en bas de page</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-          )}
         </div>
 
         <SelectTraitementDialog
