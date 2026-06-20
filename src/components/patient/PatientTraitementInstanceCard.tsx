@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, ClipboardCheck, Play, FileText, Plus, Trash2, Edit } from "lucide-react";
+import { ChevronDown, ChevronUp, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, GripVertical } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
@@ -102,6 +102,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [dragExId, setDragExId] = useState<string | null>(null);
+  const [dragOverExId, setDragOverExId] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
@@ -314,6 +316,37 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
         pb.collection("patient_seance_exercices").update(withOrdre[idx].id, { ordre: idx }),
         pb.collection("patient_seance_exercices").update(withOrdre[swapIdx].id, { ordre: swapIdx }),
       ]);
+    } catch {
+      toast.error("Erreur lors du réordonnancement");
+      fetchDetails();
+    }
+  };
+
+  // Réordonne un exercice par glisser-déposer (de fromIdx vers toIdx) et persiste les ordres impactés.
+  const reorderExercice = async (seanceId: string, fromIdx: number, toIdx: number) => {
+    if (!traitement || fromIdx === toIdx) return;
+    const seance = traitement.seances.find((s) => s.id === seanceId);
+    if (!seance) return;
+    if (fromIdx < 0 || toIdx < 0 || fromIdx >= seance.exercices.length || toIdx >= seance.exercices.length) return;
+
+    const reordered = [...seance.exercices];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const withOrdre = reordered.map((e, i) => ({ ...e, ordre: i }));
+
+    setTraitement({
+      ...traitement,
+      seances: traitement.seances.map((s) => s.id !== seanceId ? s : { ...s, exercices: withOrdre }),
+    });
+
+    try {
+      await Promise.all(
+        withOrdre
+          .map((e, i) => seance.exercices.findIndex((x) => x.id === e.id) === i
+            ? null
+            : pb.collection("patient_seance_exercices").update(e.id, { ordre: i }))
+          .filter(Boolean) as Promise<unknown>[]
+      );
     } catch {
       toast.error("Erreur lors du réordonnancement");
       fetchDetails();
@@ -589,8 +622,31 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                     <CollapsibleContent>
                       <div className="px-2 pb-2 space-y-2 border-t border-border/50 pt-2">
                         {s.exercices.map((ex, exIdx) => (
-                          <div key={ex.id} className="flex items-start gap-2 p-2 bg-background/60 rounded border">
-                            <div className="flex flex-col mt-0.5">
+                          <div
+                            key={ex.id}
+                            data-ex-row
+                            className={`flex items-start gap-2 p-2 bg-background/60 rounded border transition-all ${
+                              dragOverExId === ex.id && dragExId && dragExId !== ex.id ? "ring-2 ring-primary border-primary" : ""
+                            } ${dragExId === ex.id ? "opacity-40" : ""}`}
+                            onDragOver={(e) => { if (dragExId) { e.preventDefault(); if (dragOverExId !== ex.id) setDragOverExId(ex.id); } }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (dragExId && dragExId !== ex.id) {
+                                reorderExercice(s.id, s.exercices.findIndex((x) => x.id === dragExId), exIdx);
+                              }
+                              setDragExId(null); setDragOverExId(null);
+                            }}
+                          >
+                            <div className="flex flex-col items-center mt-0.5">
+                              <span
+                                draggable
+                                onDragStart={(e) => { setDragExId(ex.id); e.dataTransfer.effectAllowed = "move"; setExDragImage(e); }}
+                                onDragEnd={() => { setDragExId(null); setDragOverExId(null); }}
+                                className="flex items-center justify-center h-5 w-5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                                title="Glisser pour réordonner"
+                              >
+                                <GripVertical className="w-4 h-4" />
+                              </span>
                               <Button variant="ghost" size="icon" className="h-5 w-5" title="Monter"
                                 disabled={exIdx === 0}
                                 onClick={() => moveExercice(s.id, ex.id, "up")}>
@@ -602,7 +658,12 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
                                 <ChevronDown className="w-4 h-4" />
                               </Button>
                             </div>
-                            <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" className="mt-1" />
+                            <label className="flex flex-col items-center gap-0.5 mt-1 cursor-pointer">
+                              <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(s.id, ex.id, { realise: !!c })} title="Réalisé" />
+                              <span className={`text-[9px] leading-none whitespace-nowrap ${ex.realise ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"}`}>
+                                {ex.realise ? "Réalisé" : "Non réalisé"}
+                              </span>
+                            </label>
                             <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                               {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
                                 : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Play className="w-4 h-4" /></div>}
@@ -665,6 +726,28 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       {confirmDialog}
     </Card>
   );
+}
+
+// Crée une image de drag « jolie » : une copie de la ligne d'exercice, inclinée
+// et avec une ombre portée, qui suit le curseur pendant le glisser-déposer.
+export function setExDragImage(e: DragEvent<HTMLElement>) {
+  const row = e.currentTarget.closest("[data-ex-row]") as HTMLElement | null;
+  if (!row || typeof e.dataTransfer.setDragImage !== "function") return;
+  const rect = row.getBoundingClientRect();
+  const clone = row.cloneNode(true) as HTMLElement;
+  clone.style.width = `${rect.width}px`;
+  clone.style.position = "fixed";
+  clone.style.top = "0";
+  clone.style.left = "0";
+  clone.style.margin = "0";
+  clone.style.transform = "rotate(3deg) scale(1.02)";
+  clone.style.opacity = "0.97";
+  clone.style.boxShadow = "0 14px 30px rgba(0,0,0,0.28)";
+  clone.style.pointerEvents = "none";
+  clone.style.zIndex = "9999";
+  document.body.appendChild(clone);
+  e.dataTransfer.setDragImage(clone, e.clientX - rect.left, e.clientY - rect.top);
+  setTimeout(() => clone.remove(), 0);
 }
 
 function NumberField({ label, value, onSave }: { label: string; value: number | null; onSave: (n: number | null) => void }) {

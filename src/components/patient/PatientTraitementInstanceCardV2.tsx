@@ -13,12 +13,13 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { fr } from "date-fns/locale";
 import type { DayContentProps } from "react-day-picker";
 import {
-  ChevronUp, ChevronDown, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown,
+  ChevronUp, ChevronDown, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown, GripVertical,
 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import { AddFromLibraryDialog } from "@/components/patient/AddFromLibraryDialog";
+import { setExDragImage } from "@/components/patient/PatientTraitementInstanceCard";
 import { useConfirm } from "@/hooks/useConfirm";
 
 interface InstanceExercice {
@@ -105,6 +106,8 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [dragExId, setDragExId] = useState<string | null>(null);
+  const [dragOverExId, setDragOverExId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => {
     try { return (localStorage.getItem("traitementActifSort") as "asc" | "desc") || "desc"; } catch { return "desc"; }
   });
@@ -324,6 +327,37 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
         pb.collection("patient_seance_exercices").update(withOrdre[idx].id, { ordre: idx }),
         pb.collection("patient_seance_exercices").update(withOrdre[swapIdx].id, { ordre: swapIdx }),
       ]);
+    } catch {
+      toast.error("Erreur lors du réordonnancement");
+      fetchDetails();
+    }
+  };
+
+  // Réordonne un exercice par glisser-déposer (de fromIdx vers toIdx) et persiste les ordres impactés.
+  const reorderExercice = async (seanceId: string, fromIdx: number, toIdx: number) => {
+    if (!traitement || fromIdx === toIdx) return;
+    const seance = traitement.seances.find((s) => s.id === seanceId);
+    if (!seance) return;
+    if (fromIdx < 0 || toIdx < 0 || fromIdx >= seance.exercices.length || toIdx >= seance.exercices.length) return;
+
+    const reordered = [...seance.exercices];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const withOrdre = reordered.map((e, i) => ({ ...e, ordre: i }));
+
+    setTraitement({
+      ...traitement,
+      seances: traitement.seances.map((s) => s.id !== seanceId ? s : { ...s, exercices: withOrdre }),
+    });
+
+    try {
+      await Promise.all(
+        withOrdre
+          .map((e, i) => seance.exercices.findIndex((x) => x.id === e.id) === i
+            ? null
+            : pb.collection("patient_seance_exercices").update(e.id, { ordre: i }))
+          .filter(Boolean) as Promise<unknown>[]
+      );
     } catch {
       toast.error("Erreur lors du réordonnancement");
       fetchDetails();
@@ -640,8 +674,31 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
 
       <div className="space-y-2 pt-2 border-t">
         {selectedSeance.exercices.map((ex, exIdx) => (
-          <div key={ex.id} className="flex items-start gap-2 p-2 bg-background/60 rounded border">
-            <div className="flex flex-col mt-0.5">
+          <div
+            key={ex.id}
+            data-ex-row
+            className={`flex items-start gap-2 p-2 bg-background/60 rounded border transition-all ${
+              dragOverExId === ex.id && dragExId && dragExId !== ex.id ? "ring-2 ring-primary border-primary" : ""
+            } ${dragExId === ex.id ? "opacity-40" : ""}`}
+            onDragOver={(e) => { if (dragExId) { e.preventDefault(); if (dragOverExId !== ex.id) setDragOverExId(ex.id); } }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragExId && dragExId !== ex.id) {
+                reorderExercice(selectedSeance.id, selectedSeance.exercices.findIndex((x) => x.id === dragExId), exIdx);
+              }
+              setDragExId(null); setDragOverExId(null);
+            }}
+          >
+            <div className="flex flex-col items-center mt-0.5">
+              <span
+                draggable
+                onDragStart={(e) => { setDragExId(ex.id); e.dataTransfer.effectAllowed = "move"; setExDragImage(e); }}
+                onDragEnd={() => { setDragExId(null); setDragOverExId(null); }}
+                className="flex items-center justify-center h-5 w-5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                title="Glisser pour réordonner"
+              >
+                <GripVertical className="w-4 h-4" />
+              </span>
               <Button variant="ghost" size="icon" className="h-5 w-5" title="Monter"
                 disabled={exIdx === 0}
                 onClick={() => moveExercice(selectedSeance.id, ex.id, "up")}>
@@ -653,7 +710,12 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
-            <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(selectedSeance.id, ex.id, { realise: !!c })} title="Réalisé" className="mt-1" />
+            <label className="flex flex-col items-center gap-0.5 mt-1 cursor-pointer">
+              <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(selectedSeance.id, ex.id, { realise: !!c })} title="Réalisé" />
+              <span className={`text-[9px] leading-none whitespace-nowrap ${ex.realise ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"}`}>
+                {ex.realise ? "Réalisé" : "Non réalisé"}
+              </span>
+            </label>
             <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
               {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
                 : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Play className="w-4 h-4" /></div>}
