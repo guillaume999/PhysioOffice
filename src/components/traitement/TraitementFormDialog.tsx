@@ -475,12 +475,12 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>{traitement?.id ? "Modifier le traitement" : "Nouveau traitement"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 min-w-0">
           {userPseudo ? (
             <p className="text-sm text-muted-foreground">Auteur: <span className="font-medium text-foreground">{userPseudo}</span></p>
           ) : (
@@ -594,8 +594,8 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs uppercase text-muted-foreground">{item.exercice?.code || ''}</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="font-mono text-xs uppercase text-muted-foreground flex-shrink-0">{item.exercice?.code || ''}</span>
                           <p className="font-medium truncate">{item.exercice?.title}</p>
                         </div>
                         {item.exercice?.description && (
@@ -652,8 +652,8 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs uppercase text-muted-foreground">{exercice.code}</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="font-mono text-xs uppercase text-muted-foreground flex-shrink-0">{exercice.code}</span>
                           <p className="text-sm font-medium truncate">{exercice.title}</p>
                         </div>
                         {exercice.description && (
