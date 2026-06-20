@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, X, ClipboardCheck, Play, FileText, Plus, Trash2, Edit } from "lucide-react";
+import { ChevronDown, ChevronUp, ClipboardCheck, Play, FileText, Plus, Trash2, Edit } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/hooks/useConfirm";
 
 interface InstanceExercice {
   id: string;
@@ -101,6 +102,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (traitementId) fetchDetails();
@@ -188,7 +190,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteBilan = async (bilanId: string) => {
-    if (!window.confirm("Supprimer ce bilan intermédiaire ? Cette action est irréversible.")) return;
+    if (!(await confirm({ title: "Supprimer ce bilan intermédiaire ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_bilans").delete(bilanId); toast.success("Bilan supprimé"); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -265,6 +267,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteSeance = async (seanceId: string) => {
+    if (!(await confirm({ title: "Supprimer cette séance ?", description: "La séance et tous ses exercices seront définitivement supprimés. Cette action est irréversible." }))) return;
     try { await pb.collection("patient_seances").delete(seanceId); toast.success("Séance supprimée"); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -282,6 +285,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteExercice = async (exId: string) => {
+    if (!(await confirm({ title: "Supprimer cet exercice ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_seance_exercices").delete(exId); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -317,6 +321,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteTest = async (testId: string) => {
+    if (!(await confirm({ title: "Supprimer ce test ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_traitement_tests").delete(testId); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -391,7 +396,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
             </Select>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setConfirmRemoveOpen(true)} className="text-destructive h-8 w-8" title="Retirer le traitement">
-            <X className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" />
           </Button>
           <AlertDialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
             <AlertDialogContent>
@@ -657,6 +662,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       </CardContent>
 
       <AddFromLibraryDialog open={pickerOpen} onOpenChange={setPickerOpen} mode={pickerMode} onPick={handlePick} />
+      {confirmDialog}
     </Card>
   );
 }
