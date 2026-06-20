@@ -13,22 +13,13 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { fr } from "date-fns/locale";
 import type { DayContentProps } from "react-day-picker";
 import {
-  ChevronUp, ChevronDown, X, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown,
+  ChevronUp, ChevronDown, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown,
 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import { AddFromLibraryDialog } from "@/components/patient/AddFromLibraryDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/hooks/useConfirm";
 
 interface InstanceExercice {
   id: string;
@@ -112,7 +103,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   const [pickerSeanceId, setPickerSeanceId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => {
     try { return (localStorage.getItem("traitementActifSort") as "asc" | "desc") || "desc"; } catch { return "desc"; }
@@ -283,6 +274,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   };
 
   const deleteSeance = async (seanceId: string) => {
+    if (!(await confirm({ title: "Supprimer cette séance ?", description: "La séance et tous ses exercices seront définitivement supprimés. Cette action est irréversible." }))) return;
     try {
       await pb.collection("patient_seances").delete(seanceId);
       toast.success("Séance supprimée");
@@ -304,6 +296,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   };
 
   const deleteExercice = async (exId: string) => {
+    if (!(await confirm({ title: "Supprimer cet exercice ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_seance_exercices").delete(exId); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -338,6 +331,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   };
 
   const deleteTest = async (testId: string) => {
+    if (!(await confirm({ title: "Supprimer ce test ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_traitement_tests").delete(testId); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -364,7 +358,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   };
 
   const deleteBilan = async (bilanId: string) => {
-    if (!window.confirm("Supprimer ce bilan intermédiaire ? Cette action est irréversible.")) return;
+    if (!(await confirm({ title: "Supprimer ce bilan intermédiaire ?", description: "Cette action est irréversible." }))) return;
     try { await pb.collection("patient_bilans").delete(bilanId); toast.success("Bilan supprimé"); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
@@ -719,28 +713,22 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
               </SelectContent>
             </Select>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setConfirmRemoveOpen(true)} className="text-destructive h-8 w-8" title="Retirer le traitement">
-            <X className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive h-8 w-8"
+            title="Retirer le traitement"
+            onClick={async () => {
+              if (!(await confirm({
+                title: "Retirer ce traitement ?",
+                description: "Le traitement et tout son contenu (séances, exercices, tests, bilans) seront définitivement supprimés. Cette action est irréversible.",
+                confirmLabel: "Retirer",
+              }))) return;
+              onRemove();
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
           </Button>
-          <AlertDialog open={confirmRemoveOpen} onOpenChange={setConfirmRemoveOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Retirer ce traitement ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Le traitement et tout son contenu (séances, exercices, tests, bilans) seront définitivement supprimés. Cette action est irréversible.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={onRemove}
-                >
-                  Retirer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
 
         <div className="mt-2 text-xs text-muted-foreground">
@@ -777,6 +765,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
       </CardContent>
 
       <AddFromLibraryDialog open={pickerOpen} onOpenChange={setPickerOpen} mode={pickerMode} onPick={handlePick} />
+      {confirmDialog}
     </Card>
   );
 }

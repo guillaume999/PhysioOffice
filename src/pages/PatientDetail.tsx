@@ -14,6 +14,7 @@ import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/hooks/useConfirm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientCommentsCard } from "@/components/patient/PatientCommentsCard";
@@ -112,6 +113,7 @@ export default function PatientDetail() {
     keepTraitement: true,
   });
   const [reportPrintDialogOpen, setReportPrintDialogOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -369,6 +371,16 @@ export default function PatientDetail() {
     toast({ title: "Traitement retiré" });
   };
 
+  const confirmRemoveTraitement = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(await confirm({
+      title: "Retirer ce traitement ?",
+      description: "Le traitement et tout son contenu (séances, exercices, tests, bilans) seront définitivement supprimés. Cette action est irréversible.",
+      confirmLabel: "Retirer",
+    }))) return;
+    await handleRemoveTraitement();
+  };
+
   if (authLoading || loading) {
     return (
       <Layout>
@@ -489,6 +501,17 @@ export default function PatientDetail() {
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Créer
+                  </Button>
+                )}
+                {activeTraitementName && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 h-8 w-8 text-destructive"
+                    title="Retirer le traitement"
+                    onClick={confirmRemoveTraitement}
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 )}
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -730,6 +753,7 @@ export default function PatientDetail() {
           bilansIntermediaires={bilansIntermediaires}
         />
       </div>
+      {confirmDialog}
     </Layout>
   );
 }
