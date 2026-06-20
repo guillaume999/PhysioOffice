@@ -1273,10 +1273,10 @@ export default function Admin() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         <div className="flex items-center gap-3 mb-8">
           <Shield className="w-8 h-8 text-primary" />
-          <h1 className="font-display text-3xl font-bold text-foreground">
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
             Administration
           </h1>
         </div>

@@ -111,10 +111,10 @@ export default function Profile() {
   return (
     <Layout>
       <PagePopup pageKey="profile" />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8 max-w-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Mon Profil</h1>
+            <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">Mon Profil</h1>
             <p className="text-muted-foreground mt-2">Gérez vos informations personnelles et votre mot de passe</p>
           </div>
           <Button variant="outline" onClick={() => navigate("/journal")} className="gap-2">

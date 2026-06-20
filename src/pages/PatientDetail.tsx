@@ -383,7 +383,7 @@ export default function PatientDetail() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8 max-w-4xl">
         {/* Header mobile optimisé */}
         <div className="flex flex-col gap-4 mb-6 md:mb-8">
           {/* Ligne 1: Retour + Info patient */}

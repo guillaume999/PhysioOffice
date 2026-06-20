@@ -130,9 +130,9 @@ export default function Pricing() {
   return (
     <Layout>
       <PagePopup pageKey="pricing" />
-      <div className="container max-w-6xl mx-auto py-12 px-4">
+      <div className="container max-w-6xl mx-auto py-6 md:py-12 px-4">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Choisissez votre forfait</h1>
+          <h1 className="text-2xl md:text-4xl font-bold mb-4">Choisissez votre forfait</h1>
           <p className="text-muted-foreground text-lg mb-8">
             Des outils professionnels pour optimiser votre pratique de kinésithérapeute
           </p>

@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onWheel, ...props }, ref) => {
     return (
       <input
         type={type}
@@ -12,6 +12,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        onWheel={(e) => {
+          // Empêche la molette de modifier la valeur d'un champ number :
+          // on retire le focus pour laisser le scroll défiler la popup/page.
+          if (type === "number") {
+            (e.currentTarget as HTMLInputElement).blur();
+          }
+          onWheel?.(e);
+        }}
         {...props}
       />
     );

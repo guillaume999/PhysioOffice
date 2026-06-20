@@ -91,10 +91,10 @@ export default function IADiagnostic() {
   return (
     <Layout>
       <PagePopup pageKey="ia-diagnostic" />
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8 max-w-4xl">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-xl bg-emerald-500/10"><Brain className="w-6 h-6 text-emerald-500" /></div>
-          <div><h1 className="text-3xl font-display font-bold">IA Diagnostic</h1><p className="text-muted-foreground">Assistant IA pour l'analyse des symptômes</p></div>
+          <div><h1 className="text-2xl md:text-3xl font-display font-bold">IA Diagnostic</h1><p className="text-muted-foreground">Assistant IA pour l'analyse des symptômes</p></div>
         </div>
         <Card className="h-[60vh] flex flex-col">
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">

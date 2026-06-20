@@ -313,7 +313,7 @@ export default function PathologieDetail() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8 max-w-3xl">
         <div className="flex items-center justify-between mb-4">
           <Button variant="ghost" onClick={() => navigate("/pathologies")} className="gap-2">
             <ArrowLeft className="w-4 h-4" />

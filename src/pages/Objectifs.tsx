@@ -169,14 +169,14 @@ export default function Objectifs() {
   return (
     <Layout>
       <PagePopup pageKey="objectifs" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-emerald-500/10">
               <Target className="w-8 h-8 text-emerald-600" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Objectifs</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Objectifs</h1>
               <p className="text-muted-foreground">
                 {objectifs.length} objectif(s).
               </p>

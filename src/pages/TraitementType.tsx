@@ -461,14 +461,14 @@ export default function TraitementType() {
   return (
     <Layout>
       <PagePopup pageKey="traitements" />
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-rose-500/10">
               <ClipboardList className="w-8 h-8 text-rose-500" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Traitement Type</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Traitement Type</h1>
               <p className="text-muted-foreground">Gérez vos modèles de traitements standardisés</p>
             </div>
           </div>
@@ -644,6 +644,7 @@ export default function TraitementType() {
                                   <p className="text-sm font-semibold">Tests ({traitement.tests?.length || 0})</p>
                                   {traitement.tests && traitement.tests.length > 0 ? (
                                     <div className="border rounded-lg overflow-hidden">
+                                      <div className="overflow-x-auto -mx-2 sm:mx-0">
                                       <table className="w-full">
                                         <thead className="bg-muted/50">
                                           <tr className="text-left text-xs text-muted-foreground">
@@ -699,6 +700,7 @@ export default function TraitementType() {
                                           ))}
                                         </tbody>
                                       </table>
+                                      </div>
                                     </div>
                                   ) : (
                                     <p className="text-xs text-muted-foreground">Aucun test</p>

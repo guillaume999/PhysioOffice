@@ -38,9 +38,9 @@ export default function Contact() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 md:py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-display font-bold mb-4">Contactez-nous</h1>
+          <h1 className="text-2xl md:text-4xl font-display font-bold mb-4">Contactez-nous</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">Une question ? N'hésitez pas à nous contacter.</p>
         </div>
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">

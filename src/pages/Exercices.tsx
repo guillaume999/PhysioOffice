@@ -831,12 +831,12 @@ export default function Exercices() {
   return (
     <Layout>
       <PagePopup pageKey="exercices" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         <div className="flex flex-col gap-6">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-display font-bold">Exercices</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Exercices</h1>
               <p className="text-muted-foreground">
                 Gérez votre bibliothèque d'exercices
               </p>

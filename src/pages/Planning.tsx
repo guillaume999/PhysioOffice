@@ -406,7 +406,7 @@ export default function Planning() {
   return (
     <Layout>
       <PagePopup pageKey="planning" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
@@ -414,7 +414,7 @@ export default function Planning() {
               <CalendarIcon className="w-6 h-6 text-purple-500" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Planning</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Planning</h1>
               <p className="text-muted-foreground">
                 {viewMode === "week" 
                   ? `Semaine du ${format(weekDays[0], "d MMMM", { locale: fr })} au ${format(weekDays[6], "d MMMM yyyy", { locale: fr })}`

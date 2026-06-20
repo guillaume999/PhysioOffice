@@ -48,7 +48,7 @@ export default function Formation() {
   return (
     <Layout>
       <PagePopup pageKey="formation" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
@@ -56,7 +56,7 @@ export default function Formation() {
               <GraduationCap className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold text-foreground">Formation</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">Formation</h1>
               <p className="text-muted-foreground">
                 Développez vos compétences avec nos formations en ligne
               </p>

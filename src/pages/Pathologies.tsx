@@ -218,14 +218,14 @@ export default function Pathologies() {
   return (
     <Layout>
       <PagePopup pageKey="pathologies" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-fuchsia-500/10">
               <Activity className="w-8 h-8 text-fuchsia-500" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Pathologies & Traitements</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Pathologies & Traitements</h1>
               <p className="text-muted-foreground">
                 {counts.mine + counts.platform} pathologie(s) — cliquez sur l'une d'elles pour gérer son protocole de traitement.
               </p>

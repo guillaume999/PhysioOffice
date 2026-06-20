@@ -145,7 +145,7 @@ export default function Index() {
       </div>
 
       {/* CTA Section */}
-      <section className="py-20">
+      <section className="py-10 md:py-20">
         <div className="container mx-auto px-4">
           <ScrollReveal variant="scale">
           <div className="relative rounded-3xl overflow-hidden gradient-primary p-8 md:p-16">

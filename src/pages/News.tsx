@@ -84,7 +84,7 @@ export default function News() {
   return (
     <Layout>
       <PagePopup pageKey="news" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
@@ -92,7 +92,7 @@ export default function News() {
               <Newspaper className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold text-foreground">Actualités</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">Actualités</h1>
               <p className="text-muted-foreground">
                 Les dernières nouvelles et mises à jour de PhysioOffice
               </p>

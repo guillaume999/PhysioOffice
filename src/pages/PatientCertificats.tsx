@@ -336,7 +336,7 @@ export default function PatientCertificats() {
 
   return (
     <Layout>
-      <div className="container max-w-4xl py-6 space-y-6">
+      <div className="container max-w-4xl px-2 sm:px-4 py-4 md:py-6 space-y-6">
         <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm -mx-8 px-8 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>

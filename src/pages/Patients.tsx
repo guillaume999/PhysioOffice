@@ -203,12 +203,12 @@ export default function Patients() {
   return (
     <Layout>
       <PagePopup pageKey="patients" />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
         <ScrollReveal variant="up">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-blue-500/10"><Users className="w-6 h-6 text-blue-500" /></div>
-            <div><h1 className="text-3xl font-display font-bold">Patients</h1><p className="text-muted-foreground">{patients.length} patient(s) enregistré(s)</p></div>
+            <div><h1 className="text-2xl md:text-3xl font-display font-bold">Patients</h1><p className="text-muted-foreground">{patients.length} patient(s) enregistré(s)</p></div>
           </div>
           <div className="flex gap-2 md:gap-4 w-full md:w-auto flex-wrap">
             <Button variant="outline" onClick={() => navigate("/planning")}>

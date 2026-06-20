@@ -422,14 +422,14 @@ export default function SeanceType() {
   return (
     <Layout>
       <PagePopup pageKey="seances" />
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-indigo-500/10">
               <Calendar className="w-8 h-8 text-indigo-500" />
             </div>
             <div>
-              <h1 className="text-3xl font-display font-bold">Séance Type</h1>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">Séance Type</h1>
               <p className="text-muted-foreground">Gérez vos modèles de séances prédéfinies</p>
             </div>
           </div>

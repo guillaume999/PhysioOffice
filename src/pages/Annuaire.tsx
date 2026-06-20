@@ -113,7 +113,7 @@ export default function Annuaire() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 md:py-12">
+      <div className="container mx-auto px-2 sm:px-4 py-4 md:py-12">
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-4xl font-display font-bold mb-2">
             Annuaire des Kinésithérapeutes
