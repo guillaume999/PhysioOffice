@@ -104,6 +104,7 @@ type Selection =
 export function PatientTraitementInstanceCardV2({ traitementId, patientId, praticienId, onRemove }: Props) {
   const navigate = useNavigate();
   const [traitement, setTraitement] = useState<InstanceDetails | null>(null);
+  const [bilanInitialDate, setBilanInitialDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<Selection>({ kind: "tests" });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -166,6 +167,12 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
         filter: `patient_traitement = "${traitementId}"`, sort: "bilan_date",
         fields: "id,bilan_date",
       }).then((d) => d.map((b: any) => ({ id: b.id, bilan_date: b.bilan_date })));
+
+      // Date du bilan initial (niveau patient, partagée via patient_care_plans)
+      const cp: any = await pb.collection("patient_care_plans")
+        .getFirstListItem(`patient = "${patientId}"`, { fields: "id,bilan_initial_date" })
+        .catch(() => null);
+      setBilanInitialDate(cp?.bilan_initial_date || null);
 
       const details: InstanceDetails = {
         id: pt.id, nom: pt.nom, pathologie: pt.pathologie, description: pt.description,
@@ -417,6 +424,18 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
           {sortDir === "asc" ? "Chrono" : "Antichrono"}
         </Button>
       </div>
+
+      <button
+        onClick={() => { setMobileNavOpen(false); navigate(`/patients/${patientId}/bilan-initial`); }}
+        className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left bg-sky-50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/40 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 transition-colors"
+      >
+        <ClipboardCheck className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium text-sky-700 dark:text-sky-400 truncate">Bilan initial</span>
+          <span className="block text-xs text-muted-foreground">{fmtDate(bilanInitialDate)}</span>
+        </span>
+        <Edit className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
+      </button>
 
       {rows.length === 0 && (
         <p className="px-3 py-2 text-xs text-muted-foreground">Aucune séance.</p>
