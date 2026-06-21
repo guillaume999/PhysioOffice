@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import { AddFromLibraryDialog } from "@/components/patient/AddFromLibraryDialog";
 import { MediaThumb } from "@/components/MediaThumb";
+import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 import { setExDragImage } from "@/components/patient/PatientTraitementInstanceCard";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -113,6 +114,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
   const [dragExId, setDragExId] = useState<string | null>(null);
   const [dragOverExId, setDragOverExId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => {
@@ -734,13 +736,20 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </div>
-            <label className="flex flex-col items-center gap-0.5 mt-1 cursor-pointer">
-              <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(selectedSeance.id, ex.id, { realise: !!c })} title="Réalisé" />
-              <span className={`text-[9px] leading-none whitespace-nowrap ${ex.realise ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"}`}>
-                {ex.realise ? "Réalisé" : "Non réalisé"}
-              </span>
-            </label>
-            <MediaThumb source={ex} alt={ex.nom || ""} showPlayIcon className="w-12 h-10" />
+            <MediaThumb
+              source={ex}
+              alt={ex.nom || ""}
+              showPlayIcon
+              className="w-24 h-20 mt-1"
+              onClick={() => setPreviewExercice({
+                title: ex.nom || "",
+                description: ex.description,
+                video_url: ex.video_url,
+                thumbnail_url: ex.thumbnail_url,
+                image_url: ex.image_url,
+                media_type: ex.media_type,
+              })}
+            />
             <div className="flex-1 min-w-0 space-y-1">
               <Input
                 defaultValue={ex.nom || ""}
@@ -768,9 +777,17 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
                 className="text-xs min-h-0"
               />
             </div>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive mt-1" onClick={() => deleteExercice(ex.id)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <div className="flex flex-col items-center gap-2 mt-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteExercice(ex.id)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <label className="flex flex-col items-center gap-0.5 cursor-pointer">
+                <Checkbox checked={ex.realise} onCheckedChange={(c) => updateExercice(selectedSeance.id, ex.id, { realise: !!c })} title="Réalisé" />
+                <span className={`text-[9px] leading-none whitespace-nowrap ${ex.realise ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"}`}>
+                  {ex.realise ? "Réalisé" : "Non réalisé"}
+                </span>
+              </label>
+            </div>
           </div>
         ))}
         <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={() => openExercicePicker(selectedSeance.id)} disabled={isSubmitting}>
@@ -848,6 +865,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
       </CardContent>
 
       <AddFromLibraryDialog open={pickerOpen} onOpenChange={setPickerOpen} mode={pickerMode} onPick={handlePick} />
+      <ExercicePreviewDialog exercice={previewExercice} open={!!previewExercice} onOpenChange={(o) => { if (!o) setPreviewExercice(null); }} />
       {confirmDialog}
     </Card>
   );
