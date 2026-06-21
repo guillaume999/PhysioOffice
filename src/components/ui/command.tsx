@@ -57,13 +57,57 @@ CommandInput.displayName = CommandPrimitive.Input.displayName;
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive.List
-    ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
-    {...props}
-  />
-));
+>(({ className, ...props }, ref) => {
+  // Dans un Dialog, react-remove-scroll bloque le défilement natif (molette +
+  // tactile) de cette liste portée hors du dialogue. On gère le défilement
+  // manuellement via des écouteurs non-passifs, tout en relayant le ref reçu.
+  const cleanupRef = React.useRef<(() => void) | null>(null);
+  const setRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (typeof ref === "function") ref(node);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      if (!node) return;
+
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        node.scrollTop += e.deltaY;
+      };
+
+      let lastY: number | null = null;
+      const onTouchStart = (e: TouchEvent) => {
+        lastY = e.touches[0]?.clientY ?? null;
+      };
+      const onTouchMove = (e: TouchEvent) => {
+        if (lastY === null) return;
+        const y = e.touches[0]?.clientY ?? lastY;
+        e.preventDefault();
+        node.scrollTop += lastY - y;
+        lastY = y;
+      };
+
+      node.addEventListener("wheel", onWheel, { passive: false });
+      node.addEventListener("touchstart", onTouchStart, { passive: false });
+      node.addEventListener("touchmove", onTouchMove, { passive: false });
+      cleanupRef.current = () => {
+        node.removeEventListener("wheel", onWheel);
+        node.removeEventListener("touchstart", onTouchStart);
+        node.removeEventListener("touchmove", onTouchMove);
+      };
+    },
+    [ref],
+  );
+
+  return (
+    <CommandPrimitive.List
+      ref={setRef}
+      className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+      {...props}
+    />
+  );
+});
 
 CommandList.displayName = CommandPrimitive.List.displayName;
 
