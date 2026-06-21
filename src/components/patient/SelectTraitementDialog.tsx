@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Plus, ClipboardList, Users } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/utils";
 
 interface Traitement {
   id: string;
@@ -99,12 +100,12 @@ export function SelectTraitementDialog({
 
   const filterTraitements = (traitements: Traitement[]) => {
     if (!searchTerm) return traitements;
-    const term = searchTerm.toLowerCase();
+    const term = normalizeSearch(searchTerm);
     return traitements.filter(
       (t) =>
-        t.pathologie.toLowerCase().includes(term) ||
-        t.description?.toLowerCase().includes(term) ||
-        t.author_name?.toLowerCase().includes(term)
+        normalizeSearch(t.pathologie).includes(term) ||
+        normalizeSearch(t.description).includes(term) ||
+        normalizeSearch(t.author_name).includes(term)
     );
   };
 

@@ -14,6 +14,7 @@ import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/Mult
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
+import { normalizeSearch } from "@/lib/utils";
 
 interface SeanceExercice {
   id: string;
@@ -125,10 +126,10 @@ export default function SeanceType() {
 
     // Recherche texte : code / auteur
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearch(searchQuery);
       result = result.filter((s) =>
-        s.code?.toLowerCase().includes(query) ||
-        s.author_name?.toLowerCase().includes(query)
+        normalizeSearch(s.code).includes(query) ||
+        normalizeSearch(s.author_name).includes(query)
       );
     }
 

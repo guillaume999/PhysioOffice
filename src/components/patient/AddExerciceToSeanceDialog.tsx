@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SearchableExerciceTitleInput } from "./SearchableExerciceTitleInput";
 import { PathologySearchInput } from "./PathologySearchInput";
+import { matchesSearch } from "@/lib/utils";
 
 interface VideoLibraryItem {
   id: string;
@@ -296,7 +297,7 @@ export function AddExerciceToSeanceDialog({
   };
 
   const filteredLibraryVideos = librarySearch.trim()
-    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    ? libraryVideos.filter(v => matchesSearch(v.title, librarySearch))
     : libraryVideos;
 
   const handleSubmit = async () => {

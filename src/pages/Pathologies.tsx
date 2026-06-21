@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { parseDescription, parseMotsCles } from "@/lib/pathologie";
+import { normalizeSearch } from "@/lib/utils";
 
 interface Pathologie {
   id: string;
@@ -179,10 +180,10 @@ export default function Pathologies() {
 
     // Search
     if (search.trim()) {
-      const q = search.toLowerCase();
-      const inName = p.name.toLowerCase().includes(q);
-      const inAuthor = (p.author_name || "").toLowerCase().includes(q);
-      const inMotsCles = p.mots_cles.some((m) => m.toLowerCase().includes(q));
+      const q = normalizeSearch(search);
+      const inName = normalizeSearch(p.name).includes(q);
+      const inAuthor = normalizeSearch(p.author_name).includes(q);
+      const inMotsCles = p.mots_cles.some((m) => normalizeSearch(m).includes(q));
       if (!inName && !inAuthor && !inMotsCles) return false;
     }
 

@@ -31,6 +31,7 @@ import {
 import { PagePopup } from "@/components/popup/PagePopup";
 import { format, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
+import { matchesSearch as matchesSearch_ } from "@/lib/utils";
 
 interface Annonce {
   id: string;
@@ -216,8 +217,8 @@ export default function Annonces() {
 
   const filteredAnnonces = (showMyAnnonces ? myAnnonces : annonces).filter((annonce) => {
     const matchesSearch =
-      annonce.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      annonce.description.toLowerCase().includes(searchTerm.toLowerCase());
+      matchesSearch_(annonce.title, searchTerm) ||
+      matchesSearch_(annonce.description, searchTerm);
     const matchesType = filterType === "all" || annonce.type === filterType;
     const matchesRegion = filterRegion === "all" || annonce.region === filterRegion;
     return matchesSearch && matchesType && matchesRegion;

@@ -12,6 +12,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { addDays, addWeeks, addMonths } from "date-fns";
+import { matchesSearch as matchesSearch_ } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -40,7 +41,7 @@ export function BulkSharePatientsDialog({ patients, trigger }: BulkSharePatients
   // Filter patients based on search and inactive toggle
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+      const matchesSearch = matchesSearch_(p.name, search) ||
                            (p.numero && p.numero.includes(search));
       const matchesStatus = includeInactive || p.status !== "inactive";
       return matchesSearch && matchesStatus;

@@ -13,6 +13,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
+import { normalizeSearch } from "@/lib/utils";
 
 interface SeanceExercice {
   id: string;
@@ -197,9 +198,9 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
   // Filter exercices by search
   const filteredExercices = availableExercices.filter(ex => {
     if (!exerciceSearch.trim()) return true;
-    const searchLower = exerciceSearch.toLowerCase();
-    const matchTitle = ex.title.toLowerCase().includes(searchLower);
-    const matchTags = ex.pathologie_tags?.some(tag => tag.toLowerCase().includes(searchLower));
+    const searchLower = normalizeSearch(exerciceSearch);
+    const matchTitle = normalizeSearch(ex.title).includes(searchLower);
+    const matchTags = ex.pathologie_tags?.some(tag => normalizeSearch(tag).includes(searchLower));
     return matchTitle || matchTags;
   });
 
@@ -216,10 +217,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     if (seancePathoFilter !== "all" && !sPathos.includes(seancePathoFilter)) return false;
     if (seanceObjectifFilter !== "all" && !sObjs.includes(seanceObjectifFilter)) return false;
     if (!seanceSearch.trim()) return true;
-    const searchLower = seanceSearch.toLowerCase();
+    const searchLower = normalizeSearch(seanceSearch);
     return (
-      sPathos.some(p => p.toLowerCase().includes(searchLower)) ||
-      sObjs.some(o => o.toLowerCase().includes(searchLower))
+      sPathos.some(p => normalizeSearch(p).includes(searchLower)) ||
+      sObjs.some(o => normalizeSearch(o).includes(searchLower))
     );
   });
 

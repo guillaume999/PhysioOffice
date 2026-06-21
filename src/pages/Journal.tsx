@@ -47,6 +47,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { normalizeSearch } from "@/lib/utils";
 
 interface ActivityLog {
   id: string;
@@ -161,12 +162,12 @@ export default function Journal() {
     let result = [...logs];
 
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearch(searchQuery);
       result = result.filter(
         (log) =>
-          log.title.toLowerCase().includes(query) ||
-          log.details?.toLowerCase().includes(query) ||
-          log.section.toLowerCase().includes(query)
+          normalizeSearch(log.title).includes(query) ||
+          normalizeSearch(log.details).includes(query) ||
+          normalizeSearch(log.section).includes(query)
       );
     }
 

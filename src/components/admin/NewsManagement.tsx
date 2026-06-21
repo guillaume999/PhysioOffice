@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Edit, Trash2, Save, X, Newspaper, Tag, Search, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { matchesSearch as matchesSearch_ } from "@/lib/utils";
 
 interface NewsItem {
   id: string;
@@ -71,9 +72,9 @@ export function NewsManagement() {
   const filteredNews = useMemo(() => {
     return news.filter((item) => {
       const matchesSearch = searchQuery.trim() === "" ||
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase());
+        matchesSearch_(item.title, searchQuery) ||
+        matchesSearch_(item.description, searchQuery) ||
+        matchesSearch_(item.category, searchQuery);
       
       const matchesCategory = !filterCategory || item.category === filterCategory;
       

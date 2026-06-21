@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, Calendar, Play, Check } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/utils";
 
 export interface LibraryItem {
   id: string;
@@ -22,7 +23,7 @@ export interface LibraryItem {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "seance" | "exercice";
+  mode: "seance" | "exercice" | "test";
   /** Called with a library record id to copy from, or null for a blank item. */
   onPick: (sourceId: string | null) => void;
 }
@@ -105,12 +106,12 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
     if (filterPathologie !== "all" && !(it.pathologie_tags || []).includes(filterPathologie)) return false;
     if (filterObjectif !== "all" && !(it.objectif_tags || []).includes(filterObjectif)) return false;
     if (!search.trim()) return true;
-    const q = search.toLowerCase();
+    const q = normalizeSearch(search);
     return (
-      it.title.toLowerCase().includes(q) ||
-      (it.subtitle || "").toLowerCase().includes(q) ||
-      (it.pathologie_tags || []).some((t) => t.toLowerCase().includes(q)) ||
-      (it.objectif_tags || []).some((t) => t.toLowerCase().includes(q))
+      normalizeSearch(it.title).includes(q) ||
+      normalizeSearch(it.subtitle).includes(q) ||
+      (it.pathologie_tags || []).some((t) => normalizeSearch(t).includes(q)) ||
+      (it.objectif_tags || []).some((t) => normalizeSearch(t).includes(q))
     );
   });
 
@@ -132,12 +133,12 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{mode === "seance" ? "Ajouter une séance" : "Ajouter un exercice"}</DialogTitle>
+          <DialogTitle>{mode === "seance" ? "Ajouter une séance" : mode === "test" ? "Ajouter un test" : "Ajouter un exercice"}</DialogTitle>
         </DialogHeader>
 
         <Button variant="outline" className="w-full justify-start gap-2 border-dashed" onClick={() => pick(null)}>
           <Plus className="w-4 h-4" />
-          {mode === "seance" ? "Créer une séance vierge" : "Créer un exercice vierge"}
+          {mode === "seance" ? "Créer une séance vierge" : mode === "test" ? "Créer un test vierge" : "Créer un exercice vierge"}
         </Button>
 
         <div className="relative">
@@ -180,7 +181,7 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
           ) : (
             filtered.map((it) => (
               <div key={it.id} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer" onClick={() => pick(it.id)}>
-                {mode === "exercice" ? (
+                {mode !== "seance" ? (
                   it.thumbnail_url ? (
                     <img
                       src={it.thumbnail_url}
@@ -204,7 +205,7 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{it.title}</p>
                   {it.subtitle && <p className="text-xs text-muted-foreground truncate">{it.subtitle}</p>}
-                  {mode === "exercice" && ((it.pathologie_tags?.length || 0) > 0 || (it.objectif_tags?.length || 0) > 0) && (
+                  {mode !== "seance" && ((it.pathologie_tags?.length || 0) > 0 || (it.objectif_tags?.length || 0) > 0) && (
                     <p className="text-[10px] text-muted-foreground truncate">
                       {[...(it.objectif_tags || []), ...(it.pathologie_tags || [])].join(" · ")}
                     </p>

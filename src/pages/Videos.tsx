@@ -18,6 +18,7 @@ import {
   MAX_IMAGE_SIZE,
   MAX_VIDEO_SIZE,
 } from "@/lib/exerciceMedia";
+import { normalizeSearch } from "@/lib/utils";
 
 type MediaFilter = "all" | "video" | "image";
 
@@ -75,8 +76,8 @@ export default function Videos() {
     }
 
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter((v) => v.title.toLowerCase().includes(query));
+      const query = normalizeSearch(searchQuery);
+      result = result.filter((v) => normalizeSearch(v.title).includes(query));
     }
 
     setFilteredVideos(result);

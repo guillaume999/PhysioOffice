@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { matchesSearch } from "@/lib/utils";
 
 interface Annonce {
   id: string;
@@ -175,9 +176,9 @@ export function AnnoncesManagement() {
 
   const filteredAnnonces = annonces.filter(
     (a) =>
-      a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.region.toLowerCase().includes(searchTerm.toLowerCase())
+      matchesSearch(a.title, searchTerm) ||
+      matchesSearch(a.description, searchTerm) ||
+      matchesSearch(a.region, searchTerm)
   );
 
   const isExpired = (expiresAt: string) => new Date(expiresAt) < new Date();

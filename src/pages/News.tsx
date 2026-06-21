@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { pb } from "@/integrations/pocketbase/client";
+import { matchesSearch as matchesSearch_ } from "@/lib/utils";
 
 interface NewsItem {
   id: string;
@@ -64,9 +65,9 @@ export default function News() {
   const filteredNews = useMemo(() => {
     return newsItems.filter((news) => {
       const matchesSearch = searchQuery.trim() === "" || 
-        news.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        news.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        news.category.toLowerCase().includes(searchQuery.toLowerCase());
+        matchesSearch_(news.title, searchQuery) ||
+        matchesSearch_(news.description, searchQuery) ||
+        matchesSearch_(news.category, searchQuery);
       
       const matchesCategory = !selectedCategory || news.category === selectedCategory;
       

@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
+import { matchesSearch as matchesSearch_ } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -174,7 +175,7 @@ export default function Patients() {
 
   const filtered = patients
     .filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = matchesSearch_(p.name, search);
       const matchesStatus = statusFilter === "all" || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     })

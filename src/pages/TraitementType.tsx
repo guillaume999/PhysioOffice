@@ -13,6 +13,7 @@ import { TraitementFormDialog } from "@/components/traitement/TraitementFormDial
 import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/MultiSelectFilter";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
+import { normalizeSearch } from "@/lib/utils";
 
 interface TraitementTest {
   id: string;
@@ -160,13 +161,13 @@ export default function TraitementType() {
 
     // Recherche texte : nom / code / description / auteur
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearch(searchQuery);
       result = result.filter(
         (t) =>
-          t.code?.toLowerCase().includes(query) ||
-          t.nom?.toLowerCase().includes(query) ||
-          t.author_name?.toLowerCase().includes(query) ||
-          t.description?.toLowerCase().includes(query)
+          normalizeSearch(t.code).includes(query) ||
+          normalizeSearch(t.nom).includes(query) ||
+          normalizeSearch(t.author_name).includes(query) ||
+          normalizeSearch(t.description).includes(query)
       );
     }
 

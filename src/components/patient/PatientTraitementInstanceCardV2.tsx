@@ -100,7 +100,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<Selection>({ kind: "tests" });
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerMode, setPickerMode] = useState<"seance" | "exercice">("seance");
+  const [pickerMode, setPickerMode] = useState<"seance" | "exercice" | "test">("seance");
   const [pickerSeanceId, setPickerSeanceId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -266,10 +266,13 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
 
   const openSeancePicker = () => { setPickerMode("seance"); setPickerSeanceId(null); setPickerOpen(true); };
   const openExercicePicker = (seanceId: string) => { setPickerMode("exercice"); setPickerSeanceId(seanceId); setPickerOpen(true); };
+  const openTestPicker = () => { setPickerMode("test"); setPickerSeanceId(null); setPickerOpen(true); };
 
   const handlePick = (sourceId: string | null) => {
     if (pickerMode === "seance") {
       addSeanceFromLibrary(sourceId);
+    } else if (pickerMode === "test") {
+      addTestFromLibrary(sourceId);
     } else if (pickerSeanceId) {
       const seance = traitement?.seances.find((s) => s.id === pickerSeanceId);
       addExerciceFromLibrary(pickerSeanceId, seance?.exercices.length || 0, sourceId);
@@ -370,13 +373,21 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
     catch { toast.error("Erreur lors de la suppression"); }
   };
 
-  const addTest = async () => {
+  // Ajoute un test vierge ou copié depuis un exercice de la bibliothèque.
+  const addTestFromLibrary = async (sourceId: string | null) => {
     if (!traitement) return;
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      let nom = "Nouveau test";
+      let description = "";
+      if (sourceId) {
+        const ex: any = await pb.collection("exercices").getOne(sourceId, { fields: "id,title,description" });
+        nom = ex.title || "Test";
+        description = ex.description || "";
+      }
       await pb.collection("patient_traitement_tests").create({
-        patient_traitement: traitement.id, source: null, nom: "Nouveau test", description: "",
+        patient_traitement: traitement.id, source: sourceId, nom, description,
         ordre: traitement.tests.length,
       });
       fetchDetails();
@@ -613,7 +624,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
           </Button>
         </div>
       ))}
-      <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={addTest} disabled={isSubmitting}>
+      <Button variant="outline" size="sm" className="w-full gap-1 border-dashed" onClick={openTestPicker} disabled={isSubmitting}>
         <Plus className="w-4 h-4" /> Ajouter un test
       </Button>
     </div>

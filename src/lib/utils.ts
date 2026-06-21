@@ -6,6 +6,26 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Normalise une chaîne pour la recherche : passe en minuscules et supprime
+ * les accents/diacritiques. Permet une recherche insensible aux accents
+ * (ex. "velo" trouve "vélo" et inversement).
+ */
+export function normalizeSearch(value: unknown): string {
+  if (value == null) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Indique si `haystack` contient `needle` en ignorant la casse et les accents.
+ */
+export function matchesSearch(haystack: unknown, needle: unknown): boolean {
+  return normalizeSearch(haystack).includes(normalizeSearch(needle));
+}
+
+/**
  * Parse un champ JSON renvoyé par PocketBase.
  * PocketBase SDK déserialise automatiquement les champs `json` en objet.
  * Mais d'anciens enregistrements (migration Supabase) peuvent contenir une string.

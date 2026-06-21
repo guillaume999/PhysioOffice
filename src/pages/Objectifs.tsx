@@ -26,6 +26,7 @@ import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { PagePopup } from "@/components/popup/PagePopup";
+import { matchesSearch } from "@/lib/utils";
 
 interface Objectif {
   id: string;
@@ -153,7 +154,7 @@ export default function Objectifs() {
 
   const filtered = objectifs.filter((o) => {
     if (!search.trim()) return true;
-    return o.name.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch(o.name, search);
   });
 
   if (!user) {

@@ -8,6 +8,7 @@ import { Loader2, Search, ChevronDown, ChevronRight, Play } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { normalizeSearch } from "@/lib/utils";
 
 interface SeanceExercice {
   id: string;
@@ -117,12 +118,12 @@ export function ImportSeanceDialog({
   };
 
   const filteredSeances = seances.filter((s) => {
-    const searchLower = search.toLowerCase();
+    const searchLower = normalizeSearch(search);
     const tags = getAllTags(s);
     return (
-      s.pathologie.toLowerCase().includes(searchLower) ||
-      s.objectif_principal.toLowerCase().includes(searchLower) ||
-      tags.some(tag => tag.toLowerCase().includes(searchLower))
+      normalizeSearch(s.pathologie).includes(searchLower) ||
+      normalizeSearch(s.objectif_principal).includes(searchLower) ||
+      tags.some(tag => normalizeSearch(tag).includes(searchLower))
     );
   });
 

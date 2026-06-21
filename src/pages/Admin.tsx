@@ -54,6 +54,7 @@ import { fr } from "date-fns/locale";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
 import { PopupsManagement } from "@/components/admin/PopupsManagement";
+import { matchesSearch } from "@/lib/utils";
 
 interface UserProfile {
   user_id: string;
@@ -1121,10 +1122,10 @@ export default function Admin() {
   };
 
   const filteredUsers = users.filter(u => 
-    (u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.first_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.last_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.pseudo?.toLowerCase().includes(userSearch.toLowerCase()))
+    (matchesSearch(u.email, userSearch) ||
+    matchesSearch(u.first_name, userSearch) ||
+    matchesSearch(u.last_name, userSearch) ||
+    matchesSearch(u.pseudo, userSearch))
   );
 
   // Calculate copy counts for each original seance
@@ -1167,9 +1168,9 @@ export default function Admin() {
   const filteredSeances = seances
     .filter(s => !s.is_copy)
     .filter(s =>
-      s.pathologie.toLowerCase().includes(seanceSearch.toLowerCase()) ||
-      s.objectif_principal.toLowerCase().includes(seanceSearch.toLowerCase()) ||
-      s.author_name?.toLowerCase().includes(seanceSearch.toLowerCase())
+      matchesSearch(s.pathologie, seanceSearch) ||
+      matchesSearch(s.objectif_principal, seanceSearch) ||
+      matchesSearch(s.author_name, seanceSearch)
     )
     .filter(s => seanceAuthorFilter.length === 0 || (s.author_name !== null && seanceAuthorFilter.includes(s.author_name)))
     .filter(s => seancePathologieFilter.length === 0 || seancePathologieFilter.includes(s.pathologie))
@@ -1196,8 +1197,8 @@ export default function Admin() {
   const filteredTraitements = traitements
     .filter(t => !t.is_copy)
     .filter(t =>
-      t.pathologie.toLowerCase().includes(traitementSearch.toLowerCase()) ||
-      t.author_name?.toLowerCase().includes(traitementSearch.toLowerCase())
+      matchesSearch(t.pathologie, traitementSearch) ||
+      matchesSearch(t.author_name, traitementSearch)
     )
     .filter(t => traitementPathologieFilter.length === 0 || traitementPathologieFilter.includes(t.pathologie))
     .filter(t => traitementAuthorFilter.length === 0 || (t.author_name !== null && traitementAuthorFilter.includes(t.author_name)))
@@ -1227,8 +1228,8 @@ export default function Admin() {
   const filteredExercices = exercices
     .filter(e => !e.is_copy)
     .filter(e =>
-      e.title.toLowerCase().includes(exerciceSearch.toLowerCase()) ||
-      e.author_name?.toLowerCase().includes(exerciceSearch.toLowerCase())
+      matchesSearch(e.title, exerciceSearch) ||
+      matchesSearch(e.author_name, exerciceSearch)
     )
     .filter(e => exerciceAuthorFilter.length === 0 || (e.author_name !== null && exerciceAuthorFilter.includes(e.author_name)))
     .filter(e => !exerciceDateFromFilter || e.created_at.slice(0, 10) >= format(exerciceDateFromFilter, "yyyy-MM-dd"))
@@ -1252,7 +1253,7 @@ export default function Admin() {
   const objectifUserNames = [...new Set(objectifs.filter(o => o.user_id).map(o => getUserDisplayName(o.user_id!)))].filter(n => n !== "Inconnu").sort((a, b) => a.localeCompare(b, "fr"));
 
   const filteredObjectifs = objectifs.filter(o => {
-    if (!o.name.toLowerCase().includes(objectifSearch.toLowerCase())) return false;
+    if (!matchesSearch(o.name, objectifSearch)) return false;
     if (objectifLetterFilter && !o.name.toUpperCase().startsWith(objectifLetterFilter)) return false;
     if (objectifSourceFilter.length > 0 && !objectifSourceFilter.includes(o.source)) return false;
     if (objectifUserFilter.length > 0 && !objectifUserFilter.includes(getUserDisplayName(o.user_id ?? ""))) return false;

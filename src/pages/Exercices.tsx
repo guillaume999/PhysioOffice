@@ -33,6 +33,7 @@ import {
   MAX_VIDEO_SIZE,
   MEDIA_ACCEPT,
 } from "@/lib/exerciceMedia";
+import { normalizeSearch, matchesSearch } from "@/lib/utils";
 
 interface VideoLibraryItem {
   id: string;
@@ -159,20 +160,20 @@ export default function Exercices() {
 
     // Recherche texte : nom / code / description / auteur
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearch(searchQuery);
       result = result.filter(
         (e) =>
-          e.code?.toLowerCase().includes(query) ||
-          e.title.toLowerCase().includes(query) ||
-          e.description?.toLowerCase().includes(query) ||
-          e.author_name?.toLowerCase().includes(query)
+          normalizeSearch(e.code).includes(query) ||
+          normalizeSearch(e.title).includes(query) ||
+          normalizeSearch(e.description).includes(query) ||
+          normalizeSearch(e.author_name).includes(query)
       );
     }
 
     // Column-level filters
     if (filterTitre.trim()) {
-      const q = filterTitre.toLowerCase();
-      result = result.filter(e => e.title.toLowerCase().includes(q));
+      const q = normalizeSearch(filterTitre);
+      result = result.filter(e => normalizeSearch(e.title).includes(q));
     }
     if (filterPathologie.length > 0) {
       result = result.filter(e => filterPathologie.some(p => e.pathologie_tags.includes(p)));
@@ -181,8 +182,8 @@ export default function Exercices() {
       result = result.filter(e => filterObjectifs.some(o => (e.objectif_tags || []).includes(o)));
     }
     if (filterDescription.trim()) {
-      const q = filterDescription.toLowerCase();
-      result = result.filter(e => e.description?.toLowerCase().includes(q));
+      const q = normalizeSearch(filterDescription);
+      result = result.filter(e => normalizeSearch(e.description).includes(q));
     }
     if (filterAuteur.length > 0) {
       result = result.filter(e => {
@@ -1621,7 +1622,7 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
   };
 
   const filteredLibraryVideos = librarySearch.trim()
-    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    ? libraryVideos.filter(v => matchesSearch(v.title, librarySearch))
     : libraryVideos;
 
   const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

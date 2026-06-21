@@ -12,6 +12,7 @@ import { FRENCH_REGIONS } from "@/lib/french-regions";
 import { useAuth } from "@/lib/auth";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { normalizeSearch } from "@/lib/utils";
 
 interface DirectoryEntry {
   id: string;
@@ -81,7 +82,7 @@ export default function Annuaire() {
 
   const filtered = entries.filter((entry) => {
     const name = `${entry.profile?.first_name || ""} ${entry.profile?.last_name || ""} ${entry.profile?.pseudo || ""} ${entry.profile?.specialty || ""} ${entry.city || ""}`.toLowerCase();
-    const matchesSearch = !search || name.includes(search.toLowerCase());
+    const matchesSearch = !search || normalizeSearch(name).includes(normalizeSearch(search));
     const matchesRegion = regionFilter === "all" || entry.region === regionFilter;
     const matchesDept = deptFilter === "all" || entry.departement === deptFilter;
     return matchesSearch && matchesRegion && matchesDept;

@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { CommentDialog } from "./CommentDialog";
 import { SearchableExerciceTitleInput, ExerciceOption } from "./SearchableExerciceTitleInput";
 import { PathologySearchInput } from "./PathologySearchInput";
+import { matchesSearch } from "@/lib/utils";
 
 interface VideoLibraryItem {
   id: string;
@@ -306,7 +307,7 @@ export function ExerciceItemCard({
   };
 
   const filteredLibraryVideos = librarySearch.trim()
-    ? libraryVideos.filter(v => v.title.toLowerCase().includes(librarySearch.toLowerCase()))
+    ? libraryVideos.filter(v => matchesSearch(v.title, librarySearch))
     : libraryVideos;
 
   const handleSaveMetrics = async () => {

@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { normalizeSearch } from "@/lib/utils";
 
 interface SeanceExercice {
   id: string;
@@ -170,10 +171,10 @@ export function ImportTraitementDialog({
   };
 
   const filteredTraitements = traitements.filter((t) => {
-    const searchLower = search.toLowerCase();
+    const searchLower = normalizeSearch(search);
     return (
-      t.pathologie.toLowerCase().includes(searchLower) ||
-      (t.description?.toLowerCase().includes(searchLower) || false)
+      normalizeSearch(t.pathologie).includes(searchLower) ||
+      normalizeSearch(t.description).includes(searchLower)
     );
   });
 
