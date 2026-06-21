@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Calendar, Play, Check } from "lucide-react";
+import { Search, Plus, Calendar, Check } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/utils";
+import { MediaThumb } from "@/components/MediaThumb";
 
 export interface LibraryItem {
   id: string;
@@ -182,23 +183,13 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
             filtered.map((it) => (
               <div key={it.id} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer" onClick={() => pick(it.id)}>
                 {mode !== "seance" ? (
-                  it.thumbnail_url ? (
-                    <img
-                      src={it.thumbnail_url}
-                      alt={it.title}
-                      title="Cliquer pour prévisualiser"
-                      onClick={(e) => openPreview(e, it)}
-                      className="w-10 h-10 object-cover rounded flex-shrink-0 hover:ring-2 hover:ring-primary transition-shadow"
-                    />
-                  ) : (
-                    <div
-                      onClick={(e) => openPreview(e, it)}
-                      title={hasMedia(it) ? "Cliquer pour prévisualiser" : undefined}
-                      className={`w-10 h-10 bg-muted rounded flex items-center justify-center flex-shrink-0 ${hasMedia(it) ? "hover:ring-2 hover:ring-primary transition-shadow" : ""}`}
-                    >
-                      <Play className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  )
+                  <div
+                    onClick={(e) => openPreview(e, it)}
+                    title={hasMedia(it) ? "Cliquer pour prévisualiser" : undefined}
+                    className={`flex-shrink-0 rounded ${hasMedia(it) ? "hover:ring-2 hover:ring-primary transition-shadow" : ""}`}
+                  >
+                    <MediaThumb source={it} alt={it.title} showPlayIcon className="w-10 h-10" />
+                  </div>
                 ) : (
                   <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 )}
