@@ -379,15 +379,25 @@ export default function Exercices() {
         } else {
           const uploaded = await uploadVideoToStorage(formData.mediaFile);
           videoUrl = uploaded.publicUrl;
-          thumbnailUrl = "";
           imageUrl = "";
+          // Generer la vignette depuis le fichier local (pas de CORS) et la stocker,
+          // pour ne pas avoir a retelecharger la video a chaque affichage de liste.
+          thumbnailUrl = "";
+          try {
+            const thumbBlob = await createVideoThumbnailBlobFromFile(formData.mediaFile);
+            if (thumbBlob) {
+              const thumbFile = new File([thumbBlob], `thumb_${Date.now()}.jpg`, { type: "image/jpeg" });
+              const up = await uploadImageToStorage(thumbFile);
+              thumbnailUrl = up.publicUrl;
+            }
+          } catch (e) { console.error("Thumbnail generation failed:", e); }
           try {
             const videoData = await pb.collection("videos").create({
               user: user.id,
               title: formData.title.trim() || formData.mediaFile.name,
               video_url: uploaded.publicUrl,
               name: formData.mediaFile.name,
-              thumbnail_url: null,
+              thumbnail_url: thumbnailUrl || null,
               media_type: "video",
             });
             videoId = videoData.id;
@@ -467,15 +477,25 @@ export default function Exercices() {
         } else {
           const uploaded = await uploadVideoToStorage(formData.mediaFile);
           videoUrl = uploaded.publicUrl;
-          thumbnailUrl = "";
           imageUrl = "";
+          // Generer la vignette depuis le fichier local (pas de CORS) et la stocker,
+          // pour ne pas avoir a retelecharger la video a chaque affichage de liste.
+          thumbnailUrl = "";
+          try {
+            const thumbBlob = await createVideoThumbnailBlobFromFile(formData.mediaFile);
+            if (thumbBlob) {
+              const thumbFile = new File([thumbBlob], `thumb_${Date.now()}.jpg`, { type: "image/jpeg" });
+              const up = await uploadImageToStorage(thumbFile);
+              thumbnailUrl = up.publicUrl;
+            }
+          } catch (e) { console.error("Thumbnail generation failed:", e); }
           try {
             const videoData = await pb.collection("videos").create({
               user: user.id,
               title: formData.title.trim() || formData.mediaFile.name,
               video_url: uploaded.publicUrl,
               name: formData.mediaFile.name,
-              thumbnail_url: null,
+              thumbnail_url: thumbnailUrl || null,
               media_type: "video",
             });
             videoId = videoData.id;
@@ -1421,24 +1441,38 @@ export default function Exercices() {
   );
 }
 
-function createVideoThumbnailDataUrl(videoUrl: string): Promise<string | null> {
+async function createVideoThumbnailDataUrl(videoUrl: string): Promise<string | null> {
+  // PocketBase ne renvoie pas d'en-tete CORS sur /api/files/ : un <video crossOrigin>
+  // echoue a charger, et sans crossOrigin le canvas est "tainted" (toDataURL leve SecurityError).
+  // On recupere donc la video en blob et on genere la vignette depuis une URL blob: (meme origine).
+  let objectUrl: string | null = null;
+  try {
+    const resp = await fetch(videoUrl);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    objectUrl = URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+
+  const src = objectUrl;
   return new Promise((resolve) => {
     const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
     video.preload = "metadata";
     video.muted = true;
     video.playsInline = true;
-    video.src = videoUrl;
+    video.src = src;
 
     const cleanup = () => {
       video.removeAttribute("src");
       video.load();
+      if (src) URL.revokeObjectURL(src);
     };
 
     const timeout = window.setTimeout(() => {
       cleanup();
       resolve(null);
-    }, 6000);
+    }, 8000);
 
     video.onloadeddata = () => {
       const t = Math.min(1.5, Math.max(0.1, video.duration * 0.1));
@@ -1462,6 +1496,69 @@ function createVideoThumbnailDataUrl(videoUrl: string): Promise<string | null> {
         window.clearTimeout(timeout);
         cleanup();
         resolve(dataUrl);
+      } catch {
+        window.clearTimeout(timeout);
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    video.onerror = () => {
+      window.clearTimeout(timeout);
+      cleanup();
+      resolve(null);
+    };
+  });
+}
+
+// Genere une vignette (Blob JPEG) a partir d'un fichier video LOCAL.
+// Le fichier local passe par une URL blob: meme origine -> pas de probleme CORS/canvas tainted.
+function createVideoThumbnailBlobFromFile(file: File): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const src = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = src;
+
+    const cleanup = () => {
+      video.removeAttribute("src");
+      video.load();
+      URL.revokeObjectURL(src);
+    };
+
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 8000);
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(1.5, Math.max(0.1, video.duration * 0.1));
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 180;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          window.clearTimeout(timeout);
+          cleanup();
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            window.clearTimeout(timeout);
+            cleanup();
+            resolve(blob);
+          },
+          "image/jpeg",
+          0.82
+        );
       } catch {
         window.clearTimeout(timeout);
         cleanup();
