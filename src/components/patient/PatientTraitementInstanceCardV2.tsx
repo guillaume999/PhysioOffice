@@ -13,12 +13,13 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { fr } from "date-fns/locale";
 import type { DayContentProps } from "react-day-picker";
 import {
-  ChevronUp, ChevronDown, ClipboardCheck, Play, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown, GripVertical,
+  ChevronUp, ChevronDown, ClipboardCheck, FileText, Plus, Trash2, Edit, List, Calendar, ArrowUpDown, GripVertical,
 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { toast } from "sonner";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
 import { AddFromLibraryDialog } from "@/components/patient/AddFromLibraryDialog";
+import { MediaThumb } from "@/components/MediaThumb";
 import { setExDragImage } from "@/components/patient/PatientTraitementInstanceCard";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -34,6 +35,9 @@ interface InstanceExercice {
   commentaires: string | null;
   realise: boolean;
   thumbnail_url?: string | null;
+  video_url?: string | null;
+  image_url?: string | null;
+  media_type?: string | null;
 }
 
 interface InstanceSeance {
@@ -51,6 +55,9 @@ interface InstanceTest {
   description: string | null;
   ordre: number | null;
   thumbnail_url?: string | null;
+  video_url?: string | null;
+  image_url?: string | null;
+  media_type?: string | null;
 }
 
 interface InstanceBilan {
@@ -134,6 +141,9 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
       }).then((d) => d.map((r: any) => ({
         id: r.id, nom: r.nom, description: r.description, ordre: r.ordre,
         thumbnail_url: r.expand?.source?.thumbnail_url || null,
+        video_url: r.expand?.source?.video_url || null,
+        image_url: r.expand?.source?.image_url || null,
+        media_type: r.expand?.source?.media_type || null,
       })));
 
       const seancesRaw = await pb.collection("patient_seances").getFullList({
@@ -152,6 +162,9 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
               series: e.series, repetitions: e.repetitions, duree: e.duree,
               minutes: e.minutes ?? null, commentaires: e.commentaires ?? null,
               realise: !!e.realise, thumbnail_url: e.expand?.source?.thumbnail_url || null,
+              video_url: e.expand?.source?.video_url || null,
+              image_url: e.expand?.source?.image_url || null,
+              media_type: e.expand?.source?.media_type || null,
             })),
           };
         })
@@ -727,10 +740,7 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
                 {ex.realise ? "Réalisé" : "Non réalisé"}
               </span>
             </label>
-            <div className="w-12 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
-              {ex.thumbnail_url ? <img src={ex.thumbnail_url} alt={ex.nom || ""} className="w-full h-full object-cover" />
-                : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Play className="w-4 h-4" /></div>}
-            </div>
+            <MediaThumb source={ex} alt={ex.nom || ""} showPlayIcon className="w-12 h-10" />
             <div className="flex-1 min-w-0 space-y-1">
               <Input
                 defaultValue={ex.nom || ""}
