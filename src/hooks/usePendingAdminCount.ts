@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
+import { fetchCorbeilleTotal } from "@/lib/corbeille";
 
 export function usePendingAdminCount() {
   const { isAdmin, user } = useAuth();
@@ -13,7 +14,7 @@ export function usePendingAdminCount() {
 
     const fetchCount = async () => {
       try {
-        const [allExercices, consultedExercices, allTraitements, allSeances] = await Promise.all([
+        const [allExercices, consultedExercices, allTraitements, allSeances, corbeilleCount] = await Promise.all([
           pb.collection("exercices").getFullList({ filter: 'is_copy = false', fields: 'id' }),
           pb.collection("exercice_consultations").getFullList({
             filter: `user = "${user.id}" && is_consulted = true`,
@@ -21,6 +22,8 @@ export function usePendingAdminCount() {
           }),
           pb.collection("traitement_types").getFullList({ filter: 'is_copy = false', fields: 'id' }),
           pb.collection("seance_types").getFullList({ filter: 'is_copy = false', fields: 'id' }),
+          // Total de l'onglet Corbeille : demandes de retrait + éléments soft-supprimés.
+          fetchCorbeilleTotal(),
         ]);
 
         if (!cancelled) {
@@ -40,7 +43,7 @@ export function usePendingAdminCount() {
           const consultedSeanceIds = getLocalSet(`admin_consulted_seances_${user.id}`);
           const unconsultedSeances = allSeances.filter((s: any) => !consultedSeanceIds.has(s.id)).length;
 
-          setCount(unconsultedExercices + unconsultedTraitements + unconsultedSeances);
+          setCount(unconsultedExercices + unconsultedTraitements + unconsultedSeances + corbeilleCount);
         }
       } catch {
         // silently ignore — navbar badge is non-critical

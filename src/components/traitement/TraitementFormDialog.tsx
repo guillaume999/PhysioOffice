@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, X, Trash2, Calendar, GripVertical, ChevronUp, ChevronDown, Search, ChevronRight, Play, Loader2 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { TagReferenceSelect } from "@/components/tags/TagReferenceSelect";
@@ -145,23 +146,23 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
     setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch pathologies
-    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" });
     setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     // Fetch objectifs (référentiel partagé avec les exercices et les séances)
-    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const objData = await pb.collection("objectifs").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" });
     setAvailableObjectifs([...new Set((objData as any[]).map((o: any) => o.name as string).filter(Boolean))]);
 
     // Fetch seances (user's own seances)
     const seancesData = await pb.collection("seance_types").getFullList({
-      filter: `user = "${user.id}"`, sort: "-created",
+      filter: withActive(`user = "${user.id}"`), sort: "-created",
       fields: "id,code,pathologie,pathologies,objectifs,objectif_principal,objectifs_principaux",
     });
     setAvailableSeances(seancesData.map((s: any) => ({ ...s, code: s.code || '', pathologies: s.pathologies || [], objectifs: s.objectifs || [], objectifs_principaux: s.objectifs_principaux || [] })));
 
     // Fetch exercices (user's own + platform exercices)
     const exercicesData = await pb.collection("exercices").getFullList({
-      filter: `(user = "${user.id}" || status = "shared")`,
+      filter: withActive(`(user = "${user.id}" || status = "shared")`),
       sort: "title", fields: "id,code,title,description,thumbnail_url,pathologie_tags",
     });
     setAvailableExercices(exercicesData.map((e: any) => ({ ...e, code: e.code || '' })));

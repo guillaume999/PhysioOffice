@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { Loader2, Search, ChevronDown, ChevronRight, Play } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,7 +94,7 @@ export function ImportTraitementDialog({
     setLoading(true);
     try {
       const data = await pb.collection("traitement_types").getFullList({
-        filter: 'is_hidden_from_list = false',
+        filter: withActive('is_hidden_from_list = false'),
         sort: "-created",
         fields: "id,pathologie,description,author_name,is_shared,is_validated,user",
       });

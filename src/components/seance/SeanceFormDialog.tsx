@@ -12,6 +12,7 @@ import { Plus, X, GripVertical, Trash2, Upload, Video, Loader2, Pencil, Calendar
 import { MediaThumb } from "@/components/MediaThumb";
 import { format } from "date-fns";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -116,17 +117,17 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
     setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch pathologies
-    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" });
     setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     // Fetch objectifs (tous types confondus)
-    const objData = await pb.collection("objectifs").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const objData = await pb.collection("objectifs").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" });
     const objNames = (objData as any[]).map((o: any) => o.name as string).filter(Boolean);
     setAvailableObjectifs([...new Set(objNames)]);
 
     // Fetch exercices (only user's own exercices)
     const exData = await pb.collection("exercices").getFullList({
-      filter: `user = "${user.id}"`, sort: "title",
+      filter: withActive(`user = "${user.id}"`), sort: "title",
       fields: "id,code,title,description,video_url,thumbnail_url",
     });
     setAvailableExercices(exData as unknown as Exercice[]);

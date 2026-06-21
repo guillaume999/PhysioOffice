@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import DOMPurify from "dompurify";
@@ -240,13 +241,13 @@ export default function PathologieDetail() {
       const [traits, exs] = await Promise.all([
         linkedIds.length
           ? pb.collection("traitement_types").getFullList({
-              filter: linkedIds.map((tid) => `id = "${tid}"`).join(" || "),
+              filter: withActive(linkedIds.map((tid) => `id = "${tid}"`).join(" || ")),
               fields: "id,nom,user",
             })
           : Promise.resolve([] as any[]),
         exIdList.length
           ? pb.collection("exercices").getFullList({
-              filter: exIdList.map((eid) => `id = "${eid}"`).join(" || "),
+              filter: withActive(exIdList.map((eid) => `id = "${eid}"`).join(" || ")),
               fields:
                 "id,code,title,description,video_url,thumbnail_url,image_url,media_type,pathologie_tags,objectif_tags,user,author_name",
             }).catch(() => [] as any[])

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,13 +169,13 @@ export default function PatientDetail() {
     // Load the patient's active treatment INSTANCE (patient_traitements), independent of care_plan
     try {
       const ptRes = await pb.collection("patient_traitements").getList(1, 1, {
-        filter: `patient = "${id}" && statut = "actif"`, sort: "-created",
+        filter: withActive(`patient = "${id}" && statut = "actif"`), sort: "-created",
       });
       const pt: any = ptRes.items[0] ?? null;
       if (pt) {
         setActiveTraitementName(pt.pathologie || pt.nom || null);
         const ps = await pb.collection("patient_seances").getFullList({
-          filter: `patient_traitement = "${pt.id}"`, sort: "created",
+          filter: withActive(`patient_traitement = "${pt.id}"`), sort: "created",
         });
         setTraitementSeances(ps.map((s: any, i: number) => ({
           ordre: i + 1,
@@ -184,7 +185,7 @@ export default function PatientDetail() {
           pathologies: [],
         })));
         const bilansData = await pb.collection("patient_bilans").getFullList({
-          filter: `patient_traitement = "${pt.id}"`, sort: "position_after_seance",
+          filter: withActive(`patient_traitement = "${pt.id}"`), sort: "position_after_seance",
           fields: "id,position_after_seance,bilan_date,content",
         });
         setBilansIntermediaires(bilansData as any[]);
@@ -244,8 +245,8 @@ export default function PatientDetail() {
     if (!id) return;
     
     try {
-      await pb.collection("patients").delete(id);
-      toast({ title: "Patient supprimé" });
+      await softDelete("patients", id);
+      toast({ title: "Patient déplacé vers la corbeille" });
       navigate("/patients");
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -361,9 +362,9 @@ export default function PatientDetail() {
     if (!id) return;
     try {
       const ptRes = await pb.collection("patient_traitements").getList(1, 1, {
-        filter: `patient = "${id}" && statut = "actif"`, sort: "-created",
+        filter: withActive(`patient = "${id}" && statut = "actif"`), sort: "-created",
       });
-      if (ptRes.items[0]) await pb.collection("patient_traitements").delete(ptRes.items[0].id);
+      if (ptRes.items[0]) await softDelete("patient_traitements", ptRes.items[0].id);
     } catch {}
     setActiveTraitementName(null);
     setTraitementSeances([]);
@@ -375,7 +376,7 @@ export default function PatientDetail() {
     e.stopPropagation();
     if (!(await confirm({
       title: "Retirer ce traitement ?",
-      description: "Le traitement et tout son contenu (séances, exercices, tests, bilans) seront définitivement supprimés. Cette action est irréversible.",
+      description: "Le traitement actif sera déplacé vers la corbeille. Vous pourrez le restaurer depuis la page Corbeille.",
       confirmLabel: "Retirer",
     }))) return;
     await handleRemoveTraitement();
@@ -459,7 +460,7 @@ export default function PatientDetail() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Supprimer ce patient ?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cette action est irréversible. Toutes les données de ce patient seront supprimées.
+                    Le patient sera déplacé vers la corbeille. Vous pourrez le restaurer depuis la page Corbeille.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

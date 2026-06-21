@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { Loader2, Search, ChevronDown, ChevronRight, Play } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -66,6 +67,7 @@ export function ImportSeanceDialog({
     setLoading(true);
     try {
       const data = await pb.collection("seance_types").getFullList({
+        filter: withActive(),
         sort: "-created",
         fields: "id,pathologie,pathologies,objectif_principal,objectifs_principaux,author_name,is_shared,is_validated,user",
       });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown, Clock } from "lucide-react";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown, Clock, Hourglass, Ban } from "lucide-react";
 import { pb, getFileUrl } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -53,6 +54,7 @@ interface Exercice {
   pathologie_tags: string[];
   objectif_tags: string[];
   status: string;
+  withdrawal_refused?: boolean;
   video_url: string | null;
   thumbnail_url: string | null;
   image_url: string | null;
@@ -244,9 +246,9 @@ export default function Exercices() {
       const userFilter = user ? `user = "${user.id}"` : undefined;
       const [featuredData, exercicesData, pathoData, objectifData] = await Promise.all([
         pb.collection("featured_exercices").getFullList({ fields: "exercice" }),
-        pb.collection("exercices").getFullList({ sort: "-created" }),
-        pb.collection("pathologies").getFullList({ fields: "name", filter: userFilter }),
-        pb.collection("objectifs").getFullList({ fields: "name", filter: userFilter }),
+        pb.collection("exercices").getFullList({ filter: withActive(), sort: "-created" }),
+        pb.collection("pathologies").getFullList({ fields: "name", filter: withActive(userFilter) }),
+        pb.collection("objectifs").getFullList({ fields: "name", filter: withActive(userFilter) }),
       ]);
       setFeaturedExerciceIds(featuredData.map((f: any) => f.exercice));
       // PocketBase renvoie les champs relation/système bruts (user, original, video, created).
@@ -605,7 +607,7 @@ export default function Exercices() {
 
   const requestWithdrawal = async (exercice: Exercice) => {
     try {
-      await pb.collection("exercices").update(exercice.id, { status: "withdrawal_requested" });
+      await pb.collection("exercices").update(exercice.id, { status: "withdrawal_requested", withdrawal_refused: false });
       toast.success("Demande de retrait envoyée à l'administrateur");
       fetchData();
     } catch (error) {
@@ -707,15 +709,17 @@ export default function Exercices() {
       // Check if exercise is shared or on platform - use soft delete
       const isOnPlatform = featuredExerciceIds.includes(exercice.id);
       const isSharedOrPending = exercice.status === "shared" || exercice.status === "pending";
-      
-      if (isOnPlatform || isSharedOrPending) {
+
+      // Si l'admin a refusé le retrait, l'auteur l'envoie directement à sa
+      // corbeille (soft delete) plutôt que de le retirer de sa bibliothèque.
+      if ((isOnPlatform || isSharedOrPending) && !exercice.withdrawal_refused) {
         // Soft delete - mark as deleted by author
         await pb.collection("exercices").update(exercice.id, { deleted_by_author: true });
         toast.success("Exercice retiré de votre bibliothèque");
       } else {
-        // Hard delete for draft exercises
-        await pb.collection("exercices").delete(exercice.id);
-        toast.success("Exercice supprimé");
+        // Soft delete : le brouillon part à la corbeille (récupérable).
+        await softDelete("exercices", exercice.id);
+        toast.success("Exercice déplacé vers la corbeille");
       }
       fetchData();
     } catch (error) {
@@ -1234,16 +1238,19 @@ export default function Exercices() {
                                 <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
                                   <X className="w-3 h-3 text-red-500" strokeWidth={3} />
                                 </div>
-                              ) : (
+                              ) : exercice.status === "shared" || exercice.status === "withdrawal_requested" ? null : (
                                 <Checkbox
                                   checked={exercice.status !== "draft"}
                                   onCheckedChange={() => toggleShare(exercice)}
-                                  disabled={exercice.status === "shared" || exercice.status === "withdrawal_requested"}
                                 />
                               )}
                               <span className="text-xs flex items-center gap-1">
-                                {exercice.status === "shared" || exercice.status === "withdrawal_requested"
-                                  ? "Déjà partagé"
+                                {exercice.status === "withdrawal_requested"
+                                  ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                  : exercice.status === "shared" && exercice.withdrawal_refused
+                                  ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                  : exercice.status === "shared"
+                                  ? <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>
                                   : exercice.status === "rejected"
                                   ? "Partage refusé"
                                   : exercice.status === "pending"
@@ -1356,28 +1363,54 @@ export default function Exercices() {
       {/* Delete confirmation */}
       <AlertDialog open={!!exerciceToDelete} onOpenChange={(open) => !open && setExerciceToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l'exercice ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {exerciceToDelete && (featuredExerciceIds.includes(exerciceToDelete.id) || exerciceToDelete.status === "shared" || exerciceToDelete.status === "pending")
-                ? `« ${exerciceToDelete.title} » sera retiré de votre bibliothèque. La copie publique restera visible pour les autres utilisateurs.`
-                : `« ${exerciceToDelete?.title ?? ""} » sera supprimé définitivement. Cette action est irréversible.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                if (exerciceToDelete) {
-                  await deleteExercice(exerciceToDelete);
-                  setExerciceToDelete(null);
-                }
-              }}
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {exerciceToDelete && !exerciceToDelete.withdrawal_refused && (featuredExerciceIds.includes(exerciceToDelete.id) || exerciceToDelete.status === "shared" || exerciceToDelete.status === "pending") ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Demander le retrait de l'exercice ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  « {exerciceToDelete.title} » est publié sur la plateforme. Pour le retirer, une
+                  demande doit être validée par l'administrateur. Il reste visible jusque-là.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (exerciceToDelete) {
+                      await requestWithdrawal(exerciceToDelete);
+                      setExerciceToDelete(null);
+                    }
+                  }}
+                >
+                  Demander le retrait à l'admin
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer l'exercice ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  « {exerciceToDelete?.title ?? ""} » sera déplacé vers la corbeille (récupérable
+                  depuis la page Corbeille).
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    if (exerciceToDelete) {
+                      await deleteExercice(exerciceToDelete);
+                      setExerciceToDelete(null);
+                    }
+                  }}
+                >
+                  Supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 
@@ -1696,7 +1729,7 @@ function ExerciceForm({ formData, setFormData, pathologies, objectifs, addPathol
   const fetchLibraryVideos = async () => {
     setLibraryLoading(true);
     try {
-      setLibraryVideos(await pb.collection("videos").getFullList({ filter: `user = "${userId}"`, sort: "-created", fields: "id,title,video_url,thumbnail_url,image_url,media_type" }) as any[]);
+      setLibraryVideos(await pb.collection("videos").getFullList({ filter: withActive(`user = "${userId}"`), sort: "-created", fields: "id,title,video_url,thumbnail_url,image_url,media_type" }) as any[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);
       toast.error("Erreur lors du chargement de la médiathèque");

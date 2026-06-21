@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive, needsWithdrawalRequest, requestWithdrawal } from "@/lib/corbeille";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Hourglass, Ban, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +90,8 @@ interface TraitementType {
   is_copy: boolean;
   is_validated: boolean;
   is_refused?: boolean;
+  withdrawal_requested?: boolean;
+  withdrawal_refused?: boolean;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -93,6 +107,8 @@ export default function TraitementType() {
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [traitements, setTraitements] = useState<TraitementType[]>([]);
+  const [traitementToDelete, setTraitementToDelete] = useState<TraitementType | null>(null);
+  const [deletingTraitement, setDeletingTraitement] = useState(false);
   const [filteredTraitements, setFilteredTraitements] = useState<TraitementType[]>([]);
   const [featuredTraitementIds, setFeaturedTraitementIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,7 +248,7 @@ export default function TraitementType() {
 
       const [featuredData, traitementsData, usedTraitements] = await Promise.all([
         pb.collection("featured_traitements").getFullList({ fields: "traitement_type" }),
-        pb.collection("traitement_types").getFullList({ sort: "-created" }),
+        pb.collection("traitement_types").getFullList({ filter: withActive(), sort: "-created" }),
         pb.collection("patient_care_plans").getFullList({ filter: "active_traitement != null", fields: "active_traitement" }),
       ]);
       setFeaturedTraitementIds(featuredData.map((f: any) => f.traitement_type));
@@ -346,17 +362,40 @@ export default function TraitementType() {
     }
     
     try {
-      // Delete tests first
-      const tests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${id}"` });
-      for (const t of tests) await pb.collection("traitement_tests").delete(t.id);
-      const seances = await pb.collection("traitement_seances").getFullList({ filter: `traitement_type = "${id}"` });
-      for (const s of seances) await pb.collection("traitement_seances").delete(s.id);
-      await pb.collection("traitement_types").delete(id);
-      toast.success("Traitement supprimé");
+      // Soft delete : le traitement part à la corbeille. On laisse ses tests et
+      // séances rattachés pour que la restauration le retrouve intact.
+      await softDelete("traitement_types", id);
+      toast.success("Traitement déplacé vers la corbeille");
       fetchData();
     } catch (error) {
       console.error("Error deleting traitement:", error);
       toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const handleConfirmDeleteTraitement = async () => {
+    if (!traitementToDelete) return;
+    setDeletingTraitement(true);
+    try {
+      await deleteTraitement(traitementToDelete.id, false);
+      setTraitementToDelete(null);
+    } finally {
+      setDeletingTraitement(false);
+    }
+  };
+
+  const handleWithdrawTraitement = async () => {
+    if (!traitementToDelete) return;
+    setDeletingTraitement(true);
+    try {
+      await requestWithdrawal("traitement_types", traitementToDelete.id);
+      toast.success("Demande de retrait envoyée à l'administrateur");
+      setTraitementToDelete(null);
+    } catch (error) {
+      console.error("Error requesting withdrawal:", error);
+      toast.error("Erreur lors de la demande de retrait");
+    } finally {
+      setDeletingTraitement(false);
     }
   };
 
@@ -827,16 +866,19 @@ export default function TraitementType() {
                                       <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
                                         <X className="w-3 h-3 text-red-500" strokeWidth={3} />
                                       </div>
-                                    ) : (
+                                    ) : traitement.is_shared && traitement.is_validated ? null : (
                                       <Checkbox
                                         checked={traitement.is_shared}
                                         onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
-                                        disabled={traitement.is_validated && traitement.is_shared}
                                       />
                                     )}
                                     <span className="text-xs flex items-center gap-1">
                                       {traitement.is_shared && traitement.is_validated
-                                        ? "Déjà partagé"
+                                        ? (traitement.withdrawal_requested
+                                          ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                          : traitement.withdrawal_refused
+                                          ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                          : <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>)
                                         : traitement.is_refused
                                         ? "Partage refusé"
                                         : traitement.is_shared && !traitement.is_validated
@@ -879,7 +921,7 @@ export default function TraitementType() {
                                       variant="ghost"
                                       size="sm"
                                       className="text-destructive"
-                                      onClick={() => deleteTraitement(traitement.id, traitement.is_used_by_patient || false)}
+                                      onClick={() => setTraitementToDelete(traitement)}
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
@@ -913,6 +955,53 @@ export default function TraitementType() {
           open={!!previewExercice}
           onOpenChange={(open) => !open && setPreviewExercice(null)}
         />
+
+        <AlertDialog open={!!traitementToDelete} onOpenChange={(open) => !open && !deletingTraitement && setTraitementToDelete(null)}>
+          <AlertDialogContent>
+            {traitementToDelete && needsWithdrawalRequest(traitementToDelete) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Demander le retrait du traitement ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Ce traitement est partagé sur la plateforme. Pour le retirer, une demande doit
+                    être validée par l'administrateur. Il reste visible jusque-là.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deletingTraitement}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); handleWithdrawTraitement(); }}
+                    disabled={deletingTraitement}
+                  >
+                    {deletingTraitement && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Demander le retrait à l'admin
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer le traitement ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Ce traitement sera déplacé vers la corbeille. Vous pourrez le restaurer depuis
+                    la page Corbeille.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deletingTraitement}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); handleConfirmDeleteTraitement(); }}
+                    disabled={deletingTraitement}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deletingTraitement && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Supprimer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

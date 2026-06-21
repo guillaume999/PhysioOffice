@@ -54,6 +54,9 @@ import { fr } from "date-fns/locale";
 import { NewsManagement } from "@/components/admin/NewsManagement";
 import { AnnoncesManagement } from "@/components/admin/AnnoncesManagement";
 import { PopupsManagement } from "@/components/admin/PopupsManagement";
+import { CorbeilleList } from "@/components/corbeille/CorbeilleList";
+import { fetchWithdrawalCount, fetchTrashedCount } from "@/lib/corbeille";
+import { AdminWithdrawalRequests } from "@/components/admin/AdminWithdrawalRequests";
 import { matchesSearch } from "@/lib/utils";
 
 interface UserProfile {
@@ -183,6 +186,10 @@ export default function Admin() {
   const [newObjectifName, setNewObjectifName] = useState("");
   const [certificatModels, setCertificatModels] = useState<CertificatModel[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  // Badge de l'onglet "Corbeille" = demandes de retrait + éléments soft-supprimés.
+  const [withdrawalCount, setWithdrawalCount] = useState(0);
+  const [trashedCount, setTrashedCount] = useState(0);
+  const corbeilleCount = withdrawalCount + trashedCount;
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedTraitementIds, setConsultedTraitementIds] = useState<Set<string>>(() => {
@@ -303,8 +310,17 @@ export default function Admin() {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
+      fetchCorbeilleCount();
     }
   }, [isAdmin]);
+
+  // Compte initial du badge "Corbeille" (avant que l'onglet ne soit ouvert).
+  // Les composants enfants tiennent ensuite chaque part à jour en direct.
+  const fetchCorbeilleCount = async () => {
+    const [withdrawals, trashed] = await Promise.all([fetchWithdrawalCount(), fetchTrashedCount()]);
+    setWithdrawalCount(withdrawals);
+    setTrashedCount(trashed);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -994,7 +1010,7 @@ export default function Admin() {
 
   const approveWithdrawalRequest = async (exerciceId: string) => {
     try {
-      await pb.collection("exercices").update(exerciceId, { status: "draft" });
+      await pb.collection("exercices").update(exerciceId, { status: "draft", withdrawal_refused: false });
       setExercices((prev) => prev.map((e) => (e.id === exerciceId ? { ...e, status: "draft" } : e)));
       toast({ title: "Retrait approuvé", description: "L'exercice a été retiré des partagés." });
     } catch (error) {
@@ -1005,8 +1021,8 @@ export default function Admin() {
 
   const denyWithdrawalRequest = async (exerciceId: string) => {
     try {
-      await pb.collection("exercices").update(exerciceId, { status: "shared" });
-      setExercices((prev) => prev.map((e) => (e.id === exerciceId ? { ...e, status: "shared" } : e)));
+      await pb.collection("exercices").update(exerciceId, { status: "shared", withdrawal_refused: true });
+      setExercices((prev) => prev.map((e) => (e.id === exerciceId ? { ...e, status: "shared", withdrawal_refused: true } : e)));
       toast({ title: "Demande refusée", description: "L'exercice reste dans les partagés." });
     } catch (error) {
       console.error("Error denying withdrawal:", error);
@@ -1384,6 +1400,13 @@ export default function Admin() {
               Messages
               {contactMessages.filter(m => !archivedMessageIds.has(m.id)).length > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{contactMessages.filter(m => !archivedMessageIds.has(m.id)).length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="corbeille" className="relative flex items-center gap-2">
+              <Trash2 className="w-4 h-4" />
+              Corbeille
+              {corbeilleCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{corbeilleCount}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -3183,6 +3206,14 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="corbeille" className="space-y-6">
+            <AdminWithdrawalRequests onCountChange={setWithdrawalCount} />
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Éléments supprimés</h2>
+              <CorbeilleList showHeader={false} showOwner onCountChange={setTrashedCount} />
+            </div>
           </TabsContent>
         </Tabs>
 

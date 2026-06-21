@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
@@ -12,6 +13,16 @@ import { format, startOfWeek, endOfWeek, addDays, addWeeks, subWeeks, isSameDay,
 import { fr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -69,6 +80,8 @@ export default function Planning() {
   const [targetDate, setTargetDate] = useState<Date | undefined>(addDays(new Date(), 7));
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ===== Print options =====
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -94,7 +107,7 @@ export default function Planning() {
   const fetchPatients = async () => {
     try {
       const data = await pb.collection("patients").getFullList({
-        filter: `user = "${user!.id}" && status != "Inactif"`,
+        filter: withActive(`user = "${user!.id}" && status != "Inactif"`),
         sort: "name",
         fields: "id,name,numero,status",
       });
@@ -207,15 +220,19 @@ export default function Planning() {
     }
   };
 
-  const handleDeleteAppointment = async (appointmentId: string) => {
-    if (!confirm("Supprimer ce rendez-vous ?")) return;
-    
+  const confirmDeleteAppointment = async () => {
+    if (!appointmentToDelete) return;
+
+    setIsDeleting(true);
     try {
-      await pb.collection("appointments").delete(appointmentId);
+      await pb.collection("appointments").delete(appointmentToDelete.id);
       toast({ title: "Rendez-vous supprimé" });
+      setAppointmentToDelete(null);
       fetchAppointments();
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -559,7 +576,7 @@ export default function Planning() {
                                       size="icon"
                                       variant="ghost"
                                       className="h-5 w-5 p-0 bg-destructive/20 hover:bg-destructive/40 text-destructive"
-                                      onClick={() => handleDeleteAppointment(apt.id)}
+                                      onClick={() => setAppointmentToDelete(apt)}
                                       title="Supprimer le rendez-vous"
                                     >
                                       <Trash2 className="h-3 w-3" />
@@ -1074,6 +1091,51 @@ export default function Planning() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Appointment Confirmation */}
+      <AlertDialog
+        open={!!appointmentToDelete}
+        onOpenChange={(open) => !open && setAppointmentToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce rendez-vous ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {appointmentToDelete && (
+                <>
+                  Le rendez-vous de{" "}
+                  <span className="font-medium">
+                    {appointmentToDelete.patient?.name || "ce patient"}
+                  </span>{" "}
+                  le{" "}
+                  {format(parseISO(appointmentToDelete.start_time), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}{" "}
+                  sera définitivement supprimé. Cette action est irréversible.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteAppointment();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Suppression…
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

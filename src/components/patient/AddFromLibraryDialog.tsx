@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, Calendar, Check } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/utils";
 import { MediaThumb } from "@/components/MediaThumb";
@@ -58,7 +59,7 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
     try {
       if (mode === "seance") {
         const data = await pb.collection("seance_types").getFullList({
-          filter: `user = "${user.id}"`, sort: "-created",
+          filter: withActive(`user = "${user.id}"`), sort: "-created",
           fields: "id,nom,pathologie,pathologies,objectif_principal,objectifs,objectifs_principaux",
         });
         setItems(data.map((s: any) => {
@@ -76,7 +77,7 @@ export function AddFromLibraryDialog({ open, onOpenChange, mode, onPick }: Props
         }));
       } else {
         const data = await pb.collection("exercices").getFullList({
-          filter: `(user = "${user.id}" || status = "shared")`, sort: "title",
+          filter: withActive(`(user = "${user.id}" || status = "shared")`), sort: "title",
           fields: "id,title,description,thumbnail_url,pathologie_tags,objectif_tags,video_url,image_url,media_type",
         });
         setItems(data.map((e: any) => ({

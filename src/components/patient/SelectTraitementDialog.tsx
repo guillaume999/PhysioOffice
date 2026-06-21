@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Plus, ClipboardList, Users } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/utils";
 
@@ -58,11 +59,11 @@ export function SelectTraitementDialog({
       // Fetch personal traitements (not hidden from list)
       const [personal, platform] = await Promise.all([
         pb.collection("traitement_types").getFullList({
-          filter: `user = "${user.id}" && is_hidden_from_list = false`,
+          filter: withActive(`user = "${user.id}" && is_hidden_from_list = false`),
           sort: "-created", fields: "id,pathologie,description,author_name,is_shared",
         }),
         pb.collection("traitement_types").getFullList({
-          filter: `is_shared = true && is_validated = true && user != "${user.id}"`,
+          filter: withActive(`is_shared = true && is_validated = true && user != "${user.id}"`),
           sort: "-created", fields: "id,pathologie,description,author_name,is_shared",
         }),
       ]);

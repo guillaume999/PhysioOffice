@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Play, Edit, Check, X, Upload, Video, Loader2, Pencil, Trash2, MessageSquare, ChevronUp, ChevronDown, Library, Search } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { CommentDialog } from "./CommentDialog";
@@ -109,8 +110,8 @@ export function ExerciceItemCard({
     let cancelled = false;
     (async () => {
       const [exData, pathoData] = await Promise.all([
-        pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type,pathologie_tags" }),
-        pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" }),
+        pb.collection("exercices").getFullList({ filter: withActive(`user = "${user.id}"`), sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type,pathologie_tags" }),
+        pb.collection("pathologies").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" }),
       ]);
       if (cancelled) return;
       setAvailableExercices(exData as unknown as ExerciceOption[]);
@@ -281,7 +282,7 @@ export function ExerciceItemCard({
     setLibraryLoading(true);
     try {
       // Filtrer pour ne montrer que les vidéos dans ce contexte
-      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      const data = await pb.collection("videos").getFullList({ filter: withActive(`user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`), sort: "-created", fields: "id,title,video_url,thumbnail_url" });
       setLibraryVideos(data as unknown as VideoLibraryItem[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);

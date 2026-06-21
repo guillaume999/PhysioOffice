@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -189,7 +190,7 @@ export function PatientTraitementCard({
 
         // Fetch bilans for this patient and traitement
         const bilansData = await pb.collection("patient_bilans").getFullList({
-          filter: `patient = "${patientId}" && traitement = "${activeTraitementId}"`, sort: "position_after_seance",
+          filter: withActive(`patient = "${patientId}" && traitement = "${activeTraitementId}"`), sort: "position_after_seance",
           fields: "id,position_after_seance,content,bilan_date",
         });
 
@@ -547,9 +548,9 @@ try { await pb.collection("patient_bilans").update(bilanId, { bilan_date: date |
     setDeletingBilan(true);
     
     try {
-      await pb.collection("patient_bilans").delete(selectedBilanForDelete.id);
+      await softDelete("patient_bilans", selectedBilanForDelete.id);
 
-      toast.success("Bilan supprimé");
+      toast.success("Bilan déplacé vers la corbeille");
       setDeleteBilanDialogOpen(false);
       setSelectedBilanForDelete(null);
       fetchTraitementDetails();
@@ -1413,7 +1414,7 @@ try { await pb.collection("patient_bilans").update(bilanId, { bilan_date: date |
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer ce bilan intermédiaire ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Ce bilan intermédiaire sera définitivement supprimé. Cette action est irréversible.
+              Ce bilan intermédiaire sera déplacé vers la corbeille (récupérable depuis la page Corbeille).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

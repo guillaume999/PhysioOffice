@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,7 +88,7 @@ export default function Videos() {
     if (!user) return;
     setLoading(true);
     try {
-      setVideos(await pb.collection("videos").getFullList({ filter: `user = "${user.id}"`, sort: "-created" }) as any[]);
+      setVideos(await pb.collection("videos").getFullList({ filter: withActive(`user = "${user.id}"`), sort: "-created" }) as any[]);
     } catch (error) {
       console.error("Error fetching videos:", error);
       toast.error("Erreur lors du chargement des vidéos");
@@ -386,17 +387,14 @@ export default function Videos() {
   };
 
   const handleDelete = async (video: VideoItem) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce média ?")) return;
+    if (!confirm("Ce média sera déplacé vers la corbeille (récupérable depuis la page Corbeille). Continuer ?")) return;
 
     try {
-      // First, remove the media reference from all exercices using it
-      const linkedEx = await pb.collection("exercices").getFullList({ filter: `video = "${video.id}"` });
-      for (const ex of linkedEx) await pb.collection("exercices").update(ex.id, { video: null, video_url: null, thumbnail_url: null, image_url: null });
+      // Soft delete : le média part à la corbeille. On ne détache PAS les exercices
+      // liés, pour que la restauration les retrouve intacts.
+      await softDelete("videos", video.id);
 
-      // Delete the media record (PocketBase auto-deletes the linked file)
-      await pb.collection("videos").delete(video.id);
-
-      toast.success("Média supprimé avec succès");
+      toast.success("Média déplacé vers la corbeille");
       fetchVideos();
     } catch (error) {
       console.error("Error deleting media:", error);

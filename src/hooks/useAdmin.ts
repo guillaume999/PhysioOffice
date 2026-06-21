@@ -1,13 +1,11 @@
 import { useAuth } from "@/lib/auth";
 
 /**
- * Thin wrapper kept for backwards compatibility. The role now lives in the
- * auth context; in DEV we still treat the local fake session as admin.
+ * Thin wrapper kept for backwards compatibility. The role lives in the auth
+ * context and reflects the actually authenticated user — including the account
+ * chosen via the DEV switcher — so admin-only UI is gated by the real role.
  */
 export function useAdmin() {
   const { isAdmin, loading } = useAuth();
-  if (import.meta.env.DEV) {
-    return { isAdmin: true, loading: false };
-  }
   return { isAdmin, loading };
 }
