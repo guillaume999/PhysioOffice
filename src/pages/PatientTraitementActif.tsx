@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, CalendarPlus, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -52,7 +53,7 @@ export default function PatientTraitementActif() {
     // Load the patient's active treatment instance (most recent active one)
     try {
       const res = await pb.collection("patient_traitements").getList(1, 1, {
-        filter: `patient = "${id}" && statut = "actif"`,
+        filter: withActive(`patient = "${id}" && statut = "actif"`),
         sort: "-created",
       });
       setActiveTraitementId(res.items[0]?.id ?? null);
@@ -86,7 +87,7 @@ export default function PatientTraitementActif() {
     if (!user || !id) return;
     try {
       const res = await pb.collection("patient_traitements").getList(1, 1, {
-        filter: `patient = "${id}"`, sort: "-created",
+        filter: withActive(`patient = "${id}"`), sort: "-created",
       });
       if (res.items[0]) setActiveTraitementId(res.items[0].id);
     } catch { /* ignore */ }
@@ -95,7 +96,7 @@ export default function PatientTraitementActif() {
   const handleRemoveTraitement = async () => {
     if (!activeTraitementId) return;
     try {
-      await pb.collection("patient_traitements").delete(activeTraitementId);
+      await softDelete("patient_traitements", activeTraitementId);
     } catch { /* ignore */ }
     setActiveTraitementId(null);
     toast({ title: "Traitement retiré" });

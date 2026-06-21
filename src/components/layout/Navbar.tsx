@@ -9,7 +9,7 @@ import {
   Users, FileText, Calendar, Brain,
   Dumbbell, ClipboardList, Video, Activity, Target,
   Newspaper, Megaphone, GraduationCap, BookOpen,
-  ChevronDown,
+  ChevronDown, Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -208,6 +208,15 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <div className="flex items-center gap-4">
+                {!isAdmin && (
+                  <Link
+                    to="/corbeille"
+                    title="Corbeille"
+                    className="flex items-center gap-2 text-sm text-destructive hover:text-destructive transition-colors p-2 rounded-lg hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors p-2 rounded-lg hover:bg-muted"

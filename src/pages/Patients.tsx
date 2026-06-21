@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { withActive } from "@/lib/corbeille";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +83,7 @@ export default function Patients() {
   const fetchPatients = async () => {
     try {
       const data = await pb.collection("patients").getFullList({
-        filter: `user = "${user!.id}"`,
+        filter: withActive(`user = "${user!.id}"`),
         sort: "-id",
         fields: "id,name,numero,status,mutuelle,seances_restantes,ordonnance",
       });

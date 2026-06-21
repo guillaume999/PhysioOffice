@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -110,7 +111,7 @@ export default function PatientCertificats() {
       try { const patient = await pb.collection("patients").getOne(patientId, { fields: "name" }); setPatientName(patient.name); } catch {}
 
       const notes = await pb.collection("notes").getFullList({
-        filter: `patient = "${patientId}"`, sort: "-created",
+        filter: withActive(`patient = "${patientId}"`), sort: "-created",
       });
       setCertificats(notes.map((note: any) => ({
         id: note.id, title: note.title, content: note.content || "", created_at: note.created,
@@ -125,7 +126,7 @@ export default function PatientCertificats() {
 
   const fetchModels = async () => {
     try {
-      setModels(await pb.collection("certificat_models").getFullList({ sort: "-is_platform,title" }) as any[]);
+      setModels(await pb.collection("certificat_models").getFullList({ filter: withActive(), sort: "-is_platform,title" }) as any[]);
     } catch (error) {
       console.error("Error fetching models:", error);
     }
@@ -161,10 +162,10 @@ export default function PatientCertificats() {
 
   const handleDeleteCertificat = async (id: string) => {
     try {
-      await pb.collection("notes").delete(id);
+      await softDelete("notes", id);
 
       setCertificats(certificats.filter((c) => c.id !== id));
-      toast.success("Certificat supprimé");
+      toast.success("Certificat déplacé vers la corbeille");
     } catch (error) {
       console.error("Error deleting certificat:", error);
       toast.error("Erreur lors de la suppression");

@@ -4,6 +4,7 @@ import { fr } from "date-fns/locale";
 import { CalendarPlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -108,7 +109,7 @@ export function QuickAppointmentsDialog({ open, onOpenChange, patientId, patient
     // traitementId is a patient_traitements (instance) id. Use the last patient_seances
     // of this instance as the template, and clone an independent copy per date.
     const existing = await pb.collection("patient_seances").getFullList({
-      filter: `patient_traitement = "${traitementId}"`,
+      filter: withActive(`patient_traitement = "${traitementId}"`),
       sort: "-created",
     });
 

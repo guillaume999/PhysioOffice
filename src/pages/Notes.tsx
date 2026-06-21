@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { FileText, Loader2, Plus, Save, Trash2, Edit2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +45,7 @@ export default function Notes() {
   const fetchNotes = async () => {
     try {
       const data = await pb.collection("notes").getFullList<Note>({
-        filter: `user = "${user!.id}" && patient = null`,
+        filter: withActive(`user = "${user!.id}" && patient = null`),
         sort: "-updated",
       });
       setNotes(data);
@@ -99,7 +100,7 @@ export default function Notes() {
 
   const deleteNote = async (id: string) => {
     try {
-      await pb.collection("notes").delete(id);
+      await softDelete("notes", id);
       setNotes(notes.filter(n => n.id !== id));
       if (selectedNote?.id === id) {
         setSelectedNote(null);
@@ -176,7 +177,7 @@ export default function Notes() {
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer cette note ?</AlertDialogTitle>
-                        <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+                        <AlertDialogDescription>La note sera déplacée vers la corbeille (récupérable depuis la page Corbeille).</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Annuler</AlertDialogCancel>

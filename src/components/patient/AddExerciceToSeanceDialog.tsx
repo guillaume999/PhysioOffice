@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Upload, Video, Loader2, X, Pencil, Library, Search } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
+import { withActive } from "@/lib/corbeille";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SearchableExerciceTitleInput } from "./SearchableExerciceTitleInput";
@@ -99,11 +100,11 @@ export function AddExerciceToSeanceDialog({
     setUserPseudo(pb.authStore.record?.pseudo || pb.authStore.record?.name || pb.authStore.record?.email || null);
 
     // Fetch exercices (user's own exercices)
-    const exData = await pb.collection("exercices").getFullList({ filter: `user = "${user.id}"`, sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type" });
+    const exData = await pb.collection("exercices").getFullList({ filter: withActive(`user = "${user.id}"`), sort: "title", fields: "id,code,title,description,video_url,thumbnail_url,image_url,media_type" });
     setAvailableExercices(exData as unknown as Exercice[]);
 
     // Fetch pathologies for search
-    const pathoData = await pb.collection("pathologies").getFullList({ filter: `user = "${user.id}"`, fields: "name" });
+    const pathoData = await pb.collection("pathologies").getFullList({ filter: withActive(`user = "${user.id}"`), fields: "name" });
     setAvailablePathologies([...new Set(pathoData.map((p: any) => p.name as string))]);
 
     setLoading(false);
@@ -273,7 +274,7 @@ export function AddExerciceToSeanceDialog({
     setLibraryLoading(true);
     try {
       // Filtrer pour ne montrer que les vidéos (pas les images) dans ce contexte de sélection vidéo
-      const data = await pb.collection("videos").getFullList({ filter: `user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`, sort: "-created", fields: "id,title,video_url,thumbnail_url" });
+      const data = await pb.collection("videos").getFullList({ filter: withActive(`user = "${user.id}" && (media_type = "video" || media_type = "" || media_type = null)`), sort: "-created", fields: "id,title,video_url,thumbnail_url" });
       setLibraryVideos(data as unknown as VideoLibraryItem[]);
     } catch (error) {
       console.error("Error fetching library videos:", error);

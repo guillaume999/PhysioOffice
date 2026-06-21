@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive, needsWithdrawalRequest, requestWithdrawal } from "@/lib/corbeille";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Hourglass, Ban, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +64,8 @@ interface SeanceType {
   is_copy: boolean;
   is_validated: boolean;
   is_refused?: boolean;
+  withdrawal_requested?: boolean;
+  withdrawal_refused?: boolean;
   is_hidden_from_list: boolean;
   original_id: string | null;
   user_id: string;
@@ -68,6 +82,8 @@ export default function SeanceType() {
   const { user } = useAuth();
   const [userCanShare, setUserCanShare] = useState<boolean>(true);
   const [seances, setSeances] = useState<SeanceType[]>([]);
+  const [seanceToDelete, setSeanceToDelete] = useState<SeanceType | null>(null);
+  const [deletingSeance, setDeletingSeance] = useState(false);
   const [filteredSeances, setFilteredSeances] = useState<SeanceType[]>([]);
   const [featuredSeanceIds, setFeaturedSeanceIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,7 +207,7 @@ export default function SeanceType() {
 
       const [featuredData, seancesData] = await Promise.all([
         pb.collection("featured_seances").getFullList({ fields: "seance_type" }),
-        pb.collection("seance_types").getFullList({ sort: "-created" }),
+        pb.collection("seance_types").getFullList({ filter: withActive(), sort: "-created" }),
       ]);
       setFeaturedSeanceIds(featuredData.map((f: any) => f.seance_type));
 
@@ -318,15 +334,40 @@ export default function SeanceType() {
 
   const deleteSeance = async (id: string) => {
     try {
-      // Delete exercices first
-      const ses = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${id}"` });
-      for (const s of ses) await pb.collection("seance_exercices").delete(s.id);
-      await pb.collection("seance_types").delete(id);
-      toast.success("Séance supprimée");
+      // Soft delete : la séance part à la corbeille. On laisse ses exercices
+      // rattachés pour que la restauration la retrouve intacte.
+      await softDelete("seance_types", id);
+      toast.success("Séance déplacée vers la corbeille");
       fetchData();
     } catch (error) {
       console.error("Error deleting seance:", error);
       toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const handleConfirmDeleteSeance = async () => {
+    if (!seanceToDelete) return;
+    setDeletingSeance(true);
+    try {
+      await deleteSeance(seanceToDelete.id);
+      setSeanceToDelete(null);
+    } finally {
+      setDeletingSeance(false);
+    }
+  };
+
+  const handleWithdrawSeance = async () => {
+    if (!seanceToDelete) return;
+    setDeletingSeance(true);
+    try {
+      await requestWithdrawal("seance_types", seanceToDelete.id);
+      toast.success("Demande de retrait envoyée à l'administrateur");
+      setSeanceToDelete(null);
+    } catch (error) {
+      console.error("Error requesting withdrawal:", error);
+      toast.error("Erreur lors de la demande de retrait");
+    } finally {
+      setDeletingSeance(false);
     }
   };
 
@@ -739,16 +780,19 @@ export default function SeanceType() {
                                       <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
                                         <X className="w-3 h-3 text-red-500" strokeWidth={3} />
                                       </div>
-                                    ) : (
+                                    ) : seance.is_shared && seance.is_validated ? null : (
                                       <Checkbox
                                         checked={seance.is_shared}
                                         onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
-                                        disabled={seance.is_validated && seance.is_shared}
                                       />
                                     )}
                                     <span className="text-xs flex items-center gap-1">
                                       {seance.is_shared && seance.is_validated
-                                        ? "Déjà partagé"
+                                        ? (seance.withdrawal_requested
+                                          ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                          : seance.withdrawal_refused
+                                          ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                          : <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>)
                                         : seance.is_refused
                                         ? "Partage refusé"
                                         : seance.is_shared && !seance.is_validated
@@ -786,7 +830,7 @@ export default function SeanceType() {
                                       variant="ghost"
                                       size="sm"
                                       className="text-destructive"
-                                      onClick={() => deleteSeance(seance.id)}
+                                      onClick={() => setSeanceToDelete(seance)}
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
@@ -841,6 +885,53 @@ export default function SeanceType() {
             )}
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={!!seanceToDelete} onOpenChange={(open) => !open && !deletingSeance && setSeanceToDelete(null)}>
+          <AlertDialogContent>
+            {seanceToDelete && needsWithdrawalRequest(seanceToDelete) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Demander le retrait de la séance ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette séance est partagée sur la plateforme. Pour la retirer, une demande doit
+                    être validée par l'administrateur. Elle reste visible jusque-là.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deletingSeance}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); handleWithdrawSeance(); }}
+                    disabled={deletingSeance}
+                  >
+                    {deletingSeance && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Demander le retrait à l'admin
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer la séance ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette séance sera déplacée vers la corbeille. Vous pourrez la restaurer depuis
+                    la page Corbeille.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deletingSeance}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); handleConfirmDeleteSeance(); }}
+                    disabled={deletingSeance}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deletingSeance && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Supprimer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

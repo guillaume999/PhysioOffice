@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,7 @@ export default function Objectifs() {
     setLoading(true);
     try {
       const data = await pb.collection("objectifs").getFullList({
-        filter: `user = "${user.id}"`,
+        filter: withActive(`user = "${user.id}"`),
         sort: "name",
         fields: "id,name",
       });
@@ -140,9 +141,9 @@ export default function Objectifs() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await pb.collection("objectifs").delete(deleteTarget.id);
+      await softDelete("objectifs", deleteTarget.id);
       setObjectifs((prev) => prev.filter((o) => o.id !== deleteTarget.id));
-      toast.success("Objectif supprimé");
+      toast.success("Objectif déplacé vers la corbeille");
       setDeleteTarget(null);
     } catch (e) {
       console.error(e);
@@ -299,8 +300,8 @@ export default function Objectifs() {
             <AlertDialogHeader>
               <AlertDialogTitle>Supprimer l'objectif ?</AlertDialogTitle>
               <AlertDialogDescription>
-                « {deleteTarget?.name} » sera supprimé de votre bibliothèque. Les exercices et
-                séances qui l'utilisent comme tag ne seront pas modifiés.
+                « {deleteTarget?.name} » sera déplacé vers la corbeille (récupérable depuis la page
+                Corbeille). Les exercices et séances qui l'utilisent comme tag ne seront pas modifiés.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

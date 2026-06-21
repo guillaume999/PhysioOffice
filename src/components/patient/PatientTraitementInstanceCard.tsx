@@ -1,5 +1,6 @@
 import { useState, useEffect, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,7 +126,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       })));
 
       const seancesRaw = await pb.collection("patient_seances").getFullList({
-        filter: `patient_traitement = "${traitementId}"`, sort: "created",
+        filter: withActive(`patient_traitement = "${traitementId}"`), sort: "created",
       });
 
       const seances: InstanceSeance[] = await Promise.all(
@@ -146,7 +147,7 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
       );
 
       const bilans = await pb.collection("patient_bilans").getFullList({
-        filter: `patient_traitement = "${traitementId}"`, sort: "bilan_date",
+        filter: withActive(`patient_traitement = "${traitementId}"`), sort: "bilan_date",
         fields: "id,bilan_date",
       }).then((d) => d.map((b: any) => ({ id: b.id, bilan_date: b.bilan_date })));
 
@@ -192,8 +193,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteBilan = async (bilanId: string) => {
-    if (!(await confirm({ title: "Supprimer ce bilan intermédiaire ?", description: "Cette action est irréversible." }))) return;
-    try { await pb.collection("patient_bilans").delete(bilanId); toast.success("Bilan supprimé"); fetchDetails(); }
+    if (!(await confirm({ title: "Supprimer ce bilan intermédiaire ?", description: "Le bilan sera déplacé vers la corbeille." }))) return;
+    try { await softDelete("patient_bilans", bilanId); toast.success("Bilan déplacé vers la corbeille"); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
 
@@ -269,8 +270,8 @@ export function PatientTraitementInstanceCard({ traitementId, patientId, pratici
   };
 
   const deleteSeance = async (seanceId: string) => {
-    if (!(await confirm({ title: "Supprimer cette séance ?", description: "La séance et tous ses exercices seront définitivement supprimés. Cette action est irréversible." }))) return;
-    try { await pb.collection("patient_seances").delete(seanceId); toast.success("Séance supprimée"); fetchDetails(); }
+    if (!(await confirm({ title: "Supprimer cette séance ?", description: "La séance sera déplacée vers la corbeille (récupérable)." }))) return;
+    try { await softDelete("patient_seances", seanceId); toast.success("Séance déplacée vers la corbeille"); fetchDetails(); }
     catch { toast.error("Erreur lors de la suppression"); }
   };
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive, needsWithdrawalRequest, requestWithdrawal } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,7 @@ export default function Pathologies() {
     try {
       // Pathologies — toutes celles visibles par cet utilisateur (siennes + partagées)
       const data = await pb.collection("pathologies").getFullList({
+        filter: withActive(),
         sort: "name",
         fields: "id,user,name,traitement,description,is_shared,is_validated,is_copy,is_hidden_from_list,original,author_name",
       });
@@ -144,13 +146,28 @@ export default function Pathologies() {
     if (!deleteTarget || deleting) return;
     setDeleting(true);
     try {
-      await pb.collection("pathologies").delete(deleteTarget.id);
+      await softDelete("pathologies", deleteTarget.id);
       setPathologies((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      toast.success("Pathologie supprimée");
+      toast.success("Pathologie déplacée vers la corbeille");
       setDeleteTarget(null);
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleWithdrawal = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await requestWithdrawal("pathologies", deleteTarget.id);
+      toast.success("Demande de retrait envoyée à l'administrateur");
+      setDeleteTarget(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors de la demande de retrait");
     } finally {
       setDeleting(false);
     }
@@ -369,27 +386,54 @@ export default function Pathologies() {
 
         <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
           <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer la pathologie ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                « {deleteTarget?.name} » sera définitivement supprimée, avec son protocole de
-                traitement. Cette action est irréversible.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDelete();
-                }}
-                disabled={deleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Supprimer
-              </AlertDialogAction>
-            </AlertDialogFooter>
+            {deleteTarget && needsWithdrawalRequest(deleteTarget) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Demander le retrait de la pathologie ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    « {deleteTarget?.name} » est partagée sur la plateforme. Pour la retirer, une
+                    demande doit être validée par l'administrateur. Elle reste visible jusque-là.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleWithdrawal();
+                    }}
+                    disabled={deleting}
+                  >
+                    {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Demander le retrait à l'admin
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer la pathologie ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    « {deleteTarget?.name} » sera déplacée vers la corbeille, avec son protocole de
+                    traitement. Vous pourrez la restaurer depuis la page Corbeille.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete();
+                    }}
+                    disabled={deleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Supprimer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
           </AlertDialogContent>
         </AlertDialog>
       </div>

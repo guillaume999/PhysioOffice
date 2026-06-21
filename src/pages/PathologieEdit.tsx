@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,12 +147,12 @@ export default function PathologieEdit() {
 
       const [mine, featured, exData] = await Promise.all([
         pb.collection("traitement_types").getFullList({
-          filter: `user = "${user.id}"`,
+          filter: withActive(`user = "${user.id}"`),
           fields: "id,nom,pathologie,user",
         }),
         pb.collection("featured_traitements").getFullList({ fields: "traitement_type" }).catch(() => [] as any[]),
         pb.collection("exercices").getFullList({
-          filter: `(user = "${user.id}" || status = "shared")`,
+          filter: withActive(`(user = "${user.id}" || status = "shared")`),
           sort: "title",
           fields: "id,title,user,status",
         }).catch(() => [] as any[]),
@@ -160,7 +161,7 @@ export default function PathologieEdit() {
       const platformIds = (featured as any[]).map((f) => f.traitement_type).filter(Boolean);
       const platformRecords = platformIds.length
         ? await pb.collection("traitement_types").getFullList({
-            filter: platformIds.map((tid) => `id = "${tid}"`).join(" || "),
+            filter: withActive(platformIds.map((tid) => `id = "${tid}"`).join(" || ")),
             fields: "id,nom,pathologie,user",
           })
         : [];
@@ -230,7 +231,7 @@ export default function PathologieEdit() {
     if (!user) return;
     try {
       const data = await pb.collection("objectifs").getFullList({
-        filter: `user = "${user.id}"`,
+        filter: withActive(`user = "${user.id}"`),
         fields: "name",
         sort: "name",
       });
@@ -333,8 +334,8 @@ export default function PathologieEdit() {
   const handleDelete = async () => {
     if (!id) return;
     try {
-      await pb.collection("pathologies").delete(id);
-      toast.success("Pathologie supprimée");
+      await softDelete("pathologies", id);
+      toast.success("Pathologie déplacée vers la corbeille");
       navigate("/pathologies");
     } catch (e) {
       console.error(e);
@@ -655,8 +656,8 @@ export default function PathologieEdit() {
             <AlertDialogHeader>
               <AlertDialogTitle>Supprimer cette pathologie ?</AlertDialogTitle>
               <AlertDialogDescription>
-                « {name} » sera supprimée. Les exercices, séances et traitements qui l'utilisent comme tag
-                conserveront le tag tel quel.
+                « {name} » sera déplacée vers la corbeille (récupérable depuis la page Corbeille). Les
+                exercices, séances et traitements qui l'utilisent comme tag conserveront le tag tel quel.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

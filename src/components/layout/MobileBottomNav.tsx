@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { usePendingAdminCount } from "@/hooks/usePendingAdminCount";
-import { Home, Users, Dumbbell, Brain, FileText, MoreHorizontal, Calendar, ClipboardList, Video, Shield, User, LogOut } from "lucide-react";
+import { Home, Users, Dumbbell, Brain, FileText, MoreHorizontal, Calendar, ClipboardList, Video, Shield, User, LogOut, Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -32,6 +32,7 @@ export function MobileBottomNav() {
     { icon: ClipboardList, label: "Traitement", href: "/traitement-type" },
     { icon: Brain, label: "IA Diagnostic", href: "/ia-diagnostic" },
     { icon: FileText, label: "Notes", href: "/notes" },
+    ...(!isAdmin ? [{ icon: Trash2, label: "Corbeille", href: "/corbeille" }] : []),
   ];
 
   if (!user) return null;
