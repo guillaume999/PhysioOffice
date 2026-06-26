@@ -474,53 +474,6 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        {/* Lien vers le traitement actif */}
-        <Card
-          className="cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={() => navigate(`/patients/${id}`)}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <ClipboardList className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-medium">Traitement actif</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {activeTraitementName || "Aucun traitement sélectionné"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!activeTraitementName && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={(e) => { e.stopPropagation(); setSelectTraitementDialogOpen(true); }}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Créer
-                  </Button>
-                )}
-                {activeTraitementName && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 h-8 w-8 text-destructive"
-                    title="Retirer le traitement"
-                    onClick={confirmRemoveTraitement}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="mt-6">
           <PatientCommentsCard
             comments={carePlan.comments}

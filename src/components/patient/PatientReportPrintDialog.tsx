@@ -99,6 +99,7 @@ type OptionKey =
   | "includeBloodType"
   | "includeAntecedents"
   | "includeComments"
+  | "includeBilanInitial"
   | "includeMotifConsultation"
   | "includeBilanKine"
   | "includeObjectifs"
@@ -131,6 +132,7 @@ const optionGroups: OptionGroup[] = [
     title: "Prise en charge",
     icon: <FileText className="w-4 h-4" />,
     options: [
+      { key: "includeBilanInitial", label: "Bilan initial" },
       { key: "includeMotifConsultation", label: "Motif de consultation" },
       { key: "includeBilanKine", label: "Bilan kiné" },
       { key: "includeObjectifs", label: "Objectifs" },
@@ -162,6 +164,7 @@ export function PatientReportPrintDialog({
     includeBloodType: true,
     includeAntecedents: true,
     includeComments: true,
+    includeBilanInitial: true,
     includeMotifConsultation: true,
     includeBilanKine: true,
     includeObjectifs: true,
@@ -245,6 +248,12 @@ export function PatientReportPrintDialog({
       sections.push(`<p class="multiline">${patient.antecedents ? escapeHtml(patient.antecedents) + extraLines : emptyLines}</p>`);
     }
 
+
+    if (options.includeBilanInitial) {
+      sections.push(`<h2 class="section-title">Bilan initial</h2>`);
+      const bilanInitialContent = generateBilanInitialContent();
+      sections.push(bilanInitialContent || `<p class="multiline">${emptyLines}</p>`);
+    }
 
     if (options.includeMotifConsultation) {
       sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
