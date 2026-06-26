@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { softDelete, withActive } from "@/lib/corbeille";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CalendarPlus, Plus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowLeft, Loader2, CalendarPlus, Plus, User, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -116,7 +117,7 @@ export default function PatientTraitementActif() {
     <Layout>
       <div className="container mx-auto px-1 sm:px-4 py-4 md:py-8 max-w-6xl">
         <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm -mx-1 sm:-mx-4 px-1 sm:px-4 py-3 mb-6 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${id}`)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/patients")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex-1">
@@ -128,6 +129,29 @@ export default function PatientTraitementActif() {
             <span className="hidden sm:inline">Ajouter des rendez-vous</span>
           </Button>
         </div>
+
+        {/* Lien vers la fiche patient */}
+        <Card
+          className="cursor-pointer hover:bg-accent/50 transition-colors mb-6"
+          onClick={() => navigate(`/patients/${id}/details`)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <User className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Fiche patient</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Informations, objectifs, bilans, certificats
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
 
         {!activeTraitementId && (
           <div className="flex items-center justify-end mb-3">

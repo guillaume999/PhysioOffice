@@ -65,7 +65,9 @@ const App = () => (
 
             {/* Authenticated routes */}
             <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
-            <Route path="/patients/:id" element={<ProtectedRoute><PatientDetail /></ProtectedRoute>} />
+            <Route path="/patients/:id" element={<ProtectedRoute><PatientTraitementActif /></ProtectedRoute>} />
+            <Route path="/patients/:id/details" element={<ProtectedRoute><PatientDetail /></ProtectedRoute>} />
+            {/* Alias rétro-compatible : ancien chemin du traitement actif */}
             <Route path="/patients/:id/traitement-actif" element={<ProtectedRoute><PatientTraitementActif /></ProtectedRoute>} />
             <Route path="/patients/:id/bilan-initial" element={<ProtectedRoute><PatientBilanInitial /></ProtectedRoute>} />
             <Route path="/patients/:id/bilan-intermediaire" element={<ProtectedRoute><PatientBilanIntermediaire /></ProtectedRoute>} />

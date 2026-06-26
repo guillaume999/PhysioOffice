@@ -401,7 +401,7 @@ export default function PatientDetail() {
         <div className="flex flex-col gap-4 mb-6 md:mb-8">
           {/* Ligne 1: Retour + Info patient */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/patients")} className="shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/patients/${id}`)} className="shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -477,7 +477,7 @@ export default function PatientDetail() {
         {/* Lien vers le traitement actif */}
         <Card
           className="cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={() => navigate(`/patients/${id}/traitement-actif`)}
+          onClick={() => navigate(`/patients/${id}`)}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">

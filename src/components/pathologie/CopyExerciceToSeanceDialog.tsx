@@ -167,7 +167,7 @@ export function CopyExerciceToSeanceDialog({ exercice, open, onOpenChange }: Pro
       toast.success("Exercice copié dans la séance", {
         action: {
           label: "Voir le patient",
-          onClick: () => navigate(`/patients/${patientId}/traitement-actif`),
+          onClick: () => navigate(`/patients/${patientId}`),
         },
       });
       onOpenChange(false);
