@@ -180,21 +180,110 @@ export function PatientReportPrintDialog({
 
   const generateBilanInitialContent = () => {
     if (!bilanInitialData) return "";
-    
-    const fields = [
-      { key: "profession", label: "Profession" },
-      { key: "situation_fam", label: "Situation familiale" },
-      { key: "pathologie", label: "Pathologie" },
-      { key: "plainte_patient", label: "Plainte patient" },
-      { key: "atcd", label: "Antécédents" },
-      { key: "medicaments", label: "Médicaments" },
-      { key: "commentaires", label: "Commentaires" },
+
+    const d = bilanInitialData;
+    const val = (key: string): string => {
+      const v = d[key];
+      return v === null || v === undefined ? "" : String(v).trim();
+    };
+
+    // Groupes de champs simples, dans l'ordre de la page Bilan Initial.
+    const groups: { title: string; fields: { key: string; label: string }[] }[] = [
+      {
+        title: "Informations patient",
+        fields: [
+          { key: "profession", label: "Profession" },
+          { key: "taille", label: "Taille (cm)" },
+          { key: "poids", label: "Poids (kg)" },
+          { key: "lateralite", label: "Latéralité" },
+          { key: "loisir_sport", label: "Loisirs - Activités physiques" },
+          { key: "activite_physique_type", label: "Type d'activité" },
+          { key: "situation_fam", label: "Situation familiale" },
+          { key: "atcd", label: "Antécédents (ATCD)" },
+          { key: "medicaments", label: "Médicaments" },
+          { key: "pathologies_associees", label: "Pathologies associées" },
+          { key: "tabac", label: "Tabac" },
+          { key: "etat_psychique", label: "État psychique du patient" },
+        ],
+      },
+      {
+        title: "Histoire du patient",
+        fields: [{ key: "histoire_patient", label: "Histoire du patient" }],
+      },
+      {
+        title: "Pathologie / Plainte",
+        fields: [
+          { key: "pathologie", label: "Motif de consultation / Pathologie" },
+          { key: "date_debut", label: "Depuis quand ?" },
+          { key: "plainte_patient", label: "Plainte patient" },
+          { key: "facteurs_declenchants", label: "Facteurs déclenchants" },
+          { key: "circonstances", label: "Circonstances" },
+          { key: "histoire_naturelle", label: "Histoire naturelle de la pathologie" },
+          { key: "evolution", label: "Évolution" },
+          { key: "recidive", label: "Récidive" },
+          { key: "chirurgie", label: "Chirurgie" },
+          { key: "chirurgie_detail", label: "Si oui, quelle opération ?" },
+          { key: "examen_complementaire", label: "Examen complémentaire (imagerie)" },
+          { key: "ttt_deja_suivis", label: "Traitements kiné déjà suivis" },
+          { key: "signes", label: "Signes" },
+          { key: "mvt_impossibles", label: "Mouvements impossibles" },
+          { key: "projets_attentes", label: "Objectifs / Projets / Attentes du patient" },
+        ],
+      },
+      {
+        title: "Bilan cutanéo-trophique",
+        fields: [
+          { key: "cutaneo_cicatrice_couleur", label: "Cicatrice / Couleur" },
+          { key: "cutaneo_trophiques", label: "Troubles trophiques" },
+          { key: "cutaneo_adherences_chaleur", label: "Adhérences / Chaleur" },
+          { key: "cutaneo_test_decollement", label: "Test de décollement" },
+          { key: "cutaneo_test_godet", label: "Test du godet" },
+          { key: "cutaneo_amyotrophie", label: "Amyotrophie" },
+        ],
+      },
+      {
+        title: "Force et tests",
+        fields: [
+          { key: "force_musculaire", label: "Force musculaire" },
+          { key: "tests_specifiques", label: "Tests spécifiques" },
+        ],
+      },
+      {
+        title: "Commentaires",
+        fields: [{ key: "commentaires", label: "Commentaires" }],
+      },
     ];
 
     const content: string[] = [];
-    fields.forEach(({ key, label }) => {
-      if (bilanInitialData[key]) {
-        content.push(`<p><strong>${escapeHtml(label)} :</strong> ${escapeHtml(bilanInitialData[key])}</p>`);
+
+    groups.forEach(({ title, fields }) => {
+      const rows = fields
+        .filter(({ key }) => val(key) !== "")
+        .map(({ key, label }) => `<p><strong>${escapeHtml(label)} :</strong> ${escapeHtml(val(key))}</p>`);
+      if (rows.length > 0) {
+        content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
+        content.push(...rows);
+      }
+    });
+
+    // Tableaux dynamiques (zone / observation).
+    const tables: { key: string; title: string }[] = [
+      { key: "douleurs_entries", title: "Bilan douleurs" },
+      { key: "morphodynamique_entries", title: "Bilan morphodynamique" },
+      { key: "morphostatique_entries", title: "Bilan morphostatique" },
+    ];
+
+    tables.forEach(({ key, title }) => {
+      const entries = Array.isArray(d[key]) ? d[key] : [];
+      const filled = entries.filter((e: any) => (e?.zone || "").trim() || (e?.observation || "").trim());
+      if (filled.length > 0) {
+        content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
+        content.push(`<table style="width:100%; border-collapse:collapse; margin-top:6px;">`);
+        content.push(`<thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:6px; text-align:left;">Zone</th><th style="border:1px solid #ddd; padding:6px; text-align:left;">Observation</th></tr></thead><tbody>`);
+        filled.forEach((e: any) => {
+          content.push(`<tr><td style="border:1px solid #ddd; padding:6px;">${escapeHtml(e.zone || "")}</td><td style="border:1px solid #ddd; padding:6px;">${escapeHtml(e.observation || "")}</td></tr>`);
+        });
+        content.push(`</tbody></table>`);
       }
     });
 
