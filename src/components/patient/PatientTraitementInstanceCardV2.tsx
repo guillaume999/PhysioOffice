@@ -480,18 +480,6 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
         </Button>
       </div>
 
-      <button
-        onClick={() => { setMobileNavOpen(false); navigate(`/patients/${patientId}/bilan-initial`); }}
-        className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left bg-sky-50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/40 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 transition-colors"
-      >
-        <ClipboardCheck className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-medium text-sky-700 dark:text-sky-400 truncate">Bilan initial</span>
-          <span className="block text-xs text-muted-foreground">{fmtDate(bilanInitialDate)}</span>
-        </span>
-        <Edit className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
-      </button>
-
       {rows.length === 0 && (
         <p className="px-3 py-2 text-xs text-muted-foreground">Aucune séance.</p>
       )}
@@ -550,6 +538,18 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
           </div>
         );
       })}
+
+      <button
+        onClick={() => { setMobileNavOpen(false); navigate(`/patients/${patientId}/bilan-initial`); }}
+        className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left bg-sky-50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-800/40 hover:bg-sky-100/70 dark:hover:bg-sky-900/30 transition-colors"
+      >
+        <ClipboardCheck className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium text-sky-700 dark:text-sky-400 truncate">Bilan initial</span>
+          <span className="block text-xs text-muted-foreground">{fmtDate(bilanInitialDate)}</span>
+        </span>
+        <Edit className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
+      </button>
     </div>
   );
 
@@ -896,7 +896,8 @@ function CalendarDayContent(props: DayContentProps) {
 
 function NumberField({ label, value, onSave }: { label: string; value: number | null; onSave: (n: number | null) => void }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
       <Input
         type="number"
         defaultValue={value ?? ""}
@@ -907,7 +908,6 @@ function NumberField({ label, value, onSave }: { label: string; value: number | 
         }}
         className="h-6 w-12 text-xs px-1"
       />
-      <span className="text-[10px] text-muted-foreground">{label}</span>
     </div>
   );
 }
