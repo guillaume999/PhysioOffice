@@ -327,6 +327,12 @@ export function PatientReportPrintDialog({
     const emptyLines = '<span style="color: #999;">_________________________________________________<br/>_________________________________________________<br/>_________________________________________________</span>';
     const extraLines = '<br/><span style="color: #999;">_________________________________________________<br/>_________________________________________________</span>';
 
+    if (options.includeBilanInitial) {
+      sections.push(`<h2 class="section-title">Bilan initial</h2>`);
+      const bilanInitialContent = generateBilanInitialContent();
+      sections.push(bilanInitialContent || `<p class="multiline">${emptyLines}</p>`);
+    }
+
     if (options.includeAllergies) {
       sections.push(`<h2 class="section-title">Allergies</h2>`);
       sections.push(`<p class="multiline">${patient.allergies ? escapeHtml(patient.allergies) + extraLines : emptyLines}</p>`);
@@ -335,13 +341,6 @@ export function PatientReportPrintDialog({
     if (options.includeAntecedents) {
       sections.push(`<h2 class="section-title">Antécédents</h2>`);
       sections.push(`<p class="multiline">${patient.antecedents ? escapeHtml(patient.antecedents) + extraLines : emptyLines}</p>`);
-    }
-
-
-    if (options.includeBilanInitial) {
-      sections.push(`<h2 class="section-title">Bilan initial</h2>`);
-      const bilanInitialContent = generateBilanInitialContent();
-      sections.push(bilanInitialContent || `<p class="multiline">${emptyLines}</p>`);
     }
 
     if (options.includeMotifConsultation) {
