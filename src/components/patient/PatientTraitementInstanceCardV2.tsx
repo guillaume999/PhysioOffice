@@ -758,10 +758,10 @@ export function PatientTraitementInstanceCardV2({ traitementId, patientId, prati
                 className="h-7 text-sm font-medium"
               />
               <div className="flex flex-wrap gap-1">
-                <NumberField label="séries" value={ex.series} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { series: n })} />
                 <NumberField label="rép." value={ex.repetitions} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { repetitions: n })} />
-                <NumberField label="s" value={ex.duree} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { duree: n })} />
+                <NumberField label="séries" value={ex.series} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { series: n })} />
                 <NumberField label="min" value={ex.minutes} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { minutes: n })} />
+                <NumberField label="sec" value={ex.duree} onSave={(n) => updateExercice(selectedSeance.id, ex.id, { duree: n })} />
               </div>
               <Textarea
                 defaultValue={ex.description || ""}
