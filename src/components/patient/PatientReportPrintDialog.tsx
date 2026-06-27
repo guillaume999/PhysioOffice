@@ -100,6 +100,16 @@ type OptionKey =
   | "includeAntecedents"
   | "includeComments"
   | "includeBilanInitial"
+  // Sous-sections du bilan initial
+  | "bilanInfosPatient"
+  | "bilanHistoire"
+  | "bilanPathologie"
+  | "bilanDouleurs"
+  | "bilanMorphodynamique"
+  | "bilanMorphostatique"
+  | "bilanCutaneo"
+  | "bilanForceTests"
+  | "bilanCommentaires"
   | "includeMotifConsultation"
   | "includeBilanKine"
   | "includeObjectifs"
@@ -132,7 +142,6 @@ const optionGroups: OptionGroup[] = [
     title: "Prise en charge",
     icon: <FileText className="w-4 h-4" />,
     options: [
-      { key: "includeBilanInitial", label: "Bilan initial" },
       { key: "includeMotifConsultation", label: "Motif de consultation" },
       { key: "includeBilanKine", label: "Bilan kiné" },
       { key: "includeObjectifs", label: "Objectifs" },
@@ -140,6 +149,21 @@ const optionGroups: OptionGroup[] = [
       { key: "includeComments", label: "Commentaires" },
     ],
   },
+];
+
+// Sous-sections du bilan initial, dans l'ordre de la page Bilan Initial.
+// La case maîtresse "includeBilanInitial" active/désactive tout le bloc ;
+// les sous-cases pilotent chaque section individuellement.
+const bilanInitialOptions: { key: OptionKey; label: string }[] = [
+  { key: "bilanInfosPatient", label: "Informations patient" },
+  { key: "bilanHistoire", label: "Histoire du patient" },
+  { key: "bilanPathologie", label: "Pathologie / Plainte" },
+  { key: "bilanDouleurs", label: "Bilan douleurs" },
+  { key: "bilanMorphodynamique", label: "Bilan morphodynamique" },
+  { key: "bilanMorphostatique", label: "Bilan morphostatique" },
+  { key: "bilanCutaneo", label: "Bilan cutanéo-trophique" },
+  { key: "bilanForceTests", label: "Force et tests" },
+  { key: "bilanCommentaires", label: "Commentaires du bilan" },
 ];
 
 export function PatientReportPrintDialog({
@@ -165,6 +189,15 @@ export function PatientReportPrintDialog({
     includeAntecedents: true,
     includeComments: true,
     includeBilanInitial: true,
+    bilanInfosPatient: true,
+    bilanHistoire: true,
+    bilanPathologie: true,
+    bilanDouleurs: true,
+    bilanMorphodynamique: true,
+    bilanMorphostatique: true,
+    bilanCutaneo: true,
+    bilanForceTests: true,
+    bilanCommentaires: true,
     includeMotifConsultation: true,
     includeBilanKine: true,
     includeObjectifs: true,
@@ -188,9 +221,11 @@ export function PatientReportPrintDialog({
     };
 
     // Groupes de champs simples, dans l'ordre de la page Bilan Initial.
-    const groups: { title: string; fields: { key: string; label: string }[] }[] = [
+    // `option` = sous-case du dialog qui pilote l'affichage de la section.
+    const groups: { title: string; option: OptionKey; fields: { key: string; label: string }[] }[] = [
       {
         title: "Informations patient",
+        option: "bilanInfosPatient",
         fields: [
           { key: "profession", label: "Profession" },
           { key: "taille", label: "Taille (cm)" },
@@ -208,10 +243,12 @@ export function PatientReportPrintDialog({
       },
       {
         title: "Histoire du patient",
+        option: "bilanHistoire",
         fields: [{ key: "histoire_patient", label: "Histoire du patient" }],
       },
       {
         title: "Pathologie / Plainte",
+        option: "bilanPathologie",
         fields: [
           { key: "pathologie", label: "Motif de consultation / Pathologie" },
           { key: "date_debut", label: "Depuis quand ?" },
@@ -232,6 +269,7 @@ export function PatientReportPrintDialog({
       },
       {
         title: "Bilan cutanéo-trophique",
+        option: "bilanCutaneo",
         fields: [
           { key: "cutaneo_cicatrice_couleur", label: "Cicatrice / Couleur" },
           { key: "cutaneo_trophiques", label: "Troubles trophiques" },
@@ -243,6 +281,7 @@ export function PatientReportPrintDialog({
       },
       {
         title: "Force et tests",
+        option: "bilanForceTests",
         fields: [
           { key: "force_musculaire", label: "Force musculaire" },
           { key: "tests_specifiques", label: "Tests spécifiques" },
@@ -250,13 +289,15 @@ export function PatientReportPrintDialog({
       },
       {
         title: "Commentaires",
+        option: "bilanCommentaires",
         fields: [{ key: "commentaires", label: "Commentaires" }],
       },
     ];
 
     const content: string[] = [];
 
-    groups.forEach(({ title, fields }) => {
+    groups.forEach(({ title, option, fields }) => {
+      if (!options[option]) return;
       const rows = fields
         .filter(({ key }) => val(key) !== "")
         .map(({ key, label }) => `<p><strong>${escapeHtml(label)} :</strong> ${escapeHtml(val(key))}</p>`);
@@ -267,13 +308,14 @@ export function PatientReportPrintDialog({
     });
 
     // Tableaux dynamiques (zone / observation).
-    const tables: { key: string; title: string }[] = [
-      { key: "douleurs_entries", title: "Bilan douleurs" },
-      { key: "morphodynamique_entries", title: "Bilan morphodynamique" },
-      { key: "morphostatique_entries", title: "Bilan morphostatique" },
+    const tables: { key: string; title: string; option: OptionKey }[] = [
+      { key: "douleurs_entries", title: "Bilan douleurs", option: "bilanDouleurs" },
+      { key: "morphodynamique_entries", title: "Bilan morphodynamique", option: "bilanMorphodynamique" },
+      { key: "morphostatique_entries", title: "Bilan morphostatique", option: "bilanMorphostatique" },
     ];
 
-    tables.forEach(({ key, title }) => {
+    tables.forEach(({ key, title, option }) => {
+      if (!options[option]) return;
       const entries = Array.isArray(d[key]) ? d[key] : [];
       const filled = entries.filter((e: any) => (e?.zone || "").trim() || (e?.observation || "").trim());
       if (filled.length > 0) {
@@ -621,6 +663,55 @@ export function PatientReportPrintDialog({
                       </div>
                     </div>
                   ))}
+
+                  {/* Bilan initial — case maîtresse + sous-sections activables */}
+                  <div className="space-y-2">
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5 cursor-pointer rounded-md px-1 -mx-1 hover:bg-accent",
+                        options.includeBilanInitial && "text-foreground"
+                      )}
+                      onClick={() => toggleOption("includeBilanInitial")}
+                    >
+                      <Checkbox
+                        id="includeBilanInitial"
+                        checked={options.includeBilanInitial}
+                        onCheckedChange={() => toggleOption("includeBilanInitial")}
+                        className="h-4 w-4"
+                      />
+                      <FileText className="w-4 h-4" />
+                      Bilan initial
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-6">
+                      {bilanInitialOptions.map(({ key, label }) => (
+                        <div
+                          key={key}
+                          className={cn(
+                            "flex items-center space-x-2 p-1.5 rounded-md transition-colors",
+                            options.includeBilanInitial
+                              ? "cursor-pointer hover:bg-accent"
+                              : "opacity-40 pointer-events-none",
+                            options[key] && options.includeBilanInitial && "bg-accent/50"
+                          )}
+                          onClick={() => options.includeBilanInitial && toggleOption(key)}
+                        >
+                          <Checkbox
+                            id={key}
+                            checked={options[key]}
+                            disabled={!options.includeBilanInitial}
+                            onCheckedChange={() => toggleOption(key)}
+                            className="h-4 w-4"
+                          />
+                          <Label
+                            htmlFor={key}
+                            className="cursor-pointer text-sm leading-tight"
+                          >
+                            {label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Date option séparée */}
                   <div className="pt-2 border-t">
