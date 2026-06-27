@@ -208,6 +208,10 @@ export default function PatientBilanInitial() {
         if (!merged.date_bilan && carePlan.updated) {
           merged.date_bilan = new Date(carePlan.updated).toLocaleDateString("fr-FR");
         }
+        // Motif de consultation relié à la colonne BDD (source unique, partagée avec la fiche patient).
+        if (carePlan.motif_consultation) {
+          merged.pathologie = String(carePlan.motif_consultation);
+        }
         setBilan(merged);
         // Fallback: if bilan_initial_date on the care plan is absent or unreadable,
         // derive the date input value from date_bilan stored in the JSON (dd/mm/yyyy).
@@ -231,7 +235,12 @@ export default function PatientBilanInitial() {
       }
     } else if (fullName) {
       // New bilan — pre-populate nom/prenom from the patient record.
-      setBilan(prev => ({ ...prev, ...splitName(fullName) }));
+      // Motif de consultation relié à la colonne BDD si déjà saisi côté fiche patient.
+      setBilan(prev => ({
+        ...prev,
+        ...splitName(fullName),
+        pathologie: carePlan?.motif_consultation ? String(carePlan.motif_consultation) : prev.pathologie,
+      }));
     }
 
     setLoading(false);
@@ -266,10 +275,14 @@ export default function PatientBilanInitial() {
       existingPlan = await pb.collection("patient_care_plans").getFirstListItem(`patient = "${id}"`);
     } catch { /* none yet */ }
 
+    // Motif de consultation relié à la colonne BDD (source unique, partagée avec la fiche patient).
+    const motifConsultation = savedBilan.pathologie || "";
+
     if (existingPlan) {
       await pb.collection("patient_care_plans").update(existingPlan.id, {
         bilan_initial_data: bilanJson,
         bilan_initial_date: effectiveDate,
+        motif_consultation: motifConsultation,
       });
       setCarePlanId(existingPlan.id);
     } else {
@@ -278,6 +291,7 @@ export default function PatientBilanInitial() {
         user: user.id,
         bilan_initial_data: bilanJson,
         bilan_initial_date: effectiveDate,
+        motif_consultation: motifConsultation,
       });
       setCarePlanId(created.id);
     }
@@ -601,11 +615,11 @@ export default function PatientBilanInitial() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Motif de consultation / Pathologie</Label>
-                  <Input
+                  <Textarea
                     placeholder="Ex: Lombalgie chronique"
                     value={bilan.pathologie}
                     onChange={(e) => handleChange("pathologie", e.target.value)}
-                    className="mt-1"
+                    className="mt-1 min-h-[100px]"
                   />
                 </div>
                 <div>

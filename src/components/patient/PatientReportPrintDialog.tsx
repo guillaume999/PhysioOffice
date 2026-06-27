@@ -116,6 +116,25 @@ type OptionKey =
   | "includeTraitement"
   | "includeDate";
 
+// Sections dont le contenu peut être pré-rempli (données) ou laissé vierge (à remplir).
+const fillableKeys: OptionKey[] = [
+  "includePatientInfo",
+  "includeAllergies",
+  "includeAntecedents",
+  "includeObjectifs",
+  "includeTraitement",
+  "includeComments",
+  "bilanInfosPatient",
+  "bilanHistoire",
+  "bilanPathologie",
+  "bilanDouleurs",
+  "bilanMorphodynamique",
+  "bilanMorphostatique",
+  "bilanCutaneo",
+  "bilanForceTests",
+  "bilanCommentaires",
+];
+
 interface OptionGroup {
   title: string;
   icon: ReactNode;
@@ -142,8 +161,6 @@ const optionGroups: OptionGroup[] = [
     title: "Prise en charge",
     icon: <FileText className="w-4 h-4" />,
     options: [
-      { key: "includeMotifConsultation", label: "Motif de consultation" },
-      { key: "includeBilanKine", label: "Bilan kiné" },
       { key: "includeObjectifs", label: "Objectifs" },
       { key: "includeTraitement", label: "Plan de traitement" },
       { key: "includeComments", label: "Commentaires" },
@@ -205,6 +222,23 @@ export function PatientReportPrintDialog({
     includeDate: true,
   });
 
+  // Pré-rempli vs vierge, réglable section par section.
+  // Une clé présente = section laissée VIERGE ; absente = pré-remplie (défaut).
+  const [blankSections, setBlankSections] = useState<Set<OptionKey>>(new Set());
+  const isPrefilled = (key: OptionKey) => !blankSections.has(key);
+  const toggleFill = (key: OptionKey) => {
+    setBlankSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const setAllFill = (prefill: boolean) =>
+    setBlankSections(prefill ? new Set() : new Set(fillableKeys));
+  const allPrefilled = blankSections.size === 0;
+  const allBlank = fillableKeys.every((k) => blankSections.has(k));
+
   const [activeTab, setActiveTab] = useState<"options" | "preview">("options");
 
   const toggleOption = (key: OptionKey) => {
@@ -215,99 +249,142 @@ export function PatientReportPrintDialog({
     if (!bilanInitialData) return "";
 
     const d = bilanInitialData;
-    const val = (key: string): string => {
+    // Valeur brute du champ. Le motif de consultation est relié à la colonne BDD
+    // (source unique) : on l'affiche en priorité, avec repli sur l'ancien JSON.
+    const rawVal = (key: string): string => {
+      if (key === "pathologie" && carePlan.motif_consultation && String(carePlan.motif_consultation).trim()) {
+        return String(carePlan.motif_consultation).trim();
+      }
       const v = d[key];
       return v === null || v === undefined ? "" : String(v).trim();
     };
 
-    // Groupes de champs simples, dans l'ordre de la page Bilan Initial.
-    // `option` = sous-case du dialog qui pilote l'affichage de la section.
-    const groups: { title: string; option: OptionKey; fields: { key: string; label: string }[] }[] = [
+    // Mise en page « formulaire » identique à la page Bilan Initial :
+    // chaque section = des lignes de champs, chaque champ = libellé au-dessus d'une case bordée.
+    // `tall` = champ texte (textarea) → case plus haute. Une ligne peut contenir 1 à 4 champs.
+    type BilanField = { key: string; label: string; tall?: boolean };
+    type BilanSection = { title: string; option: OptionKey; rows: BilanField[][] };
+    const sections: BilanSection[] = [
       {
         title: "Informations patient",
         option: "bilanInfosPatient",
-        fields: [
-          { key: "profession", label: "Profession" },
-          { key: "taille", label: "Taille (cm)" },
-          { key: "poids", label: "Poids (kg)" },
-          { key: "lateralite", label: "Latéralité" },
-          { key: "loisir_sport", label: "Loisirs - Activités physiques" },
-          { key: "activite_physique_type", label: "Type d'activité" },
-          { key: "situation_fam", label: "Situation familiale" },
-          { key: "atcd", label: "Antécédents (ATCD)" },
-          { key: "medicaments", label: "Médicaments" },
-          { key: "pathologies_associees", label: "Pathologies associées" },
-          { key: "tabac", label: "Tabac" },
-          { key: "etat_psychique", label: "État psychique du patient" },
+        rows: [
+          [
+            { key: "profession", label: "Profession" },
+            { key: "taille", label: "Taille (cm)" },
+            { key: "poids", label: "Poids (kg)" },
+            { key: "lateralite", label: "Latéralité" },
+          ],
+          [
+            { key: "loisir_sport", label: "Loisirs - Activités physiques" },
+            { key: "activite_physique_type", label: "Type d'activité" },
+            { key: "situation_fam", label: "Situation familiale" },
+          ],
+          [
+            { key: "atcd", label: "Antécédents (ATCD)", tall: true },
+            { key: "medicaments", label: "Médicaments", tall: true },
+          ],
+          [
+            { key: "pathologies_associees", label: "Pathologies associées" },
+            { key: "tabac", label: "Tabac" },
+          ],
+          [{ key: "etat_psychique", label: "État psychique du patient" }],
         ],
       },
       {
         title: "Histoire du patient",
         option: "bilanHistoire",
-        fields: [{ key: "histoire_patient", label: "Histoire du patient" }],
+        rows: [[{ key: "histoire_patient", label: "Histoire du patient", tall: true }]],
       },
       {
         title: "Pathologie / Plainte",
         option: "bilanPathologie",
-        fields: [
-          { key: "pathologie", label: "Motif de consultation / Pathologie" },
-          { key: "date_debut", label: "Depuis quand ?" },
-          { key: "plainte_patient", label: "Plainte patient" },
-          { key: "facteurs_declenchants", label: "Facteurs déclenchants" },
-          { key: "circonstances", label: "Circonstances" },
-          { key: "histoire_naturelle", label: "Histoire naturelle de la pathologie" },
-          { key: "evolution", label: "Évolution" },
-          { key: "recidive", label: "Récidive" },
-          { key: "chirurgie", label: "Chirurgie" },
-          { key: "chirurgie_detail", label: "Si oui, quelle opération ?" },
-          { key: "examen_complementaire", label: "Examen complémentaire (imagerie)" },
-          { key: "ttt_deja_suivis", label: "Traitements kiné déjà suivis" },
-          { key: "signes", label: "Signes" },
-          { key: "mvt_impossibles", label: "Mouvements impossibles" },
-          { key: "projets_attentes", label: "Objectifs / Projets / Attentes du patient" },
+        rows: [
+          [
+            { key: "pathologie", label: "Motif de consultation / Pathologie", tall: true },
+            { key: "date_debut", label: "Depuis quand ?" },
+          ],
+          [{ key: "plainte_patient", label: "Plainte patient", tall: true }],
+          [
+            { key: "facteurs_declenchants", label: "Facteurs déclenchants" },
+            { key: "circonstances", label: "Circonstances" },
+          ],
+          [
+            { key: "histoire_naturelle", label: "Histoire naturelle de la pathologie" },
+            { key: "evolution", label: "Évolution" },
+          ],
+          [
+            { key: "recidive", label: "Récidive" },
+            { key: "chirurgie", label: "Chirurgie" },
+            { key: "chirurgie_detail", label: "Si oui, quelle opération ?" },
+          ],
+          [
+            { key: "examen_complementaire", label: "Examen complémentaire (imagerie)", tall: true },
+            { key: "ttt_deja_suivis", label: "Traitements kiné déjà suivis", tall: true },
+          ],
+          [
+            { key: "signes", label: "Signes" },
+            { key: "mvt_impossibles", label: "Mouvements impossibles" },
+          ],
+          [{ key: "projets_attentes", label: "Objectifs / Projets / Attentes du patient", tall: true }],
         ],
       },
       {
         title: "Bilan cutanéo-trophique",
         option: "bilanCutaneo",
-        fields: [
-          { key: "cutaneo_cicatrice_couleur", label: "Cicatrice / Couleur" },
-          { key: "cutaneo_trophiques", label: "Troubles trophiques" },
-          { key: "cutaneo_adherences_chaleur", label: "Adhérences / Chaleur" },
-          { key: "cutaneo_test_decollement", label: "Test de décollement" },
-          { key: "cutaneo_test_godet", label: "Test du godet" },
-          { key: "cutaneo_amyotrophie", label: "Amyotrophie" },
+        rows: [
+          [
+            { key: "cutaneo_cicatrice_couleur", label: "Cicatrice / Couleur" },
+            { key: "cutaneo_trophiques", label: "Troubles trophiques" },
+          ],
+          [
+            { key: "cutaneo_adherences_chaleur", label: "Adhérences / Chaleur" },
+            { key: "cutaneo_test_decollement", label: "Test de décollement" },
+          ],
+          [
+            { key: "cutaneo_test_godet", label: "Test du godet" },
+            { key: "cutaneo_amyotrophie", label: "Amyotrophie" },
+          ],
         ],
       },
       {
         title: "Force et tests",
         option: "bilanForceTests",
-        fields: [
-          { key: "force_musculaire", label: "Force musculaire" },
-          { key: "tests_specifiques", label: "Tests spécifiques" },
+        rows: [
+          [{ key: "force_musculaire", label: "Force musculaire", tall: true }],
+          [{ key: "tests_specifiques", label: "Tests spécifiques", tall: true }],
         ],
       },
       {
         title: "Commentaires",
         option: "bilanCommentaires",
-        fields: [{ key: "commentaires", label: "Commentaires" }],
+        rows: [[{ key: "commentaires", label: "Commentaires", tall: true }]],
       },
     ];
 
     const content: string[] = [];
-    // Trait vide pour les champs non renseignés → la section s'imprime en entier
-    // (template à remplir), comme sur la page Bilan Initial.
-    const blank = '<span style="color:#999;">______________________________</span>';
 
-    groups.forEach(({ title, option, fields }) => {
+    // Une case de formulaire : libellé + encadré. En mode vierge, la case reste vide.
+    const fieldBox = ({ key, label, tall }: BilanField, prefill: boolean): string => {
+      const v = prefill ? rawVal(key) : "";
+      const minH = tall ? "44px" : "20px";
+      return (
+        `<div style="display:flex; flex-direction:column;">` +
+        `<span style="font-size:11px; font-weight:bold; color:#444; margin-bottom:3px;">${escapeHtml(label)}</span>` +
+        `<div style="border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; min-height:${minH}; white-space:pre-wrap; word-break:break-word;">${v ? escapeHtml(v) : "&nbsp;"}</div>` +
+        `</div>`
+      );
+    };
+
+    sections.forEach(({ title, option, rows }) => {
       if (!options[option]) return;
-      // On affiche TOUS les champs de la section, remplis ou non.
-      const rows = fields.map(({ key, label }) => {
-        const v = val(key);
-        return `<p><strong>${escapeHtml(label)} :</strong> ${v ? escapeHtml(v) : blank}</p>`;
+      const prefill = isPrefilled(option);
+      content.push(`<h2 class="section-title">${escapeHtml(title)}</h2>`);
+      rows.forEach((row) => {
+        content.push(`<div style="display:grid; grid-template-columns:repeat(${row.length}, 1fr); gap:10px; margin-bottom:8px;">`);
+        row.forEach((f) => content.push(fieldBox(f, prefill)));
+        content.push(`</div>`);
       });
-      content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
-      content.push(...rows);
     });
 
     // Tableaux dynamiques (zone / observation).
@@ -320,12 +397,14 @@ export function PatientReportPrintDialog({
     tables.forEach(({ key, title, option }) => {
       if (!options[option]) return;
       const entries = Array.isArray(d[key]) ? d[key] : [];
-      const filled = entries.filter((e: any) => (e?.zone || "").trim() || (e?.observation || "").trim());
+      const filled = isPrefilled(option)
+        ? entries.filter((e: any) => (e?.zone || "").trim() || (e?.observation || "").trim())
+        : [];
       // Si aucune ligne renseignée, on imprime des lignes vierges à remplir.
       const rows = filled.length > 0
         ? filled
         : [{ zone: "", observation: "" }, { zone: "", observation: "" }, { zone: "", observation: "" }];
-      content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
+      content.push(`<h2 class="section-title">${escapeHtml(title)}</h2>`);
       content.push(`<table style="width:100%; border-collapse:collapse; margin-top:6px;">`);
       content.push(`<thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:6px; text-align:left;">Zone</th><th style="border:1px solid #ddd; padding:6px; text-align:left;">Observation</th></tr></thead><tbody>`);
       rows.forEach((e: any) => {
@@ -366,8 +445,9 @@ export function PatientReportPrintDialog({
     sections.push(`<p><strong>Mutuelle :</strong> ____________________</p>`);
     sections.push(`<p><strong>N° Sécu. Soc. :</strong> ____________________</p>`);
     sections.push(`<p><strong>Médecin prescripteur :</strong> ____________________</p>`);
-    if (options.includePatientInfo && patient.numero) {
-      sections.push(`<p><strong>N° Patient :</strong> ${escapeHtml(patient.numero)}</p>`);
+    if (options.includePatientInfo) {
+      const show = isPrefilled("includePatientInfo") && patient.numero;
+      sections.push(`<p><strong>N° Patient :</strong> ${show ? escapeHtml(patient.numero) : "____________________"}</p>`);
     }
     sections.push(`</div>`);
 
@@ -382,34 +462,24 @@ export function PatientReportPrintDialog({
 
     if (options.includeAllergies) {
       sections.push(`<h2 class="section-title">Allergies</h2>`);
-      sections.push(`<p class="multiline">${patient.allergies ? escapeHtml(patient.allergies) + extraLines : emptyLines}</p>`);
+      sections.push(`<p class="multiline">${isPrefilled("includeAllergies") && patient.allergies ? escapeHtml(patient.allergies) + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeAntecedents) {
       sections.push(`<h2 class="section-title">Antécédents</h2>`);
-      sections.push(`<p class="multiline">${patient.antecedents ? escapeHtml(patient.antecedents) + extraLines : emptyLines}</p>`);
-    }
-
-    if (options.includeMotifConsultation) {
-      sections.push(`<h2 class="section-title">Motif de consultation</h2>`);
-      sections.push(`<p class="multiline">${carePlan.motif_consultation ? escapeHtml(carePlan.motif_consultation) + extraLines : emptyLines}</p>`);
-    }
-
-    if (options.includeBilanKine) {
-      sections.push(`<h2 class="section-title">Bilan kiné</h2>`);
-      sections.push(`<p class="multiline">${carePlan.bilan_kine ? escapeHtml(carePlan.bilan_kine) + extraLines : emptyLines}</p>`);
+      sections.push(`<p class="multiline">${isPrefilled("includeAntecedents") && patient.antecedents ? escapeHtml(patient.antecedents) + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeObjectifs) {
       sections.push(`<h2 class="section-title">Objectifs de prise en charge</h2>`);
-      sections.push(`<p class="multiline">${carePlan.objectifs_prise_en_charge ? escapeHtml(carePlan.objectifs_prise_en_charge) + extraLines : emptyLines}</p>`);
+      sections.push(`<p class="multiline">${isPrefilled("includeObjectifs") && carePlan.objectifs_prise_en_charge ? escapeHtml(carePlan.objectifs_prise_en_charge) + extraLines : emptyLines}</p>`);
     }
 
     if (options.includeTraitement) {
       sections.push(`<h2 class="section-title">Plan de traitement</h2>`);
-      sections.push(`<p><strong>Traitement :</strong> ${escapeHtml(activeTraitementName) || '____________________'}</p>`);
-      
-      if (traitementSeances.length > 0) {
+      sections.push(`<p><strong>Traitement :</strong> ${isPrefilled("includeTraitement") && activeTraitementName ? escapeHtml(activeTraitementName) : '____________________'}</p>`);
+
+      if (isPrefilled("includeTraitement") && traitementSeances.length > 0) {
         sections.push(`<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">`);
         sections.push(`<thead><tr style="background: #f5f5f5;">`);
         sections.push(`<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">N°</th>`);
@@ -496,7 +566,7 @@ export function PatientReportPrintDialog({
 
     if (options.includeComments) {
       sections.push(`<h2 class="section-title">Commentaires</h2>`);
-      sections.push(`<p class="multiline">${carePlan.comments ? escapeHtml(carePlan.comments) + extraLines : emptyLines}</p>`);
+      sections.push(`<p class="multiline">${isPrefilled("includeComments") && carePlan.comments ? escapeHtml(carePlan.comments) + extraLines : emptyLines}</p>`);
     }
 
     return sections.join("\n");
@@ -635,6 +705,36 @@ export function PatientReportPrintDialog({
             {activeTab === "options" && (
               <ScrollArea className="flex-1 min-h-0">
                 <div className="space-y-4 pr-3">
+                  {/* Mode de remplissage global + réglage par section (2e case verte sur chaque ligne) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
+                      <FileText className="w-4 h-4" />
+                      Contenu des champs
+                    </div>
+                    <div className="flex gap-1 bg-muted rounded-lg p-1 w-fit">
+                      <Button
+                        variant={allPrefilled ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => setAllFill(true)}
+                      >
+                        Tout pré-rempli
+                      </Button>
+                      <Button
+                        variant={allBlank ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => setAllFill(false)}
+                      >
+                        Tout vierge
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      Sur chaque ligne : la case <span className="text-primary font-medium">bleue</span> affiche la section,
+                      la case <span className="text-emerald-600 font-medium">verte</span> la pré-remplit (décochée = vierge).
+                    </p>
+                  </div>
+
                   {optionGroups.map((group) => (
                     <div key={group.title} className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-1.5">
@@ -646,20 +746,26 @@ export function PatientReportPrintDialog({
                           <div
                             key={key}
                             className={cn(
-                              "flex items-center space-x-2 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-accent",
+                              "flex items-center space-x-2 p-1.5 rounded-md transition-colors",
                               options[key] && "bg-accent/50"
                             )}
-                            onClick={() => toggleOption(key)}
                           >
                             <Checkbox
-                              id={key}
                               checked={options[key]}
                               onCheckedChange={() => toggleOption(key)}
                               className="h-4 w-4"
+                              title="Afficher cette section"
+                            />
+                            <Checkbox
+                              checked={isPrefilled(key)}
+                              disabled={!options[key]}
+                              onCheckedChange={() => toggleFill(key)}
+                              className="h-4 w-4 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                              title="Pré-remplir avec les données (décocher = vierge)"
                             />
                             <Label
-                              htmlFor={key}
                               className="cursor-pointer text-sm leading-tight"
+                              onClick={() => toggleOption(key)}
                             >
                               {label}
                             </Label>
@@ -693,23 +799,27 @@ export function PatientReportPrintDialog({
                           key={key}
                           className={cn(
                             "flex items-center space-x-2 p-1.5 rounded-md transition-colors",
-                            options.includeBilanInitial
-                              ? "cursor-pointer hover:bg-accent"
-                              : "opacity-40 pointer-events-none",
+                            options.includeBilanInitial ? "" : "opacity-40 pointer-events-none",
                             options[key] && options.includeBilanInitial && "bg-accent/50"
                           )}
-                          onClick={() => options.includeBilanInitial && toggleOption(key)}
                         >
                           <Checkbox
-                            id={key}
                             checked={options[key]}
                             disabled={!options.includeBilanInitial}
                             onCheckedChange={() => toggleOption(key)}
                             className="h-4 w-4"
+                            title="Afficher cette section"
+                          />
+                          <Checkbox
+                            checked={isPrefilled(key)}
+                            disabled={!options.includeBilanInitial || !options[key]}
+                            onCheckedChange={() => toggleFill(key)}
+                            className="h-4 w-4 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                            title="Pré-remplir avec les données (décocher = vierge)"
                           />
                           <Label
-                            htmlFor={key}
                             className="cursor-pointer text-sm leading-tight"
+                            onClick={() => options.includeBilanInitial && toggleOption(key)}
                           >
                             {label}
                           </Label>

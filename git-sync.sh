@@ -11,6 +11,15 @@ echo "📁 Répertoire : $REPO_DIR"
 # Fetch silencieux pour avoir l'état du remote
 git fetch origin
 
+# Garde : vérifier les types avant tout commit/push.
+# Empêche qu'un fichier cassé (ou tronqué par le mount sandbox) parte sur origin/main.
+echo "🔎 Vérification des types (tsc)..."
+if ! npm run typecheck; then
+  echo "❌ Erreurs de types détectées. Commit/push annulé."
+  exit 1
+fi
+echo "✅ Types OK."
+
 # Vérifier s'il y a des modifications non committées
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "⚠️  Modifications locales non committées détectées."
