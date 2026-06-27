@@ -295,16 +295,19 @@ export function PatientReportPrintDialog({
     ];
 
     const content: string[] = [];
+    // Trait vide pour les champs non renseignés → la section s'imprime en entier
+    // (template à remplir), comme sur la page Bilan Initial.
+    const blank = '<span style="color:#999;">______________________________</span>';
 
     groups.forEach(({ title, option, fields }) => {
       if (!options[option]) return;
-      const rows = fields
-        .filter(({ key }) => val(key) !== "")
-        .map(({ key, label }) => `<p><strong>${escapeHtml(label)} :</strong> ${escapeHtml(val(key))}</p>`);
-      if (rows.length > 0) {
-        content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
-        content.push(...rows);
-      }
+      // On affiche TOUS les champs de la section, remplis ou non.
+      const rows = fields.map(({ key, label }) => {
+        const v = val(key);
+        return `<p><strong>${escapeHtml(label)} :</strong> ${v ? escapeHtml(v) : blank}</p>`;
+      });
+      content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
+      content.push(...rows);
     });
 
     // Tableaux dynamiques (zone / observation).
@@ -318,15 +321,17 @@ export function PatientReportPrintDialog({
       if (!options[option]) return;
       const entries = Array.isArray(d[key]) ? d[key] : [];
       const filled = entries.filter((e: any) => (e?.zone || "").trim() || (e?.observation || "").trim());
-      if (filled.length > 0) {
-        content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
-        content.push(`<table style="width:100%; border-collapse:collapse; margin-top:6px;">`);
-        content.push(`<thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:6px; text-align:left;">Zone</th><th style="border:1px solid #ddd; padding:6px; text-align:left;">Observation</th></tr></thead><tbody>`);
-        filled.forEach((e: any) => {
-          content.push(`<tr><td style="border:1px solid #ddd; padding:6px;">${escapeHtml(e.zone || "")}</td><td style="border:1px solid #ddd; padding:6px;">${escapeHtml(e.observation || "")}</td></tr>`);
-        });
-        content.push(`</tbody></table>`);
-      }
+      // Si aucune ligne renseignée, on imprime des lignes vierges à remplir.
+      const rows = filled.length > 0
+        ? filled
+        : [{ zone: "", observation: "" }, { zone: "", observation: "" }, { zone: "", observation: "" }];
+      content.push(`<p style="margin-top:10px;"><strong><u>${escapeHtml(title)}</u></strong></p>`);
+      content.push(`<table style="width:100%; border-collapse:collapse; margin-top:6px;">`);
+      content.push(`<thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd; padding:6px; text-align:left;">Zone</th><th style="border:1px solid #ddd; padding:6px; text-align:left;">Observation</th></tr></thead><tbody>`);
+      rows.forEach((e: any) => {
+        content.push(`<tr><td style="border:1px solid #ddd; padding:6px; height:22px;">${escapeHtml(e.zone || "")}</td><td style="border:1px solid #ddd; padding:6px; height:22px;">${escapeHtml(e.observation || "")}</td></tr>`);
+      });
+      content.push(`</tbody></table>`);
     });
 
     return content.join("\n");
