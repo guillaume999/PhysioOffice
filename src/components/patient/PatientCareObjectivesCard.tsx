@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Target, ClipboardList, FileText } from "lucide-react";
+import { Target } from "lucide-react";
 
 interface CarePlanData {
   motif_consultation: string;
@@ -14,42 +13,20 @@ interface PatientCareObjectivesCardProps {
   carePlan: CarePlanData;
   onChange: (field: keyof CarePlanData, value: string) => void;
   onBlur?: () => void;
-  onBilanInitial?: () => void;
-  onCertificats?: () => void;
 }
 
 export function PatientCareObjectivesCard({
   carePlan,
   onChange,
   onBlur,
-  onBilanInitial,
-  onCertificats,
 }: PatientCareObjectivesCardProps) {
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-3 pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Objectifs soins
-          </CardTitle>
-        </div>
-        {/* Actions - responsive layout */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          {onBilanInitial && (
-            <Button variant="outline" size="sm" onClick={onBilanInitial} className="shrink-0">
-              <ClipboardList className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Bilan initial</span>
-            </Button>
-          )}
-          {onCertificats && (
-            <Button variant="outline" size="sm" onClick={onCertificats} className="shrink-0">
-              <FileText className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Certificat constat</span>
-              <span className="sm:hidden">Certificat</span>
-            </Button>
-          )}
-        </div>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Target className="w-5 h-5" />
+          Objectifs soins
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight, AlertTriangle, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, User, Copy, History, Printer, Share2, ClipboardList, ChevronRight, AlertTriangle, Plus, FileText } from "lucide-react";
 import { ShareResourceDialog } from "@/components/sharing/ShareResourceDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -422,8 +422,18 @@ export default function PatientDetail() {
               <span className="hidden sm:inline">Enregistrer</span>
               <span className="sm:hidden">Sauver</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/patients/${id}/certificats`)}
+              className="shrink-0"
+            >
+              <FileText className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Certificat constat</span>
+              <span className="sm:hidden">Certificat</span>
+            </Button>
+            <Button
+              variant="outline"
               size="icon"
               onClick={() => setReportPrintDialogOpen(true)}
               title="Imprimer le compte-rendu"
@@ -491,8 +501,6 @@ export default function PatientDetail() {
             }}
             onChange={handleCarePlanChange}
             onBlur={handleAutoSave}
-            onBilanInitial={() => navigate(`/patients/${id}/bilan-initial`)}
-            onCertificats={() => navigate(`/patients/${id}/certificats`)}
           />
         </div>
 
