@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +72,8 @@ export function CorbeilleList({
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const fetchTrash = async () => {
     setLoading(true);
@@ -147,6 +150,52 @@ export function CorbeilleList({
     }
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === visible.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(visible.map((i) => i.id)));
+    }
+  };
+
+  const handleBulkPurge = async () => {
+    setBulkBusy(true);
+    try {
+      const targets = visible.filter((i) => selected.has(i.id));
+      await Promise.all(targets.map((i) => purge(i.collection.name, i.id)));
+      setItems((prev) => prev.filter((i) => !selected.has(i.id)));
+      setSelected(new Set());
+      toast.success(`${targets.length} élément(s) supprimé(s) définitivement`);
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    setBulkBusy(true);
+    try {
+      const targets = visible.filter((i) => selected.has(i.id));
+      await Promise.all(targets.map((i) => restore(i.collection.name, i.id)));
+      setItems((prev) => prev.filter((i) => !selected.has(i.id)));
+      setSelected(new Set());
+      toast.success(`${targets.length} élément(s) restauré(s)`);
+    } catch {
+      toast.error("Erreur lors de la restauration");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const filters = TRASH_COLLECTIONS.filter((c) => counts[c.name]);
 
   return (
@@ -171,7 +220,7 @@ export function CorbeilleList({
           <Button
             variant={activeFilter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setActiveFilter("all")}
+            onClick={() => { setActiveFilter("all"); setSelected(new Set()); }}
           >
             Tout ({items.length})
           </Button>
@@ -180,7 +229,7 @@ export function CorbeilleList({
               key={c.name}
               variant={activeFilter === c.name ? "default" : "outline"}
               size="sm"
-              onClick={() => setActiveFilter(c.name)}
+              onClick={() => { setActiveFilter(c.name); setSelected(new Set()); }}
             >
               <c.icon className="w-4 h-4 mr-1.5" />
               {c.label} ({counts[c.name]})
@@ -202,12 +251,66 @@ export function CorbeilleList({
         </Card>
       ) : (
         <div className="space-y-2">
+          {/* Barre de sélection en masse */}
+          <div className="flex items-center gap-3 px-1 py-2">
+            <Checkbox
+              checked={visible.length > 0 && selected.size === visible.length}
+              onCheckedChange={toggleSelectAll}
+              aria-label="Tout sélectionner"
+            />
+            <span className="text-sm text-muted-foreground">
+              {selected.size > 0 ? `${selected.size} sélectionné(s)` : "Tout sélectionner"}
+            </span>
+            {selected.size > 0 && (
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkBusy}
+                  onClick={handleBulkRestore}
+                >
+                  {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RotateCcw className="w-4 h-4 mr-1.5" />Restaurer</>}
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={bulkBusy}>
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      Supprimer ({selected.size})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer définitivement ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {selected.size} élément(s) seront supprimés définitivement. Cette action est irréversible.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={handleBulkPurge}
+                      >
+                        Supprimer définitivement
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
           {visible.map((item) => {
             const Icon = item.collection.icon;
             const busy = busyId === item.id;
             return (
               <Card key={`${item.collection.name}-${item.id}`}>
                 <CardContent className="flex items-center gap-3 py-3">
+                  <Checkbox
+                    checked={selected.has(item.id)}
+                    onCheckedChange={() => toggleSelect(item.id)}
+                    aria-label={`Sélectionner ${item.title}`}
+                    className="shrink-0"
+                  />
                   <div className="p-2 rounded-lg bg-muted shrink-0">
                     <Icon className="w-4 h-4 text-muted-foreground" />
                   </div>

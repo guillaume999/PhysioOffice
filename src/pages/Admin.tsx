@@ -46,6 +46,7 @@ import {
   Calendar as CalendarIcon,
   ArrowUp,
   ArrowDown,
+  RefreshCw,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -87,6 +88,9 @@ interface SeanceType {
   original_id: string | null;
   user_id: string;
   created_at: string;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
 }
 
 interface TraitementType {
@@ -100,6 +104,9 @@ interface TraitementType {
   original_id: string | null;
   user_id: string;
   created_at: string;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
 }
 
 interface ExerciceType {
@@ -116,6 +123,9 @@ interface ExerciceType {
   thumbnail_url?: string | null;
   pathologie_tags?: string[] | null;
   rejection_reason?: string | null;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
 }
 
 interface ObjectifItem {
@@ -177,6 +187,12 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const parseSnapshot = (raw: string | object | null | undefined): Record<string, any> | null => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw as Record<string, any>;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
   const [seances, setSeances] = useState<SeanceType[]>([]);
@@ -186,10 +202,10 @@ export default function Admin() {
   const [newObjectifName, setNewObjectifName] = useState("");
   const [certificatModels, setCertificatModels] = useState<CertificatModel[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
-  // Badge de l'onglet "Corbeille" = demandes de retrait + éléments soft-supprimés.
+  // Badge de l'onglet "Corbeille" = uniquement les demandes de retrait en attente.
   const [withdrawalCount, setWithdrawalCount] = useState(0);
   const [trashedCount, setTrashedCount] = useState(0);
-  const corbeilleCount = withdrawalCount + trashedCount;
+  const corbeilleCount = withdrawalCount;
   const [featuredExerciceIds, setFeaturedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedExerciceIds, setConsultedExerciceIds] = useState<Set<string>>(new Set());
   const [consultedTraitementIds, setConsultedTraitementIds] = useState<Set<string>>(() => {
@@ -350,7 +366,7 @@ export default function Admin() {
 
     // Fetch seances
     const seancesData = (
-      await safeFetch("seance_types", () => pb.collection("seance_types").getFullList({ sort: "-created" }), [] as any[])
+      await safeFetch("seance_types", () => pb.collection("seance_types").getFullList({ sort: "-created", filter: 'deleted_at = ""' }), [] as any[])
     ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
     setSeances(seancesData as any);
 
@@ -358,7 +374,7 @@ export default function Admin() {
     const traitementsData = (
       await safeFetch(
         "traitement_types",
-        () => pb.collection("traitement_types").getFullList({ sort: "-created" }),
+        () => pb.collection("traitement_types").getFullList({ sort: "-created", filter: 'deleted_at = ""' }),
         [] as any[],
       )
     ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
@@ -366,7 +382,7 @@ export default function Admin() {
 
     // Fetch exercices
     const exercicesData = (
-      await safeFetch("exercices", () => pb.collection("exercices").getFullList({ sort: "-created" }), [] as any[])
+      await safeFetch("exercices", () => pb.collection("exercices").getFullList({ sort: "-created", filter: 'deleted_at = ""' }), [] as any[])
     ).map((r: any) => ({ ...r, created_at: r.created, user_id: r.user || r.user_id }));
     setExercices(exercicesData as any);
 
@@ -785,6 +801,50 @@ export default function Admin() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette séance ?")) return;
 
     try {
+      // Preserve pending or refused modification draft as a new independent non-shared record
+      const seance = seances.find(s => s.id === seanceId) as any;
+      if (seance?.shared_snapshot && (seance?.modification_refused || seance?.modification_pending)) {
+        try {
+          const snap = parseSnapshot(seance.shared_snapshot);
+          const draft = snap?.refused ?? snap?.modification;
+          if (draft) {
+            const pathologies: string[] = draft.pathologies?.length ? draft.pathologies : (seance.pathologies?.length ? seance.pathologies : [seance.pathologie].filter(Boolean));
+            const objectifs: string[] = draft.objectifs?.length ? draft.objectifs : [];
+            const newSeance = await pb.collection("seance_types").create({
+              user: seance.user_id,
+              nom: draft.nom || pathologies[0] || "",
+              pathologie: pathologies[0] || "",
+              pathologies,
+              objectif_principal: objectifs[0] || "",
+              objectifs_principaux: objectifs,
+              objectifs_secondaires: [],
+              author_name: seance.author_name,
+              is_shared: false,
+              is_copy: false,
+            });
+            const exercices = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${seanceId}"` });
+            for (const ex of exercices) {
+              await pb.collection("seance_exercices").create({
+                seance_type: newSeance.id,
+                exercice: ex.exercice || null,
+                name: ex.name || null,
+                description: ex.description || null,
+                repetitions: ex.repetitions || null,
+                duration_seconds: ex.duration_seconds || null,
+                series: ex.series || null,
+                force_1: ex.force_1 || null,
+                duration_seconds_2: ex.duration_seconds_2 || null,
+                force_2: ex.force_2 || null,
+                comment: ex.comment || null,
+                ordre: ex.ordre,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error preserving modification draft:", e);
+        }
+      }
+
       await pb.collection("seance_types").delete(seanceId);
 
       setSeances(seances.filter(s => s.id !== seanceId));
@@ -1030,6 +1090,174 @@ export default function Admin() {
     }
   };
 
+  const approveModification = async (type: "exercices" | "seance_types" | "traitement_types", id: string) => {
+    try {
+      const item = await pb.collection(type).getOne(id);
+      const approvePayload: Record<string, any> = { modification_pending: false, modification_note: null, modification_refused: false, shared_snapshot: null };
+
+      // Apply modification fields to main record on approval when they were stored in snapshot
+      if (item.shared_snapshot) {
+        try {
+          const s = parseSnapshot(item.shared_snapshot);
+          if (s?.modification) {
+            if (type === "exercices") {
+              Object.assign(approvePayload, {
+                title: s.modification.title,
+                description: s.modification.description,
+                pathologie_tags: s.modification.pathologie_tags,
+                objectif_tags: s.modification.objectif_tags,
+                video_url: s.modification.video_url,
+                thumbnail_url: s.modification.thumbnail_url,
+                image_url: s.modification.image_url,
+                media_type: s.modification.media_type,
+                ...(s.modification.video_id != null ? { video: s.modification.video_id } : {}),
+              });
+            } else if (type === "traitement_types") {
+              Object.assign(approvePayload, {
+                nom: s.modification.pathologie,
+                pathologie: s.modification.pathologie,
+                objectifs: s.modification.objectifs,
+                description: s.modification.description,
+              });
+            } else if (type === "seance_types") {
+              Object.assign(approvePayload, {
+                nom: s.modification.pathologies?.[0] || s.modification.pathologie || "",
+                pathologies: s.modification.pathologies,
+                objectifs: s.modification.objectifs,
+                objectifs_principaux: s.modification.objectifs,
+                pathologie: s.modification.pathologies?.[0] || s.modification.pathologie || "",
+                objectif_principal: s.modification.objectifs?.[0] || s.modification.objectif_principal || "",
+              });
+            }
+          }
+        } catch {}
+      }
+
+      // Parse snapshot before clearing it (needed to apply sub-collections on approval)
+      let modificationSnapshot: Record<string, any> | null = null;
+      if (item.shared_snapshot) {
+        try {
+          const s = parseSnapshot(item.shared_snapshot);
+          if (s?.modification) modificationSnapshot = s.modification;
+        } catch {}
+      }
+
+      await pb.collection(type).update(id, approvePayload);
+
+      // Apply sub-collection changes from snapshot for traitements and séances
+      if (type === "traitement_types" && modificationSnapshot) {
+        const oldTests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${id}"` });
+        for (const t of oldTests) await pb.collection("traitement_tests").delete(t.id);
+        for (const t of (modificationSnapshot.tests || []) as any[]) {
+          if (t.exercice_id) {
+            await pb.collection("traitement_tests").create({ traitement_type: id, exercice: t.exercice_id, description: "", ordre: t.ordre });
+          }
+        }
+        const oldSeances = await pb.collection("traitement_seances").getFullList({ filter: `traitement_type = "${id}"` });
+        for (const s of oldSeances) await pb.collection("traitement_seances").delete(s.id);
+        for (const s of (modificationSnapshot.seances || []) as any[]) {
+          if (s.seance_type_id) {
+            await pb.collection("traitement_seances").create({ traitement_type: id, seance_type: s.seance_type_id, ordre: s.ordre });
+          }
+        }
+      } else if (type === "seance_types" && modificationSnapshot) {
+        const oldEx = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${id}"` });
+        for (const e of oldEx) await pb.collection("seance_exercices").delete(e.id);
+        for (const ex of (modificationSnapshot.exercices || []) as any[]) {
+          await pb.collection("seance_exercices").create({
+            seance_type: id,
+            exercice: ex.exercice_id || null,
+            name: ex.name,
+            description: ex.description,
+            repetitions: ex.repetitions,
+            duration_seconds: ex.duration_seconds,
+            series: ex.series,
+            ordre: ex.ordre,
+          });
+        }
+      }
+
+      if (type === "exercices") {
+        setExercices(prev => prev.map(e => e.id === id ? { ...e, ...approvePayload, video_id: approvePayload.video ?? e.video_id } : e));
+      } else if (type === "seance_types") {
+        setSeances(prev => prev.map(s => s.id === id ? { ...s, modification_pending: false, modification_note: null, modification_refused: false, shared_snapshot: null } : s));
+      } else {
+        setTraitements(prev => prev.map(t => t.id === id ? { ...t, modification_pending: false, modification_note: null, modification_refused: false, shared_snapshot: null } : t));
+      }
+      toast({ title: "Modification validée", description: "La modification a été acceptée et l'élément reste partagé." });
+    } catch (error) {
+      console.error("Error approving modification:", error);
+      toast({ title: "Erreur", description: "Impossible d'approuver la modification.", variant: "destructive" });
+    }
+  };
+
+  const rejectModification = async (type: "exercices" | "seance_types" | "traitement_types", id: string) => {
+    try {
+      const item = await pb.collection(type).getOne(id);
+
+      // Get original and refused data from shared_snapshot
+      let originalData: Record<string, any> = {};
+      let refusedData: Record<string, any> = {};
+      if (item.shared_snapshot) {
+        const s = parseSnapshot(item.shared_snapshot);
+        if (s) {
+          if (s.modification) {
+            // New format: modification was stored in snapshot (main fields unchanged)
+            originalData = s.original || {};
+            refusedData = s.modification;
+          } else {
+            // Legacy format: main fields were updated, original stored in snapshot
+            originalData = s.original || s;
+          }
+        }
+      }
+
+      // For legacy format (no s.modification), read refused data from current main fields
+      if (Object.keys(refusedData).length === 0) {
+        if (type === "exercices") {
+          refusedData = { title: item.title, description: item.description, pathologie_tags: item.pathologie_tags, objectif_tags: item.objectif_tags, video_url: item.video_url, thumbnail_url: item.thumbnail_url, image_url: item.image_url, media_type: item.media_type, video_id: item.video_id };
+        } else if (type === "seance_types") {
+          refusedData = { pathologies: item.pathologies, objectifs: item.objectifs_principaux, nom: item.nom, pathologie: item.pathologie, objectif_principal: item.objectif_principal };
+        } else {
+          refusedData = { pathologie: item.pathologie, objectifs: item.objectifs, description: item.description };
+        }
+      }
+
+      // Store both versions in shared_snapshot; revert main record to original only in legacy flow
+      const dualSnapshot = JSON.stringify({ original: originalData, refused: refusedData });
+      const revertPayload: Record<string, any> = {
+        shared_snapshot: dualSnapshot,
+        modification_pending: false,
+        modification_note: null,
+        modification_refused: true,
+      };
+      // New flow (snapshot has modification field): main record was never changed → no revert needed.
+      // Legacy flow (no modification field in snapshot): main record was changed → revert to original.
+      const snapshotHadModification = (() => {
+        if (!item.shared_snapshot) return false;
+        return !!parseSnapshot(item.shared_snapshot)?.modification;
+      })();
+      const shouldRevert = !snapshotHadModification;
+      if (shouldRevert && Object.keys(originalData).length > 0) {
+        Object.assign(revertPayload, originalData);
+      }
+
+      await pb.collection(type).update(id, revertPayload);
+
+      if (type === "exercices") {
+        setExercices(prev => prev.map(e => e.id === id ? { ...e, ...revertPayload } : e));
+      } else if (type === "seance_types") {
+        setSeances(prev => prev.map(s => s.id === id ? { ...s, ...revertPayload } : s));
+      } else {
+        setTraitements(prev => prev.map(t => t.id === id ? { ...t, ...revertPayload } : t));
+      }
+      toast({ title: "Modification refusée", description: "La version précédente reste partagée. L'utilisateur en sera informé." });
+    } catch (error) {
+      console.error("Error rejecting modification:", error);
+      toast({ title: "Erreur", description: "Impossible de rejeter la modification.", variant: "destructive" });
+    }
+  };
+
   // Certificat model functions
   const handleAddModel = async () => {
     if (!newModelTitle.trim() || !newModelContent.trim() || !user) return;
@@ -1266,6 +1494,31 @@ export default function Admin() {
   const pendingExercices = filteredExercices.filter(e => e.status === 'pending');
   const withdrawalExercices = filteredExercices.filter(e => e.status === 'withdrawal_requested');
 
+  // Moderation lists: raw data (not filtered by search/filter) — used for section 1 and badge counts
+  const seancesForModeration = seances
+    .filter(s => !s.is_copy && s.is_shared && !s.is_validated && !s.is_refused)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const traitementsForModeration = traitements
+    .filter(t => !t.is_copy && t.is_shared && !t.is_validated && !t.is_refused)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const exercicesPendingModeration = exercices
+    .filter(e => !e.is_copy && e.status === "pending")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const exercicesWithdrawalModeration = exercices
+    .filter(e => !e.is_copy && e.status === "withdrawal_requested")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const exercicesModerationCount = exercicesPendingModeration.length + exercicesWithdrawalModeration.length;
+
+  const seancesModificationPending = seances
+    .filter(s => !s.is_copy && s.modification_pending)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const traitementsModificationPending = traitements
+    .filter(t => !t.is_copy && t.modification_pending)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const exercicesModificationPending = exercices
+    .filter(e => !e.is_copy && e.modification_pending)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
   const objectifUserNames = [...new Set(objectifs.filter(o => o.user_id).map(o => getUserDisplayName(o.user_id!)))].filter(n => n !== "Inconnu").sort((a, b) => a.localeCompare(b, "fr"));
 
   const filteredObjectifs = objectifs.filter(o => {
@@ -1353,22 +1606,22 @@ export default function Admin() {
             <TabsTrigger value="seances" className="relative flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Séances
-              {filteredSeances.filter(s => !consultedSeanceIds.has(s.id)).length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredSeances.filter(s => !consultedSeanceIds.has(s.id)).length}</Badge>
+              {(seancesForModeration.length + seancesModificationPending.length) > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{seancesForModeration.length + seancesModificationPending.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="traitements" className="relative flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
               Traitements
-              {filteredTraitements.filter(t => !consultedTraitementIds.has(t.id)).length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredTraitements.filter(t => !consultedTraitementIds.has(t.id)).length}</Badge>
+              {(traitementsForModeration.length + traitementsModificationPending.length) > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{traitementsForModeration.length + traitementsModificationPending.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="exercices" className="relative flex items-center gap-2">
               <Dumbbell className="w-4 h-4" />
               Exercices
-              {filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{filteredExercices.filter(e => !consultedExerciceIds.has(e.id)).length}</Badge>
+              {(exercicesModerationCount + exercicesModificationPending.length) > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-0 text-xs flex items-center justify-center">{exercicesModerationCount + exercicesModificationPending.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="objectifs" className="flex items-center gap-2">
@@ -1548,31 +1801,35 @@ export default function Admin() {
             <Card>
               <CardHeader>
                 <CardTitle>Modération des séances</CardTitle>
-                <div className="relative mt-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher par pathologie, objectif ou auteur..."
-                    value={seanceSearch}
-                    onChange={(e) => setSeanceSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
               </CardHeader>
               <CardContent>
-                {pendingSeances.length > 0 && (
-                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      En attente de validation de partage ({pendingSeances.length})
-                    </h3>
+                {/* Section 1 : Modération */}
+                <div className="mb-8">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4 text-orange-500" />
+                    Modération de partage
+                    {seancesForModeration.length > 0 && (
+                      <Badge variant="destructive" className="ml-1">{seancesForModeration.length}</Badge>
+                    )}
+                  </h3>
+                  {seancesForModeration.length > 0 ? (
                     <div className="space-y-2">
-                      {pendingSeances.map((s) => (
-                        <div key={s.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                      {seancesForModeration.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between bg-orange-500/5 border border-orange-500/20 p-3 rounded-lg">
                           <div>
                             <p className="font-medium">{s.pathologie}</p>
-                            <p className="text-sm text-muted-foreground">{s.author_name || "Anonyme"}</p>
+                            <p className="text-sm text-muted-foreground">{s.author_name || "Anonyme"} · {getUserDisplayName(s.user_id)}</p>
                           </div>
                           <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => allowSeance(s.id)}
+                              className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Valider
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -1592,8 +1849,101 @@ export default function Admin() {
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm p-4 bg-muted/30 rounded-lg border">
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                      Aucune séance en attente de modération
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 1b : Révisions soumises */}
+                {seancesModificationPending.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                      <RefreshCw className="w-4 h-4 text-amber-500" />
+                      Révisions soumises
+                      <Badge variant="destructive" className="ml-1">{seancesModificationPending.length}</Badge>
+                    </h3>
+                    <div className="space-y-2">
+                      {seancesModificationPending.map((s) => {
+                        let modPathologies: string[] | null = null;
+                        let origPathologies: string[] | null = null;
+                        let modObjectifs: string[] | null = null;
+                        let origObjectifs: string[] | null = null;
+                        if ((s as any).shared_snapshot) {
+                          const snap = parseSnapshot((s as any).shared_snapshot);
+                          if (snap?.modification) {
+                            modPathologies = snap.modification.pathologies || null;
+                            origPathologies = (snap.original || {}).pathologies || null;
+                            modObjectifs = snap.modification.objectifs || null;
+                            origObjectifs = (snap.original || {}).objectifs || null;
+                          }
+                        }
+                        const displayPathologies = modPathologies ?? (s as any).pathologies ?? [s.pathologie];
+                        const displayObjectifs = modObjectifs ?? (s as any).objectifs_principaux ?? (s.objectif_principal ? [s.objectif_principal] : []);
+                        return (
+                        <div key={s.id} className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              {displayPathologies && displayPathologies.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                  {displayPathologies.map((p: string) => <Badge key={p} variant="outline" className="text-xs">{p}</Badge>)}
+                                </div>
+                              )}
+                              {origPathologies && JSON.stringify(origPathologies) !== JSON.stringify(modPathologies) && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                  {origPathologies.map((p: string) => <Badge key={p} variant="outline" className="text-xs line-through opacity-50">{p}</Badge>)}
+                                </div>
+                              )}
+                              {displayObjectifs && displayObjectifs.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                  {displayObjectifs.map((o: string) => <Badge key={o} variant="secondary" className="text-xs">{o}</Badge>)}
+                                </div>
+                              )}
+                              {origObjectifs && JSON.stringify(origObjectifs) !== JSON.stringify(modObjectifs) && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                  {origObjectifs.map((o: string) => <Badge key={o} variant="secondary" className="text-xs line-through opacity-50">{o}</Badge>)}
+                                </div>
+                              )}
+                              <p className="text-sm text-muted-foreground">{s.author_name || "Anonyme"} · {getUserDisplayName(s.user_id)}</p>
+                              <p className="text-xs text-muted-foreground">{formatDateTime(s.created_at)}</p>
+                              <p className="text-xs text-amber-600 mt-1">⚠ Déjà partagé — modification soumise</p>
+                              {s.modification_note && (
+                                <p className="text-sm mt-1 italic">"{s.modification_note}"</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button variant="outline" size="sm" className="gap-1 border-green-500 text-green-600 hover:bg-green-50" onClick={() => approveModification("seance_types", s.id)}>
+                                <CheckCircle className="w-4 h-4" />Valider
+                              </Button>
+                              <Button variant="outline" size="sm" className="gap-1 border-red-500 text-red-500 hover:bg-red-50" onClick={() => rejectModification("seance_types", s.id)}>
+                                Rejeter
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
+
+                {/* Section 2 : Tous les éléments */}
+                <div className="border-t pt-6">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-4">
+                    <FileText className="w-4 h-4" />
+                    Tous les éléments ({filteredSeances.length})
+                  </h3>
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Rechercher par pathologie, objectif ou auteur..."
+                      value={seanceSearch}
+                      onChange={(e) => setSeanceSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -1859,48 +2209,92 @@ export default function Admin() {
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            {s.is_refused ? (
-                              <Badge className="bg-red-500">Refusé</Badge>
-                            ) : s.is_shared ? (
-                              s.is_validated ? (
-                                <Badge className="bg-green-500">Partagé & Validé</Badge>
+                            <div className="flex flex-col gap-1">
+                              {s.is_refused ? (
+                                <Badge className="bg-red-500">Refusé</Badge>
+                              ) : s.is_shared ? (
+                                s.is_validated ? (
+                                  <Badge className="bg-green-500">Partagé & Validé</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                                )
                               ) : (
-                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
-                              )
-                            ) : (
-                              <Badge variant="outline">Privé</Badge>
+                                <Badge variant="outline">Privé</Badge>
+                              )}
+                              {s.modification_pending && (
+                                <Badge className="bg-amber-500 text-white text-xs">
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Modification en attente
+                                </Badge>
+                              )}
+                            </div>
+                            {s.modification_pending && s.modification_note && (
+                              <p className="text-xs text-muted-foreground mt-1 max-w-xs italic">
+                                « {s.modification_note} »
+                              </p>
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            <div className="flex gap-2">
-                              {s.is_refused && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => allowSeance(s.id)}
-                                  className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                  Autoriser
-                                </Button>
+                            <div className="flex flex-col gap-2">
+                              {s.modification_pending && (
+                                <div className="flex gap-1 p-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                                  <span className="text-xs text-amber-700 dark:text-amber-300 font-medium mr-auto">
+                                    ⚠ Déjà partagé — modification soumise
+                                  </span>
+                                </div>
                               )}
-                              {s.is_shared && s.is_validated && (
+                              <div className="flex gap-2 flex-wrap">
+                                {s.modification_pending && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => approveModification("seance_types", s.id)}
+                                      className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                      Valider modif.
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => rejectModification("seance_types", s.id)}
+                                      className="gap-1 border-red-300 text-red-600 hover:bg-red-50"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                      Rejeter modif.
+                                    </Button>
+                                  </>
+                                )}
+                                {s.is_refused && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => allowSeance(s.id)}
+                                    className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Autoriser
+                                  </Button>
+                                )}
+                                {s.is_shared && s.is_validated && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => revokeSeance(s.id)}
+                                    className="gap-1 border-orange-500 text-orange-600 hover:bg-orange-50"
+                                  >
+                                    Révoquer
+                                  </Button>
+                                )}
                                 <Button
-                                  variant="outline"
+                                  variant="destructive"
                                   size="sm"
-                                  onClick={() => revokeSeance(s.id)}
-                                  className="gap-1 border-orange-500 text-orange-600 hover:bg-orange-50"
+                                  onClick={() => deleteSeance(s.id)}
                                 >
-                                  Révoquer
+                                  <Trash2 className="w-4 h-4" />
                                 </Button>
-                              )}
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => deleteSeance(s.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
@@ -1922,6 +2316,7 @@ export default function Admin() {
                     </tbody>
                   </table>
                 </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1930,30 +2325,25 @@ export default function Admin() {
             <Card>
               <CardHeader>
                 <CardTitle>Modération des traitements</CardTitle>
-                <div className="relative mt-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher par pathologie ou auteur..."
-                    value={traitementSearch}
-                    onChange={(e) => setTraitementSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
               </CardHeader>
               <CardContent>
-                {pendingTraitements.length > 0 && (
-                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      En attente de validation de partage ({pendingTraitements.length})
-                    </h3>
+                {/* Section 1 : Modération */}
+                <div className="mb-8">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4 text-orange-500" />
+                    Modération de partage
+                    {traitementsForModeration.length > 0 && (
+                      <Badge variant="destructive" className="ml-1">{traitementsForModeration.length}</Badge>
+                    )}
+                  </h3>
+                  {traitementsForModeration.length > 0 ? (
                     <div className="space-y-2">
-                      {pendingTraitements.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                      {traitementsForModeration.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between bg-orange-500/5 border border-orange-500/20 p-3 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div>
                               <p className="font-medium">{t.pathologie}</p>
-                              <p className="text-sm text-muted-foreground">{t.author_name || "Anonyme"}</p>
+                              <p className="text-sm text-muted-foreground">{t.author_name || "Anonyme"} · {getUserDisplayName(t.user_id)}</p>
                             </div>
                             {traitementCopyCounts[t.id] > 0 && (
                               <Badge variant="secondary" className="text-xs">{traitementCopyCounts[t.id]} copies</Badge>
@@ -1961,10 +2351,10 @@ export default function Admin() {
                           </div>
                           <div className="flex gap-2">
                             <Button
-                              variant="default"
+                              variant="outline"
                               size="sm"
                               onClick={() => toggleTraitementValidation(t.id, false)}
-                              className="gap-1"
+                              className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
                             >
                               <CheckCircle className="w-4 h-4" />
                               Valider
@@ -1988,8 +2378,106 @@ export default function Admin() {
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm p-4 bg-muted/30 rounded-lg border">
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                      Aucun traitement en attente de modération
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 1b : Révisions soumises */}
+                {traitementsModificationPending.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                      <RefreshCw className="w-4 h-4 text-amber-500" />
+                      Révisions soumises
+                      <Badge variant="destructive" className="ml-1">{traitementsModificationPending.length}</Badge>
+                    </h3>
+                    <div className="space-y-2">
+                      {traitementsModificationPending.map((t) => {
+                        let modPathologie: string | null = null;
+                        let origPathologie: string | null = null;
+                        let modObjectifs: string[] | null = null;
+                        let origObjectifs: string[] | null = null;
+                        let modDescription: string | null = null;
+                        let origDescription: string | null = null;
+                        if ((t as any).shared_snapshot) {
+                          const snap = parseSnapshot((t as any).shared_snapshot);
+                          if (snap?.modification) {
+                            modPathologie = snap.modification.pathologie || null;
+                            origPathologie = (snap.original || {}).pathologie || null;
+                            modObjectifs = snap.modification.objectifs || null;
+                            origObjectifs = (snap.original || {}).objectifs || null;
+                            modDescription = snap.modification.description || null;
+                            origDescription = (snap.original || {}).description || null;
+                          }
+                        }
+                        const displayPathologie = modPathologie ?? t.pathologie;
+                        const displayObjectifs = modObjectifs ?? (t as any).objectifs ?? [];
+                        const displayDescription = modDescription ?? (t as any).description ?? null;
+                        return (
+                        <div key={t.id} className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium">{displayPathologie}</p>
+                              {modPathologie && origPathologie && modPathologie !== origPathologie && (
+                                <p className="text-xs text-muted-foreground line-through opacity-60">{origPathologie}</p>
+                              )}
+                              {displayObjectifs.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {displayObjectifs.map((o: string) => <Badge key={o} variant="secondary" className="text-xs">{o}</Badge>)}
+                                </div>
+                              )}
+                              {origObjectifs && JSON.stringify(origObjectifs) !== JSON.stringify(modObjectifs) && origObjectifs.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {origObjectifs.map((o: string) => <Badge key={o} variant="secondary" className="text-xs line-through opacity-50">{o}</Badge>)}
+                                </div>
+                              )}
+                              {displayDescription && (
+                                <p className="text-sm text-muted-foreground mt-1">{displayDescription}</p>
+                              )}
+                              {modDescription && origDescription && modDescription !== origDescription && (
+                                <p className="text-xs text-muted-foreground line-through opacity-60 mt-1">{origDescription}</p>
+                              )}
+                              <p className="text-sm text-muted-foreground mt-1">{t.author_name || "Anonyme"} · {getUserDisplayName(t.user_id)}</p>
+                              <p className="text-xs text-muted-foreground">{formatDateTime(t.created_at)}</p>
+                              <p className="text-xs text-amber-600 mt-1">⚠ Déjà partagé — modification soumise</p>
+                              {t.modification_note && (
+                                <p className="text-sm mt-1 italic">"{t.modification_note}"</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button variant="outline" size="sm" className="gap-1 border-green-500 text-green-600 hover:bg-green-50" onClick={() => approveModification("traitement_types", t.id)}>
+                                <CheckCircle className="w-4 h-4" />Valider
+                              </Button>
+                              <Button variant="outline" size="sm" className="gap-1 border-red-500 text-red-500 hover:bg-red-50" onClick={() => rejectModification("traitement_types", t.id)}>
+                                Rejeter
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
+
+                {/* Section 2 : Tous les éléments */}
+                <div className="border-t pt-6">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-4">
+                    <ClipboardList className="w-4 h-4" />
+                    Tous les éléments ({filteredTraitements.length})
+                  </h3>
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Rechercher par pathologie ou auteur..."
+                      value={traitementSearch}
+                      onChange={(e) => setTraitementSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -2238,16 +2726,29 @@ export default function Admin() {
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            {t.is_refused ? (
-                              <Badge className="bg-red-500">Refusé</Badge>
-                            ) : t.is_shared ? (
-                              t.is_validated ? (
-                                <Badge className="bg-green-500">Partagé & Validé</Badge>
+                            <div className="flex flex-col gap-1">
+                              {t.is_refused ? (
+                                <Badge className="bg-red-500">Refusé</Badge>
+                              ) : t.is_shared ? (
+                                t.is_validated ? (
+                                  <Badge className="bg-green-500">Partagé & Validé</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                                )
                               ) : (
-                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
-                              )
-                            ) : (
-                              <Badge variant="outline">Privé</Badge>
+                                <Badge variant="outline">Privé</Badge>
+                              )}
+                              {t.modification_pending && (
+                                <Badge className="bg-amber-500 text-white text-xs">
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Modification en attente
+                                </Badge>
+                              )}
+                            </div>
+                            {t.modification_pending && t.modification_note && (
+                              <p className="text-xs text-muted-foreground mt-1 max-w-xs italic">
+                                « {t.modification_note} »
+                              </p>
                             )}
                           </td>
                           <td className="py-3 px-2">
@@ -2258,25 +2759,56 @@ export default function Admin() {
                             />
                           </td>
                           <td className="py-3 px-2">
-                            <div className="flex gap-2">
-                              {t.is_refused && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => allowTraitement(t.id)}
-                                  className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                  Autoriser
-                                </Button>
+                            <div className="flex flex-col gap-2">
+                              {t.modification_pending && (
+                                <div className="flex gap-1 p-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                                  <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                                    ⚠ Déjà partagé — modification soumise
+                                  </span>
+                                </div>
                               )}
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => deleteTraitement(t.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <div className="flex gap-2 flex-wrap">
+                                {t.modification_pending && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => approveModification("traitement_types", t.id)}
+                                      className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                      Valider modif.
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => rejectModification("traitement_types", t.id)}
+                                      className="gap-1 border-red-300 text-red-600 hover:bg-red-50"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                      Rejeter modif.
+                                    </Button>
+                                  </>
+                                )}
+                                {t.is_refused && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => allowTraitement(t.id)}
+                                    className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Autoriser
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteTraitement(t.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-2 text-sm text-muted-foreground">
@@ -2298,6 +2830,7 @@ export default function Admin() {
                     </tbody>
                   </table>
                 </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2306,110 +2839,222 @@ export default function Admin() {
             <Card>
               <CardHeader>
                 <CardTitle>Modération des exercices</CardTitle>
-                <div className="relative mt-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher par titre ou auteur..."
-                    value={exerciceSearch}
-                    onChange={(e) => setExerciceSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
               </CardHeader>
               <CardContent>
-                {withdrawalExercices.length > 0 && (
-                  <div className="mb-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    <h3 className="font-semibold text-blue-600 mb-3 flex items-center gap-2">
-                      <Undo2 className="w-4 h-4" />
-                      Demandes de retrait ({withdrawalExercices.length})
-                    </h3>
-                    <div className="space-y-2">
-                      {withdrawalExercices.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
-                          <div>
-                            <p className="font-medium">{e.title}</p>
-                            <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => approveWithdrawalRequest(e.id)}
-                              className="gap-1"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Approuver le retrait
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => denyWithdrawalRequest(e.id)}
-                              className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
-                            >
-                              <XCircle className="w-4 h-4" />
-                              Refuser
-                            </Button>
+                {/* Section 1 : Modération */}
+                <div className="mb-8">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4 text-orange-500" />
+                    Modération de partage
+                    {exercicesModerationCount > 0 && (
+                      <Badge variant="destructive" className="ml-1">{exercicesModerationCount}</Badge>
+                    )}
+                  </h3>
+                  {exercicesModerationCount === 0 ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm p-4 bg-muted/30 rounded-lg border">
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                      Aucun exercice en attente de modération
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {exercicesWithdrawalModeration.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-blue-600 flex items-center gap-1 mb-2">
+                            <Undo2 className="w-4 h-4" />
+                            Demandes de retrait ({exercicesWithdrawalModeration.length})
+                          </p>
+                          <div className="space-y-2">
+                            {exercicesWithdrawalModeration.map((e) => (
+                              <div key={e.id} className="flex items-center justify-between bg-blue-500/5 border border-blue-500/20 p-3 rounded-lg">
+                                <div>
+                                  <p className="font-medium">{e.title}</p>
+                                  <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"} · {getUserDisplayName(e.user_id)}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => approveWithdrawalRequest(e.id)}
+                                    className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Approuver le retrait
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => denyWithdrawalRequest(e.id)}
+                                    className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                    Refuser
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      )}
+                      {exercicesPendingModeration.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-orange-600 flex items-center gap-1 mb-2">
+                            <Clock className="w-4 h-4" />
+                            En attente de validation ({exercicesPendingModeration.length})
+                          </p>
+                          <div className="space-y-2">
+                            {exercicesPendingModeration.map((e) => (
+                              <div key={e.id} className="flex items-center justify-between bg-orange-500/5 border border-orange-500/20 p-3 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    <p className="font-medium">{e.title}</p>
+                                    <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"} · {getUserDisplayName(e.user_id)}</p>
+                                  </div>
+                                  {exerciceCopyCounts[e.id] > 0 && (
+                                    <Badge variant="secondary" className="text-xs">{exerciceCopyCounts[e.id]} copies</Badge>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => toggleExerciceValidation(e.id, e.status)}
+                                    className="gap-1 border-green-500 text-green-600 hover:bg-green-50"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Valider
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setRejectExerciceDialog({
+                                      open: true,
+                                      exerciceId: e.id,
+                                      exerciceTitle: e.title
+                                    })}
+                                    className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                    Refuser
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => deleteExercice(e.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 1b : Révisions soumises */}
+                {exercicesModificationPending.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
+                      <RefreshCw className="w-4 h-4 text-amber-500" />
+                      Révisions soumises
+                      <Badge variant="destructive" className="ml-1">{exercicesModificationPending.length}</Badge>
+                    </h3>
+                    <div className="space-y-2">
+                      {exercicesModificationPending.map((e) => {
+                        // New format stores modification in shared_snapshot.modification
+                        let modificationTitle: string | null = null;
+                        let originalTitle: string | null = null;
+                        let modificationDescription: string | null = null;
+                        let originalDescription: string | null = null;
+                        let modificationPathologieTags: string[] | null = null;
+                        let originalPathologieTags: string[] | null = null;
+                        let modificationObjectifTags: string[] | null = null;
+                        let originalObjectifTags: string[] | null = null;
+                        if ((e as any).shared_snapshot) {
+                          const s = parseSnapshot((e as any).shared_snapshot);
+                          if (s?.modification) {
+                            modificationTitle = s.modification.title || null;
+                            originalTitle = (s.original || {}).title || null;
+                            modificationDescription = s.modification.description || null;
+                            originalDescription = (s.original || {}).description || null;
+                            modificationPathologieTags = s.modification.pathologie_tags || null;
+                            originalPathologieTags = (s.original || {}).pathologie_tags || null;
+                            modificationObjectifTags = s.modification.objectif_tags || null;
+                            originalObjectifTags = (s.original || {}).objectif_tags || null;
+                          }
+                        }
+                        const displayTitle = modificationTitle || e.title;
+                        const displayDescription = modificationDescription ?? e.description;
+                        const displayPathologieTags = modificationPathologieTags ?? e.pathologie_tags;
+                        const displayObjectifTags = modificationObjectifTags ?? (e as any).objectif_tags;
+                        return (
+                        <div key={e.id} className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-lg space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium">{displayTitle}</p>
+                              {modificationTitle && originalTitle && modificationTitle !== originalTitle && (
+                                <p className="text-xs text-muted-foreground line-through">{originalTitle}</p>
+                              )}
+                              {displayDescription && (
+                                <p className="text-sm text-muted-foreground mt-1">{displayDescription}</p>
+                              )}
+                              {modificationDescription && originalDescription && modificationDescription !== originalDescription && (
+                                <p className="text-xs text-muted-foreground line-through">{originalDescription}</p>
+                              )}
+                              {displayPathologieTags && displayPathologieTags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {displayPathologieTags.map((tag: string) => (
+                                    <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              {displayObjectifTags && displayObjectifTags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {displayObjectifTags.map((tag: string) => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-sm text-muted-foreground mt-1">{e.author_name || "Anonyme"} · {getUserDisplayName(e.user_id)}</p>
+                              <p className="text-xs text-muted-foreground">{formatDateTime(e.created_at)}</p>
+                              <p className="text-xs text-amber-600 mt-1">⚠ Déjà partagé — modification soumise</p>
+                              {e.modification_note && (
+                                <p className="text-sm mt-1 italic">"{e.modification_note}"</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button variant="outline" size="sm" className="gap-1 border-green-500 text-green-600 hover:bg-green-50" onClick={() => approveModification("exercices", e.id)}>
+                                <CheckCircle className="w-4 h-4" />Valider
+                              </Button>
+                              <Button variant="outline" size="sm" className="gap-1 border-red-500 text-red-500 hover:bg-red-50" onClick={() => rejectModification("exercices", e.id)}>
+                                Rejeter
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {pendingExercices.length > 0 && (
-                  <div className="mb-6 p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                    <h3 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      En attente de validation de partage ({pendingExercices.length})
-                    </h3>
-                    <div className="space-y-2">
-                      {pendingExercices.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between bg-background p-3 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium">{e.title}</p>
-                              <p className="text-sm text-muted-foreground">{e.author_name || "Anonyme"}</p>
-                            </div>
-                            {exerciceCopyCounts[e.id] > 0 && (
-                              <Badge variant="secondary" className="text-xs">{exerciceCopyCounts[e.id]} copies</Badge>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => toggleExerciceValidation(e.id, e.status)}
-                              className="gap-1"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Valider
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setRejectExerciceDialog({
-                                open: true,
-                                exerciceId: e.id,
-                                exerciceTitle: e.title
-                              })}
-                              className="gap-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
-                            >
-                              <XCircle className="w-4 h-4" />
-                              Refuser
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteExercice(e.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                {/* Section 2 : Tous les éléments */}
+                <div className="border-t pt-6">
+                  <h3 className="font-semibold text-base flex items-center gap-2 mb-4">
+                    <Dumbbell className="w-4 h-4" />
+                    Tous les éléments ({filteredExercices.length})
+                  </h3>
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Rechercher par titre ou auteur..."
+                      value={exerciceSearch}
+                      onChange={(e) => setExerciceSearch(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -2608,16 +3253,51 @@ export default function Admin() {
                             )}
                           </td>
                           <td className="py-3 px-2">
-                            {e.status === 'shared' ? (
-                              <Badge className="bg-green-500">Partagé</Badge>
-                            ) : e.status === 'pending' ? (
-                              <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
-                            ) : e.status === 'rejected' ? (
-                              <Badge className="bg-red-500">Refusé</Badge>
-                            ) : e.status === 'withdrawal_requested' ? (
-                              <Badge variant="secondary" className="bg-purple-500">Retrait demandé</Badge>
-                            ) : (
-                              <Badge variant="outline">Brouillon</Badge>
+                            <div className="flex flex-col gap-1">
+                              {e.status === 'shared' ? (
+                                <Badge className="bg-green-500">Partagé</Badge>
+                              ) : e.status === 'pending' ? (
+                                <Badge variant="secondary" className="bg-orange-500">En attente</Badge>
+                              ) : e.status === 'rejected' ? (
+                                <Badge className="bg-red-500">Refusé</Badge>
+                              ) : e.status === 'withdrawal_requested' ? (
+                                <Badge variant="secondary" className="bg-purple-500">Retrait demandé</Badge>
+                              ) : (
+                                <Badge variant="outline">Brouillon</Badge>
+                              )}
+                              {e.modification_pending && (
+                                <Badge className="bg-amber-500 text-white text-xs">
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Modification en attente
+                                </Badge>
+                              )}
+                            </div>
+                            {e.modification_pending && e.modification_note && (
+                              <p className="text-xs text-muted-foreground mt-1 max-w-xs italic">
+                                « {e.modification_note} »
+                              </p>
+                            )}
+                            {e.modification_pending && (
+                              <div className="flex gap-1 mt-1" onClick={(ev) => ev.stopPropagation()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => approveModification("exercices", e.id)}
+                                  className="gap-1 border-green-500 text-green-600 hover:bg-green-50 h-7 text-xs"
+                                >
+                                  <CheckCircle className="w-3 h-3" />
+                                  Valider modif.
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => rejectModification("exercices", e.id)}
+                                  className="gap-1 border-red-300 text-red-600 hover:bg-red-50 h-7 text-xs"
+                                >
+                                  <XCircle className="w-3 h-3" />
+                                  Rejeter
+                                </Button>
+                              </div>
                             )}
                           </td>
                           <td className="py-3 px-2">
@@ -2642,6 +3322,7 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+                </div>
                 </div>
               </CardContent>
             </Card>

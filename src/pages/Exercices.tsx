@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { softDelete, withActive } from "@/lib/corbeille";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown, Clock, Hourglass, Ban } from "lucide-react";
+import { Plus, Search, Users, User, Shield, Copy, Trash2, Edit, Play, X, Check, Upload, Loader2, Video, Library, Image as ImageIcon, ChevronDown, ChevronUp, Clock, Hourglass, Ban, RefreshCw, XCircle, Eye } from "lucide-react";
 import { pb, getFileUrl } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -55,6 +55,11 @@ interface Exercice {
   objectif_tags: string[];
   status: string;
   withdrawal_refused?: boolean;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
+  shared_snapshot?: string | null;
+  pending_draft?: string | null;
   video_url: string | null;
   thumbnail_url: string | null;
   image_url: string | null;
@@ -86,12 +91,20 @@ export default function Exercices() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [sharedVersionPreviewOpen, setSharedVersionPreviewOpen] = useState(false);
+  const [sharedVersionExercice, setSharedVersionExercice] = useState<Exercice | null>(null);
   const [selectedExercice, setSelectedExercice] = useState<Exercice | null>(null);
   const [copyEx, setCopyEx] = useState<ExercicePreview | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [exerciceToDelete, setExerciceToDelete] = useState<Exercice | null>(null);
+  const [exerciceModifRefusalToDismiss, setExerciceModifRefusalToDismiss] = useState<Exercice | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modifRequestDialogExercice, setModifRequestDialogExercice] = useState<Exercice | null>(null);
+  const [modifRequestNote, setModifRequestNote] = useState("");
+  const [modifiedSharedExerciceIds, setModifiedSharedExerciceIds] = useState<Set<string>>(new Set());
+  const [expandedVersionHistoryIds, setExpandedVersionHistoryIds] = useState<Set<string>>(new Set());
+  const [isDraftEdit, setIsDraftEdit] = useState(false);
 
   const [filter, setFilter] = useState<FilterType>("mine");
   const [searchQuery, setSearchQuery] = useState("");
@@ -235,6 +248,14 @@ export default function Exercices() {
     return featuredExerciceIds.includes(exerciceId);
   };
 
+  // PocketBase may return shared_snapshot as a string (text field) or already-parsed object
+  // (json field). Handle both cases gracefully.
+  const parseSnapshot = (raw: string | object | null | undefined): Record<string, any> | null => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw as Record<string, any>;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -342,12 +363,12 @@ export default function Exercices() {
       // Persister les nouveaux items dans les tables de référence
       for (const p of formData.pathologie_tags) {
         if (!pathologies.includes(p)) {
-          await pb.collection("pathologies").create({ user: user.id, name: p });
+          try { await pb.collection("pathologies").create({ user: user.id, name: p }); } catch {}
         }
       }
       for (const o of formData.objectif_tags) {
         if (!objectifs.includes(o)) {
-          await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" });
+          try { await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" }); } catch {}
         }
       }
 
@@ -442,12 +463,12 @@ export default function Exercices() {
     try {
       for (const p of formData.pathologie_tags) {
         if (!pathologies.includes(p)) {
-          await pb.collection("pathologies").create({ user: user.id, name: p });
+          try { await pb.collection("pathologies").create({ user: user.id, name: p }); } catch {}
         }
       }
       for (const o of formData.objectif_tags) {
         if (!objectifs.includes(o)) {
-          await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" });
+          try { await pb.collection("objectifs").create({ user: user.id, name: o, type: "principal" }); } catch {}
         }
       }
 
@@ -505,14 +526,79 @@ export default function Exercices() {
         }
       }
 
-      await pb.collection("exercices").update(selectedExercice.id, {
-          title: formData.title.trim(), description: formData.description.trim() || null,
+      const updatePayload: Record<string, any> = {
+        title: formData.title.trim(), description: formData.description.trim() || null,
+        pathologie_tags: formData.pathologie_tags,
+        objectif_tags: formData.objectif_tags,
+        video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
+        image_url: imageUrl || null, media_type: mediaType,
+      };
+      if (selectedExercice.status === "shared") {
+        // Shared exercices: never touch main content — store modification in snapshot for admin review.
+        let originalData: Record<string, any> = {};
+        if (selectedExercice.shared_snapshot) {
+          try {
+            const s = parseSnapshot(selectedExercice.shared_snapshot);
+            originalData = s?.original || {};
+          } catch {}
+        }
+        if (Object.keys(originalData).length === 0) {
+          originalData = {
+            title: selectedExercice.title,
+            description: selectedExercice.description,
+            pathologie_tags: selectedExercice.pathologie_tags,
+            objectif_tags: selectedExercice.objectif_tags,
+            video_url: selectedExercice.video_url,
+            thumbnail_url: selectedExercice.thumbnail_url,
+            image_url: selectedExercice.image_url,
+            media_type: selectedExercice.media_type,
+            video_id: selectedExercice.video_id,
+          };
+        }
+        const modificationData = {
+          title: formData.title.trim(),
+          description: formData.description.trim() || null,
           pathologie_tags: formData.pathologie_tags,
           objectif_tags: formData.objectif_tags,
-          video: videoId, video_url: videoUrl || null, thumbnail_url: thumbnailUrl || null,
-          image_url: imageUrl || null, media_type: mediaType,
-        });
-
+          video_url: videoUrl || null,
+          thumbnail_url: thumbnailUrl || null,
+          image_url: imageUrl || null,
+          media_type: mediaType,
+          video_id: videoId,
+        };
+        const snapshotPayload: Record<string, any> = {
+          shared_snapshot: JSON.stringify({ original: originalData, modification: modificationData }),
+          modification_refused: false,
+          modification_pending: false,
+        };
+        await pb.collection("exercices").update(selectedExercice.id, snapshotPayload);
+        setModifiedSharedExerciceIds(prev => new Set([...prev, selectedExercice.id]));
+        // Optimistic update only — do NOT call fetchData() after this to avoid
+        // a race where the SDK returns a stale or prematurely-cancelled response
+        // that overwrites the correct local state.
+        setExercices(prev => prev.map(e =>
+          e.id === selectedExercice.id
+            ? { ...e, shared_snapshot: snapshotPayload.shared_snapshot, modification_refused: false, modification_pending: false }
+            : e
+        ));
+        toast.success("Modification enregistrée. Soumettez-la à l'admin pour validation.");
+        setEditDialogOpen(false);
+        resetForm();
+        return;
+      }
+      if (selectedExercice.status === "rejected") {
+        updatePayload.status = "draft";
+      }
+      if (selectedExercice.modification_refused && selectedExercice.status !== "shared") {
+        updatePayload.modification_refused = false;
+      }
+      await pb.collection("exercices").update(selectedExercice.id, updatePayload);
+      // Optimistic local update for immediate display
+      setExercices(prev => prev.map(e =>
+        e.id === selectedExercice.id
+          ? { ...e, ...updatePayload, video_id: updatePayload.video ?? e.video_id }
+          : e
+      ));
       toast.success("Exercice modifié avec succès");
       setEditDialogOpen(false);
       resetForm();
@@ -526,6 +612,7 @@ export default function Exercices() {
   };
 
   const resetForm = () => {
+    setIsDraftEdit(false);
     setFormData({
       title: "",
       description: "",
@@ -543,7 +630,15 @@ export default function Exercices() {
   };
 
   const openPreviewDialog = (exercice: Exercice) => {
-    setSelectedExercice(exercice);
+    // Apply pending modification values so the preview shows what the user saved
+    let displayExercice = exercice;
+    if (exercice.status === "shared" && exercice.shared_snapshot && !exercice.modification_refused) {
+      const s = parseSnapshot(exercice.shared_snapshot);
+      if (s?.modification) {
+        displayExercice = { ...exercice, ...s.modification };
+      }
+    }
+    setSelectedExercice(displayExercice);
     setPreviewDialogOpen(true);
   };
 
@@ -554,19 +649,51 @@ export default function Exercices() {
   };
 
   const openEditDialog = (exercice: Exercice) => {
+    setIsDraftEdit(false);
+    setSelectedExercice(exercice);
+    // For shared exercices, pre-fill from the pending modification if one exists
+    let prefill: any = {};
+    if (exercice.status === "shared" && exercice.shared_snapshot && !exercice.modification_refused) {
+      const s = parseSnapshot(exercice.shared_snapshot);
+      if (s?.modification) prefill = s.modification;
+    }
+    setFormData({
+      title: prefill.title ?? exercice.title,
+      description: prefill.description ?? exercice.description ?? "",
+      pathologie_tags: prefill.pathologie_tags ?? exercice.pathologie_tags ?? [],
+      objectif_tags: prefill.objectif_tags ?? exercice.objectif_tags ?? [],
+      mediaFile: null,
+      media_type: ((prefill.media_type || exercice.media_type) === "image" ? "image" : "video") as MediaType,
+      video_url: prefill.video_url ?? exercice.video_url ?? "",
+      thumbnail_url: prefill.thumbnail_url ?? exercice.thumbnail_url ?? "",
+      image_url: prefill.image_url ?? exercice.image_url ?? "",
+      video_id: prefill.video_id ?? exercice.video_id ?? null,
+      video_title: ""
+    });
+    setEditDialogOpen(true);
+  };
+
+  const openDraftEditDialog = (exercice: Exercice) => {
+    setIsDraftEdit(true);
+    // Pre-fill from the refused version stored in shared_snapshot.refused
+    let draft: any = {};
+    if (exercice.shared_snapshot) {
+      const s = parseSnapshot(exercice.shared_snapshot);
+      draft = s?.refused || {};
+    }
     setSelectedExercice(exercice);
     setFormData({
-      title: exercice.title,
-      description: exercice.description || "",
-      pathologie_tags: exercice.pathologie_tags || [],
-      objectif_tags: exercice.objectif_tags || [],
+      title: draft.title || exercice.title,
+      description: draft.description ?? exercice.description ?? "",
+      pathologie_tags: draft.pathologie_tags || exercice.pathologie_tags || [],
+      objectif_tags: draft.objectif_tags || exercice.objectif_tags || [],
       mediaFile: null,
-      media_type: (exercice.media_type === "image" ? "image" : "video") as MediaType,
-      video_url: exercice.video_url || "",
-      thumbnail_url: exercice.thumbnail_url || "",
-      image_url: exercice.image_url || "",
-      video_id: exercice.video_id || null,
-      video_title: ""
+      media_type: ((draft.media_type || exercice.media_type) === "image" ? "image" : "video") as MediaType,
+      video_url: draft.video_url || exercice.video_url || "",
+      thumbnail_url: draft.thumbnail_url || exercice.thumbnail_url || "",
+      image_url: draft.image_url || exercice.image_url || "",
+      video_id: draft.video_id || exercice.video_id || null,
+      video_title: "",
     });
     setEditDialogOpen(true);
   };
@@ -624,6 +751,62 @@ export default function Exercices() {
     } catch (error) {
       console.error("Error cancelling withdrawal request:", error);
       toast.error("Erreur lors de l'annulation");
+    }
+  };
+
+  const handleRequestExerciceRevision = async () => {
+    if (!modifRequestDialogExercice) return;
+    try {
+      await pb.collection("exercices").update(modifRequestDialogExercice.id, {
+        modification_pending: true,
+        modification_note: modifRequestNote.trim() || null,
+        modification_refused: false,
+      });
+      setModifiedSharedExerciceIds(prev => { const s = new Set(prev); s.delete(modifRequestDialogExercice.id); return s; });
+      toast.success("Demande de révision envoyée à l'administrateur");
+      setModifRequestDialogExercice(null);
+      setModifRequestNote("");
+      fetchData();
+    } catch (error) {
+      console.error("Error requesting revision:", error);
+      toast.error("Erreur lors de la demande de révision");
+    }
+  };
+
+  const handleCancelExerciceRevision = async (exercice: Exercice) => {
+    try {
+      await pb.collection("exercices").update(exercice.id, {
+        modification_pending: false,
+        modification_note: null,
+      });
+      setModifiedSharedExerciceIds(prev => new Set([...prev, exercice.id]));
+      toast.success("Demande de révision annulée");
+      fetchData();
+    } catch (error) {
+      console.error("Error cancelling revision:", error);
+      toast.error("Erreur lors de l'annulation");
+    }
+  };
+
+  const handleDismissExerciceModifRefusal = async (exercice: Exercice) => {
+    try {
+      await pb.collection("exercices").update(exercice.id, { modification_refused: false, shared_snapshot: null });
+      setModifiedSharedExerciceIds(prev => { const s = new Set(prev); s.delete(exercice.id); return s; });
+      setExpandedVersionHistoryIds(prev => { const s = new Set(prev); s.delete(exercice.id); return s; });
+      fetchData();
+    } catch (error) {
+      console.error("Error dismissing refusal:", error);
+    }
+  };
+
+  const handleDismissShareRefusal = async (exercice: Exercice) => {
+    try {
+      await pb.collection("exercices").update(exercice.id, { status: "draft" });
+      setExercices(prev => prev.map(e => e.id === exercice.id ? { ...e, status: "draft" } : e));
+      setExpandedVersionHistoryIds(prev => { const s = new Set(prev); s.delete(exercice.id + "_rejected"); return s; });
+      fetchData();
+    } catch (error) {
+      console.error("Error dismissing share refusal:", error);
     }
   };
 
@@ -706,6 +889,39 @@ export default function Exercices() {
 
   const deleteExercice = async (exercice: Exercice) => {
     try {
+      // Preserve refused modification draft as a new independent non-shared record
+      if (exercice.modification_refused && exercice.shared_snapshot) {
+        try {
+          const s = parseSnapshot(exercice.shared_snapshot);
+          const draft = s?.refused;
+          if (draft) {
+            await pb.collection("exercices").create({
+              user: exercice.user_id,
+              title: draft.title || exercice.title,
+              description: draft.description ?? null,
+              pathologie_tags: draft.pathologie_tags || [],
+              objectif_tags: draft.objectif_tags || [],
+              video_url: draft.video_url || null,
+              thumbnail_url: draft.thumbnail_url || null,
+              image_url: draft.image_url || null,
+              media_type: draft.media_type || "video",
+              video: draft.video_id || null,
+              author_name: exercice.author_name,
+              status: "draft",
+              modification_refused: true,
+              is_copy: false,
+            });
+          }
+        } catch (e) {
+          console.error("Error preserving refused draft:", e);
+        }
+        // Send original directly to corbeille (bypass withdrawal_requested flow)
+        await softDelete("exercices", exercice.id);
+        toast.success("Exercice déplacé vers la corbeille");
+        fetchData();
+        return;
+      }
+
       // Check if exercise is shared or on platform - use soft delete
       const isOnPlatform = featuredExerciceIds.includes(exercice.id);
       const isSharedOrPending = exercice.status === "shared" || exercice.status === "pending";
@@ -758,7 +974,7 @@ export default function Exercices() {
     if (featuredExerciceIds.includes(exercice.id)) {
       return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Plateforme</Badge>;
     }
-    
+
     // For user's own exercises in "mine" filter
     if (filter === "mine" && exercice.user_id === user?.id) {
       if (exercice.status === "shared") {
@@ -772,11 +988,13 @@ export default function Exercices() {
       }
       return null;
     }
-    
+
     // For other views (shared, platform)
     switch (exercice.status) {
       case "shared":
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
+        return exercice.modification_pending
+          ? <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente de validation</Badge>
+          : <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Partagé</Badge>;
       case "pending":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">En attente de validation de partage</Badge>;
       default:
@@ -786,13 +1004,10 @@ export default function Exercices() {
 
   const canEdit = (exercice: Exercice) => {
     const isExerciceOnPlatform = featuredExerciceIds.includes(exercice.id);
-    // Admins can edit platform exercises
     if (isAdmin && isExerciceOnPlatform) return true;
-    // Users can edit their own exercises (draft or pending) but not shared ones
-    // Cannot edit copies or platform exercises
-    return exercice.user_id === user?.id && 
-           (exercice.status === "draft" || exercice.status === "pending") && 
-           !isExerciceOnPlatform && 
+    return exercice.user_id === user?.id &&
+           (exercice.status === "draft" || exercice.status === "pending" || exercice.status === "shared" || exercice.status === "rejected") &&
+           !isExerciceOnPlatform &&
            !exercice.is_copy;
   };
 
@@ -1160,9 +1375,29 @@ export default function Exercices() {
                         Aucun exercice trouvé
                       </TableCell>
                     </TableRow>
-                  ) : filteredExercices.map((exercice) => (
+                  ) : filteredExercices.map((exercice) => {
+                    // Pour les exercices partagés avec une modification en attente,
+                    // afficher les valeurs de la modification plutôt que les valeurs originales.
+                    let display = {
+                      title: exercice.title,
+                      description: exercice.description,
+                      pathologie_tags: exercice.pathologie_tags,
+                      objectif_tags: exercice.objectif_tags,
+                    };
+                    if (exercice.status === "shared" && exercice.shared_snapshot && !exercice.modification_refused) {
+                      const s = parseSnapshot(exercice.shared_snapshot);
+                      if (s?.modification) {
+                        display = {
+                          title: s.modification.title ?? exercice.title,
+                          description: s.modification.description ?? exercice.description,
+                          pathologie_tags: s.modification.pathologie_tags ?? exercice.pathologie_tags,
+                          objectif_tags: s.modification.objectif_tags ?? exercice.objectif_tags,
+                        };
+                      }
+                    }
+                    return (
+                    <Fragment key={exercice.id}>
                     <TableRow
-                      key={exercice.id}
                       onClick={() => openPreviewDialog(exercice)}
                       className="cursor-pointer"
                     >
@@ -1181,11 +1416,11 @@ export default function Exercices() {
                             <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50">
                               {exercice.code}
                             </Badge>
-                            <p className="font-medium">{exercice.title}</p>
+                            <p className="font-medium">{display.title}</p>
                           </div>
-                          {exercice.pathologie_tags.length > 0 && (
+                          {display.pathologie_tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {exercice.pathologie_tags.map((tag) => (
+                              {display.pathologie_tags.map((tag) => (
                                 <Badge key={tag} variant="secondary" className="text-xs">
                                   {tag}
                                 </Badge>
@@ -1197,9 +1432,9 @@ export default function Exercices() {
 
                       {/* Objectifs */}
                       <TableCell>
-                        {exercice.objectif_tags && exercice.objectif_tags.length > 0 ? (
+                        {display.objectif_tags && display.objectif_tags.length > 0 ? (
                           <div className="flex flex-wrap gap-1 max-w-xs">
-                            {exercice.objectif_tags.map((tag) => (
+                            {display.objectif_tags.map((tag) => (
                               <Badge key={tag} variant="default" className="text-xs">
                                 {tag}
                               </Badge>
@@ -1212,9 +1447,9 @@ export default function Exercices() {
 
                       {/* Description */}
                       <TableCell>
-                        {exercice.description ? (
+                        {display.description ? (
                           <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">
-                            {exercice.description}
+                            {display.description}
                           </p>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
@@ -1233,30 +1468,77 @@ export default function Exercices() {
                         <div className="flex justify-end items-center gap-1">
                           {/* Share status */}
                           {filter === "mine" && exercice.user_id === user?.id && !exercice.is_copy && userCanShare && (
-                            <div className="flex items-center gap-1.5">
-                              {exercice.status === "rejected" ? (
-                                <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
-                                  <X className="w-3 h-3 text-red-500" strokeWidth={3} />
-                                </div>
-                              ) : exercice.status === "shared" || exercice.status === "withdrawal_requested" ? null : (
-                                <Checkbox
-                                  checked={exercice.status !== "draft"}
-                                  onCheckedChange={() => toggleShare(exercice)}
-                                />
+                            <div className="flex flex-col gap-1 items-end">
+                              <div
+                                className={`flex items-center gap-1.5${!(exercice.status === "rejected" || (exercice.modification_refused && exercice.status !== "shared")) && exercice.status !== "shared" && exercice.status !== "withdrawal_requested" ? " cursor-pointer select-none" : ""}`}
+                                onClick={!(exercice.status === "rejected" || (exercice.modification_refused && exercice.status !== "shared")) && exercice.status !== "shared" && exercice.status !== "withdrawal_requested" ? () => toggleShare(exercice) : undefined}
+                              >
+                                {(exercice.status === "rejected" || (exercice.modification_refused && exercice.status !== "shared")) ? (
+                                  <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                    <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                  </div>
+                                ) : exercice.status === "shared" || exercice.status === "withdrawal_requested" ? null : (
+                                  <Checkbox
+                                    checked={exercice.status !== "draft"}
+                                    onCheckedChange={() => toggleShare(exercice)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                )}
+                                <span className="text-xs flex items-center gap-1">
+                                  {exercice.status === "withdrawal_requested"
+                                    ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                    : exercice.status === "shared" && exercice.withdrawal_refused
+                                    ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                    : exercice.status === "shared"
+                                    ? <span className="flex items-center gap-1 text-green-600">
+                                        <Check className="w-3 h-3" />Déjà partagé
+                                        {exercice.shared_snapshot && !exercice.modification_refused && (
+                                          <button
+                                            title="Voir la version partagée (sans les modifications en attente)"
+                                            className="ml-1 text-green-600 hover:text-green-800"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const s = parseSnapshot(exercice.shared_snapshot!);
+                                              if (s?.original) {
+                                                setSharedVersionExercice({ ...exercice, ...s.original });
+                                                setSharedVersionPreviewOpen(true);
+                                              }
+                                            }}
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </span>
+                                    : (exercice.status === "rejected" || (exercice.modification_refused && exercice.status !== "shared"))
+                                    ? <span className="text-red-500">Partage refusé</span>
+                                    : exercice.status === "pending"
+                                    ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                    : "Partager"}
+                                </span>
+                              </div>
+                              {/* Modification request for shared exercices */}
+                              {exercice.status === "shared" && !exercice.withdrawal_refused && (
+                                exercice.modification_pending ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-1 text-xs text-muted-foreground"
+                                    onClick={() => handleCancelExerciceRevision(exercice)}
+                                  >
+                                    Annuler la modification soumise
+                                  </Button>
+                                ) : (modifiedSharedExerciceIds.has(exercice.id) || !!exercice.shared_snapshot) && !exercice.modification_refused ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-1 text-xs text-muted-foreground hover:text-primary"
+                                    onClick={() => { setModifRequestDialogExercice(exercice); setModifRequestNote(""); }}
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                    Demander la révision
+                                  </Button>
+                                ) : null
                               )}
-                              <span className="text-xs flex items-center gap-1">
-                                {exercice.status === "withdrawal_requested"
-                                  ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
-                                  : exercice.status === "shared" && exercice.withdrawal_refused
-                                  ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
-                                  : exercice.status === "shared"
-                                  ? <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>
-                                  : exercice.status === "rejected"
-                                  ? "Partage refusé"
-                                  : exercice.status === "pending"
-                                  ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
-                                  : "Partager"}
-                              </span>
                             </div>
                           )}
 
@@ -1340,7 +1622,198 @@ export default function Exercices() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    {exercice.modification_refused && (exercice.status === "shared" || exercice.status === "withdrawal_requested") && (() => {
+                      // Read refused version from shared_snapshot.refused (dual-format)
+                      let draft: any = null;
+                      if (exercice.shared_snapshot) {
+                        const s = parseSnapshot(exercice.shared_snapshot);
+                        draft = s?.refused || null;
+                      }
+                      const hasThumbnail = !!(draft?.thumbnail_url || draft?.image_url);
+                      const isHistoryExpanded = expandedVersionHistoryIds.has(exercice.id);
+                      return (
+                        <>
+                          {/* Expand/collapse button row */}
+                          <TableRow className="bg-transparent hover:bg-transparent border-0">
+                            <TableCell colSpan={6} className="pt-0 pb-0 px-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 w-full bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-950/60 hover:text-red-800 dark:hover:text-red-300"
+                                onClick={(e) => { e.stopPropagation(); setExpandedVersionHistoryIds(prev => {
+                                  const s = new Set(prev);
+                                  if (s.has(exercice.id)) s.delete(exercice.id); else s.add(exercice.id);
+                                  return s;
+                                }); }}
+                              >
+                                {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                1 version refusée par l'admin
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Full version card — only when expanded */}
+                          {isHistoryExpanded && (
+                            <TableRow className="bg-transparent hover:bg-transparent border-0">
+                              <TableCell colSpan={6} className="pt-0 pb-2 px-4">
+                                <div className="ml-4">
+                                  <Card className="overflow-hidden border-red-200 dark:border-red-800 border-l-4 border-l-red-300 dark:border-l-red-700 bg-red-50 dark:bg-red-950/40 cursor-pointer" onClick={() => openPreviewDialog(exercice)}>
+                                    <CardContent className="p-4">
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                                          <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                          {hasThumbnail && (
+                                            <div className="w-12 h-9 rounded overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                                              <img src={draft.thumbnail_url || draft.image_url} alt="" className="w-full h-full object-cover" />
+                                            </div>
+                                          )}
+                                          <span className="text-sm font-semibold">{draft?.title || exercice.title}</span>
+                                          <Badge className="text-xs bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/40 dark:text-red-400 flex-shrink-0">Non partagée</Badge>
+                                          {(() => {
+                                            const pathoTags = draft?.pathologie_tags || exercice.pathologie_tags || [];
+                                            return pathoTags.map((t: string) => (
+                                              <Badge key={t} variant="secondary" className="text-xs flex-shrink-0">{t}</Badge>
+                                            ));
+                                          })()}
+                                          {(() => {
+                                            const tags = draft?.objectif_tags || exercice.objectif_tags || [];
+                                            return tags.map((t: string) => (
+                                              <Badge key={t} variant="default" className="text-xs flex-shrink-0">{t}</Badge>
+                                            ));
+                                          })()}
+                                        </div>
+                                        <div className="flex gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 w-7 p-0"
+                                            onClick={(e) => { e.stopPropagation(); openDraftEditDialog(exercice); }}
+                                          >
+                                            <Edit className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-destructive hover:text-destructive"
+                                            onClick={(e) => { e.stopPropagation(); setExerciceModifRefusalToDismiss(exercice); }}
+                                            title="Supprimer cette version refusée"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      {(() => {
+                                        const desc = draft?.description ?? exercice.description;
+                                        return desc ? (
+                                          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{desc}</p>
+                                        ) : null;
+                                      })()}
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {exercice.status === "rejected" && (() => {
+                      const isHistoryExpanded = expandedVersionHistoryIds.has(exercice.id + "_rejected");
+                      const hasThumbnail = !!(exercice.thumbnail_url || exercice.image_url);
+                      return (
+                        <>
+                          <TableRow className="bg-transparent hover:bg-transparent border-0">
+                            <TableCell colSpan={6} className="pt-0 pb-0 px-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 w-full bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-950/60 hover:text-red-800 dark:hover:text-red-300"
+                                onClick={(e) => { e.stopPropagation(); setExpandedVersionHistoryIds(prev => {
+                                  const s = new Set(prev);
+                                  const key = exercice.id + "_rejected";
+                                  if (s.has(key)) s.delete(key); else s.add(key);
+                                  return s;
+                                }); }}
+                              >
+                                {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                1 partage refusé par l'admin
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {isHistoryExpanded && (
+                            <TableRow className="bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 border-red-200 dark:border-red-800 border-l-4 border-l-red-300 dark:border-l-red-700 cursor-pointer" onClick={() => openPreviewDialog(exercice)}>
+                              <TableCell className="pl-10">
+                                <div className="w-16 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+                                  {hasThumbnail ? (
+                                    <img src={exercice.thumbnail_url || exercice.image_url || ""} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <XCircle className="w-5 h-5 text-red-300" />
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-semibold">{exercice.title}</span>
+                                    <Badge className="text-xs bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/40 dark:text-red-400">Partage refusé</Badge>
+                                  </div>
+                                  {exercice.pathologie_tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {exercice.pathologie_tags.map((t: string) => (
+                                        <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {exercice.objectif_tags?.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 max-w-xs">
+                                    {exercice.objectif_tags.map((t: string) => (
+                                      <Badge key={t} variant="default" className="text-xs">{t}</Badge>
+                                    ))}
+                                  </div>
+                                ) : <span className="text-sm text-muted-foreground">-</span>}
+                              </TableCell>
+                              <TableCell>
+                                {exercice.description ? (
+                                  <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">{exercice.description}</p>
+                                ) : <span className="text-sm text-muted-foreground">-</span>}
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-muted-foreground">
+                                  {exercice.user_id === user?.id ? "Moi" : (exercice.author_name || "-")}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-1.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => { e.stopPropagation(); openEditDialog(exercice); }}
+                                  >
+                                    <Edit className="w-3 h-3 mr-1" />
+                                    Modifier
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-muted-foreground"
+                                    onClick={(e) => { e.stopPropagation(); handleDismissShareRefusal(exercice); }}
+                                  >
+                                    OK
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      );
+                    })()}
+                    </Fragment>
+                  );
+                  })}
                 </TableBody>
               </Table>
             </Card>
@@ -1357,6 +1830,22 @@ export default function Exercices() {
           if (!open) setSelectedExercice(null);
         }}
         onCopyToSeance={copyExerciceToSeance}
+      />
+
+      {/* Shared version preview (original without pending modifications) */}
+      <ExercicePreviewDialog
+        exercice={sharedVersionExercice}
+        open={sharedVersionPreviewOpen}
+        onOpenChange={(open) => {
+          setSharedVersionPreviewOpen(open);
+          if (!open) setSharedVersionExercice(null);
+        }}
+        onCopyToSeance={copyExerciceToSeance}
+        banner={
+          <p className="text-xs text-green-700 bg-green-50 dark:bg-green-950/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded px-3 py-2">
+            Cette version est actuellement partagée et visible par les autres utilisateurs. Les modifications en attente ne sont pas incluses.
+          </p>
+        }
       />
       <CopyExerciceToSeanceDialog exercice={copyEx} open={copyOpen} onOpenChange={setCopyOpen} />
 
@@ -1413,6 +1902,61 @@ export default function Exercices() {
           )}
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dismiss refused modification confirmation */}
+      <AlertDialog open={!!exerciceModifRefusalToDismiss} onOpenChange={(open) => !open && setExerciceModifRefusalToDismiss(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la version refusée ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La version refusée de « {exerciceModifRefusalToDismiss?.title ?? ""} » sera supprimée définitivement. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => { if (exerciceModifRefusalToDismiss) { await handleDismissExerciceModifRefusal(exerciceModifRefusalToDismiss); setExerciceModifRefusalToDismiss(null); } }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modification revision request dialog */}
+      <Dialog open={!!modifRequestDialogExercice} onOpenChange={(open) => { if (!open) { setModifRequestDialogExercice(null); setModifRequestNote(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-primary" />
+              Demander la révision de l'exercice modifié
+            </DialogTitle>
+            <DialogDescription>
+              Cet exercice est déjà partagé. L'administrateur sera notifié pour réviser vos modifications avant de les valider.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="modifNote">Décrivez vos modifications (optionnel)</Label>
+            <Textarea
+              id="modifNote"
+              value={modifRequestNote}
+              onChange={(e) => setModifRequestNote(e.target.value)}
+              placeholder="Ex : J'ai mis à jour la description et ajouté le tag 'épaule'..."
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => { setModifRequestDialogExercice(null); setModifRequestNote(""); }}>
+              Annuler
+            </Button>
+            <Button onClick={handleRequestExerciceRevision} className="gradient-primary text-primary-foreground">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Soumettre à l'admin
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={(open) => {

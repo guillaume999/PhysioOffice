@@ -73,13 +73,14 @@ interface TraitementFormData {
   tests: TraitementTest[];
   seances: TraitementSeanceItem[];
   author_name: string | null;
+  shared_snapshot?: string | null;
 }
 
 interface TraitementFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   traitement?: TraitementFormData | null;
-  onSuccess: () => void;
+  onSuccess: (saved?: { description: string | null; pathologie: string; objectifs: string[] }) => void;
   isHiddenFromList?: boolean;
   /**
    * When provided, the dialog creates a *patient instance* (patient_traitements
@@ -87,9 +88,11 @@ interface TraitementFormDialogProps {
    * fully independent from the template, instead of a traitement_types model.
    */
   patientId?: string;
+  isValidated?: boolean;
+  isRefused?: boolean;
 }
 
-export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess, isHiddenFromList = false, patientId }: TraitementFormDialogProps) {
+export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess, isHiddenFromList = false, patientId, isValidated = false, isRefused = false }: TraitementFormDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
@@ -397,8 +400,62 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
 
         toast.success("Traitement créé pour le patient");
       } else if (traitement?.id) {
-        // Update existing traitement
-        await pb.collection("traitement_types").update(traitement.id, { nom: finalPathologie, pathologie: finalPathologie, objectifs, description });
+        if (isValidated) {
+          // Shared traitement: never touch main record or sub-collections — store modification in snapshot only (same as exercices).
+          const existingSnapshot = traitement.shared_snapshot ? (() => { try { return JSON.parse(traitement.shared_snapshot); } catch { return null; } })() : null;
+          const original = existingSnapshot?.original || {
+            pathologie: traitement.pathologie,
+            objectifs: traitement.objectifs || [],
+            description: traitement.description || null,
+            tests: (traitement.tests || []).map(t => ({
+              exercice_id: t.exercice_id,
+              title: t.exercice?.title || null,
+              ordre: t.ordre,
+            })),
+            seances: (traitement.seances || []).map(s => ({
+              seance_type_id: s.seance_type_id,
+              pathologie: s.seance?.pathologie || null,
+              objectif: s.seance?.objectif_principal || null,
+              ordre: s.ordre,
+            })),
+          };
+          const snapshotPayload: Record<string, any> = {
+            shared_snapshot: JSON.stringify({
+              original,
+              modification: {
+                pathologie: finalPathologie,
+                objectifs,
+                description: description || null,
+                tests: tests.map(t => ({
+                  exercice_id: t.exercice_id,
+                  title: t.exercice?.title || null,
+                  ordre: t.ordre,
+                })),
+                seances: selectedSeances.map(s => ({
+                  seance_type_id: s.seance_type_id,
+                  pathologie: s.seance?.pathologie || null,
+                  objectif: s.seance?.objectif_principal || null,
+                  ordre: s.ordre,
+                })),
+              },
+            }),
+            modification_refused: false,
+          };
+          await pb.collection("traitement_types").update(traitement.id, snapshotPayload);
+          toast.success("Modification enregistrée. Soumettez-la à l'admin pour validation.");
+          onOpenChange(false);
+          resetForm();
+          onSuccess(undefined);
+          return;
+        }
+
+        // Update existing traitement (non-validated path)
+        const traitementUpdatePayload: Record<string, any> = { nom: finalPathologie, pathologie: finalPathologie, objectifs, description };
+        if (isRefused) {
+          traitementUpdatePayload.is_refused = false;
+          traitementUpdatePayload.is_shared = false;
+        }
+        await pb.collection("traitement_types").update(traitement.id, traitementUpdatePayload);
 
         // Delete old tests
         const oldTests = await pb.collection("traitement_tests").getFullList({ filter: `traitement_type = "${traitement.id}"` });
@@ -428,6 +485,10 @@ export function TraitementFormDialog({ open, onOpenChange, traitement, onSuccess
         }
 
         toast.success("Traitement modifié avec succès");
+        onOpenChange(false);
+        resetForm();
+        onSuccess({ description: description || null, pathologie: finalPathologie, objectifs });
+        return;
       } else {
         // Create new traitement
         const newTraitement = await pb.collection("traitement_types").create({

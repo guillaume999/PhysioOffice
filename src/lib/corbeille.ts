@@ -66,15 +66,17 @@ export function isPublished(record: { is_shared?: boolean; is_validated?: boolea
 /**
  * Vrai si la suppression d'un contenu doit passer par une demande de retrait à
  * l'admin. C'est le cas d'un contenu publié — SAUF si l'admin a déjà refusé un
- * retrait (`withdrawal_refused`) : l'auteur peut alors l'envoyer directement à
- * sa corbeille sans relancer une demande.
+ * retrait (`withdrawal_refused`) ou si une demande de retrait est déjà en cours
+ * (`withdrawal_requested`) : dans ces deux cas, l'auteur peut envoyer
+ * directement l'élément à sa corbeille.
  */
 export function needsWithdrawalRequest(record: {
   is_shared?: boolean;
   is_validated?: boolean;
   withdrawal_refused?: boolean;
+  withdrawal_requested?: boolean;
 }): boolean {
-  return isPublished(record) && !record.withdrawal_refused;
+  return isPublished(record) && !record.withdrawal_refused && !record.withdrawal_requested;
 }
 
 /** Envoie une demande de retrait à l'admin (le contenu reste visible jusqu'à validation). */
@@ -150,11 +152,10 @@ export async function fetchTrashedCount(): Promise<number> {
 
 /**
  * Total affiché sur le badge de l'onglet "Corbeille" :
- * demandes de retrait en attente + éléments soft-supprimés.
+ * uniquement les demandes de retrait en attente de validation admin.
  */
 export async function fetchCorbeilleTotal(): Promise<number> {
-  const [withdrawals, trashed] = await Promise.all([fetchWithdrawalCount(), fetchTrashedCount()]);
-  return withdrawals + trashed;
+  return fetchWithdrawalCount();
 }
 
 /** Meilleur titre affichable d'un enregistrement, peu importe la collection. */

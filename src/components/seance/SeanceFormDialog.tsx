@@ -47,6 +47,7 @@ interface SeanceFormData {
   objectifs_secondaires?: string[];
   exercices: SeanceExerciceItem[];
   author_name: string | null;
+  shared_snapshot?: string | null;
 }
 
 interface SeanceFormDialogProps {
@@ -58,9 +59,11 @@ interface SeanceFormDialogProps {
   showDateField?: boolean;
   initialPathologies?: string[];
   hiddenFromListByDefault?: boolean;
+  isValidated?: boolean;
+  isRefused?: boolean;
 }
 
-export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initialDate, showDateField = false, initialPathologies, hiddenFromListByDefault = false }: SeanceFormDialogProps) {
+export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initialDate, showDateField = false, initialPathologies, hiddenFromListByDefault = false, isValidated = false, isRefused = false }: SeanceFormDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userPseudo, setUserPseudo] = useState<string | null>(null);
@@ -256,8 +259,55 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
       }
 
       if (seance?.id) {
-        // Update existing seance
-        await pb.collection("seance_types").update(seance.id, {
+        if (isValidated) {
+          // Shared seance: never touch main record or sub-collections — store modification in snapshot only (same as exercices).
+          const existingSnapshot = seance.shared_snapshot ? (() => { try { return JSON.parse(seance.shared_snapshot); } catch { return null; } })() : null;
+          const original = existingSnapshot?.original || {
+            pathologies: seance.pathologies || [],
+            objectifs: seance.objectifs_principaux || [],
+            pathologie: seance.pathologies?.[0] || "",
+            objectif_principal: seance.objectifs_principaux?.[0] || "",
+            exercices: (seance.exercices || []).map(e => ({
+              exercice_id: e.exercice_id,
+              name: e.name,
+              description: e.description,
+              repetitions: e.repetitions,
+              duration_seconds: e.duration_seconds,
+              series: e.series,
+              ordre: e.ordre,
+            })),
+          };
+          const snapshotPayload: Record<string, any> = {
+            shared_snapshot: JSON.stringify({
+              original,
+              modification: {
+                pathologies,
+                objectifs,
+                pathologie: pathologies[0] || "",
+                objectif_principal: objectifs[0] || "",
+                exercices: exercices.map(e => ({
+                  exercice_id: e.exercice_id,
+                  name: e.name,
+                  description: e.description,
+                  repetitions: e.repetitions,
+                  duration_seconds: e.duration_seconds,
+                  series: e.series,
+                  ordre: e.ordre,
+                })),
+              },
+            }),
+            modification_refused: false,
+          };
+          await pb.collection("seance_types").update(seance.id, snapshotPayload);
+          toast.success("Modification enregistrée. Soumettez-la à l'admin pour validation.");
+          onOpenChange(false);
+          resetForm();
+          onSuccess?.();
+          return;
+        }
+
+        // Update existing seance (non-validated path)
+        const seanceUpdatePayload: Record<string, any> = {
             nom: pathologies[0] || objectifs[0] || "Séance",
             pathologies,
             objectifs,
@@ -266,7 +316,12 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
             pathologie: pathologies[0] || "",
             objectif_principal: objectifs[0] || "",
             objectif_secondaire: null,
-          });
+          };
+        if (isRefused) {
+          seanceUpdatePayload.is_refused = false;
+          seanceUpdatePayload.is_shared = false;
+        }
+        await pb.collection("seance_types").update(seance.id, seanceUpdatePayload);
 
         // Delete old exercices
         const oldEx = await pb.collection("seance_exercices").getFullList({ filter: `seance_type = "${seance.id}"` });
@@ -275,7 +330,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
         // Insert new exercices - create new exercice in exercices table if custom
         for (const ex of exercices) {
           let exerciceId = ex.exercice_id;
-          
+
           // If it's a custom exercice (no exercice_id) and has a name, create it in the exercices table
           if (!exerciceId && ex.name && ex.name.trim()) {
             try {
@@ -291,7 +346,7 @@ export function SeanceFormDialog({ open, onOpenChange, seance, onSuccess, initia
               exerciceId = newExercice.id;
             } catch(e) { console.error("Error creating exercice:", e); }
           }
-          
+
           await pb.collection("seance_exercices").create({
             seance_type: seance.id,
             exercice: exerciceId,
