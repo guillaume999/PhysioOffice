@@ -1388,10 +1388,6 @@ export default function Admin() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Unique author lists for filters
-  const seanceAuthors = [...new Set(seances.filter(s => !s.is_copy && s.author_name).map(s => s.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
-  const traitementAuthors = [...new Set(traitements.filter(t => !t.is_copy && t.author_name).map(t => t.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
-  const exerciceAuthors = [...new Set(exercices.filter(e => !e.is_copy && e.author_name).map(e => e.author_name as string))].sort((a, b) => a.localeCompare(b, "fr"));
 
   const seancePathologies = [...new Set(seances.filter(s => !s.is_copy).map(s => s.pathologie).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const seanceObjectifs = [...new Set(seances.filter(s => !s.is_copy).map(s => s.objectif_principal).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
@@ -1416,7 +1412,7 @@ export default function Admin() {
       matchesSearch(s.objectif_principal, seanceSearch) ||
       matchesSearch(s.author_name, seanceSearch)
     )
-    .filter(s => seanceAuthorFilter.length === 0 || (s.author_name !== null && seanceAuthorFilter.includes(s.author_name)))
+    .filter(s => seanceAuthorFilter.length === 0 || seanceAuthorFilter.includes(getUserDisplayName(s.user_id)))
     .filter(s => seancePathologieFilter.length === 0 || seancePathologieFilter.includes(s.pathologie))
     .filter(s => seanceObjectifFilter.length === 0 || seanceObjectifFilter.includes(s.objectif_principal))
     .filter(s => !seanceDateFromFilter || s.created_at.slice(0, 10) >= format(seanceDateFromFilter, "yyyy-MM-dd"))
@@ -1445,7 +1441,7 @@ export default function Admin() {
       matchesSearch(t.author_name, traitementSearch)
     )
     .filter(t => traitementPathologieFilter.length === 0 || traitementPathologieFilter.includes(t.pathologie))
-    .filter(t => traitementAuthorFilter.length === 0 || (t.author_name !== null && traitementAuthorFilter.includes(t.author_name)))
+    .filter(t => traitementAuthorFilter.length === 0 || traitementAuthorFilter.includes(getUserDisplayName(t.user_id)))
     .filter(t => !traitementDateFromFilter || t.created_at.slice(0, 10) >= format(traitementDateFromFilter, "yyyy-MM-dd"))
     .filter(t => !traitementDateToFilter || t.created_at.slice(0, 10) <= format(traitementDateToFilter, "yyyy-MM-dd"))
     .filter(t => traitementCopiesFilter === "all" || (traitementCopiesFilter === "with" ? (traitementCopyCounts[t.id] || 0) > 0 : (traitementCopyCounts[t.id] || 0) === 0))
@@ -1475,7 +1471,7 @@ export default function Admin() {
       matchesSearch(e.title, exerciceSearch) ||
       matchesSearch(e.author_name, exerciceSearch)
     )
-    .filter(e => exerciceAuthorFilter.length === 0 || (e.author_name !== null && exerciceAuthorFilter.includes(e.author_name)))
+    .filter(e => exerciceAuthorFilter.length === 0 || exerciceAuthorFilter.includes(getUserDisplayName(e.user_id)))
     .filter(e => !exerciceDateFromFilter || e.created_at.slice(0, 10) >= format(exerciceDateFromFilter, "yyyy-MM-dd"))
     .filter(e => !exerciceDateToFilter || e.created_at.slice(0, 10) <= format(exerciceDateToFilter, "yyyy-MM-dd"))
     .filter(e => exerciceCopiesFilter === "all" || (exerciceCopiesFilter === "with" ? (exerciceCopyCounts[e.id] || 0) > 0 : (exerciceCopyCounts[e.id] || 0) === 0))
@@ -2017,7 +2013,7 @@ export default function Admin() {
                               </PopoverTrigger>
                               <PopoverContent className="w-48 p-2" align="start">
                                 <div className="space-y-1 max-h-60 overflow-y-auto">
-                                  {seanceAuthors.map(a => (
+                                  {seanceUserNames.map(a => (
                                     <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
                                       <Checkbox checked={seanceAuthorFilter.includes(a)} onCheckedChange={(checked) => setSeanceAuthorFilter(prev => checked ? [...prev, a] : prev.filter(x => x !== a))} />
                                       {a}
@@ -2527,7 +2523,7 @@ export default function Admin() {
                               </PopoverTrigger>
                               <PopoverContent className="w-48 p-2" align="start">
                                 <div className="space-y-1 max-h-60 overflow-y-auto">
-                                  {traitementAuthors.map(a => (
+                                  {traitementUserNames.map(a => (
                                     <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
                                       <Checkbox
                                         checked={traitementAuthorFilter.includes(a)}
@@ -3081,7 +3077,7 @@ export default function Admin() {
                               </PopoverTrigger>
                               <PopoverContent className="w-48 p-2" align="start">
                                 <div className="space-y-1 max-h-60 overflow-y-auto">
-                                  {exerciceAuthors.map(a => (
+                                  {exerciceUserNames.map(a => (
                                     <label key={a} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-muted cursor-pointer text-sm">
                                       <Checkbox
                                         checked={exerciceAuthorFilter.includes(a)}
