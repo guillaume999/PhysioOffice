@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 config.cfg
+
+# Capacitor Android
+android/
