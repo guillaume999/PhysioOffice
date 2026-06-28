@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Play, Image as ImageIcon, CopyPlus } from "lucide-react";
@@ -33,9 +34,11 @@ interface ExercicePreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   // Si fourni, affiche un bouton « Copier vers une séance » qui appelle ce callback.
   onCopyToSeance?: (exercice: ExercicePreview) => void;
+  // Bannière informative optionnelle affichée sous le titre
+  banner?: React.ReactNode;
 }
 
-export function ExercicePreviewDialog({ exercice, open, onOpenChange, onCopyToSeance }: ExercicePreviewDialogProps) {
+export function ExercicePreviewDialog({ exercice, open, onOpenChange, onCopyToSeance, banner }: ExercicePreviewDialogProps) {
   const { user } = useAuth();
 
   if (!exercice) return null;
@@ -56,6 +59,8 @@ export function ExercicePreviewDialog({ exercice, open, onOpenChange, onCopyToSe
             {exercice.title}
           </DialogTitle>
         </DialogHeader>
+
+        {banner}
 
         <div className="space-y-4">
           {/* Media */}

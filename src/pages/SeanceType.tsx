@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { softDelete, withActive, needsWithdrawalRequest, requestWithdrawal } from "@/lib/corbeille";
 import {
@@ -11,19 +11,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Hourglass, Ban, Check } from "lucide-react";
+import { Loader2, Hourglass, Ban, Check, XCircle, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Calendar, Heart, MessageCircle, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Video, Play, X, ChevronDown, ChevronUp, Clock, RefreshCw } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { SeanceFormDialog } from "@/components/seance/SeanceFormDialog";
 import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/MultiSelectFilter";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 import { normalizeSearch } from "@/lib/utils";
@@ -66,6 +68,11 @@ interface SeanceType {
   is_refused?: boolean;
   withdrawal_requested?: boolean;
   withdrawal_refused?: boolean;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
+  shared_snapshot?: string | null;
+  pending_draft?: string | null;
   is_hidden_from_list: boolean;
   original_id: string | null;
   user_id: string;
@@ -97,10 +104,19 @@ export default function SeanceType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingSeance, setEditingSeance] = useState<any>(null);
+  const [editingSeanceIsValidated, setEditingSeanceIsValidated] = useState(false);
+  const [editingSeanceIsRefused, setEditingSeanceIsRefused] = useState(false);
+  const [editingSeanceDraftMode, setEditingSeanceDraftMode] = useState(false);
+  const [modifiedSharedSeanceIds, setModifiedSharedSeanceIds] = useState<Set<string>>(new Set());
+  const [expandedVersionHistoryIds, setExpandedVersionHistoryIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoToPlay, setVideoToPlay] = useState<string | null>(null);
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
+  const [modifRequestDialogSeance, setModifRequestDialogSeance] = useState<SeanceType | null>(null);
+  const [modifRequestNote, setModifRequestNote] = useState("");
+  const [sharedVersionSeance, setSharedVersionSeance] = useState<Record<string, any> | null>(null);
+  const [seanceModifRefusalToDismiss, setSeanceModifRefusalToDismiss] = useState<SeanceType | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -266,6 +282,8 @@ export default function SeanceType() {
   const openEditDialog = (seance: SeanceType) => {
     const principaux = seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : (seance.objectif_principal ? [seance.objectif_principal] : []);
     const secondaires = seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []);
+    setEditingSeanceIsValidated(seance.is_validated || false);
+    setEditingSeanceIsRefused(seance.is_refused || false);
     setEditingSeance({
       id: seance.id,
       pathologies: seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie],
@@ -283,7 +301,43 @@ export default function SeanceType() {
         ordre: ex.ordre,
         video_url: ex.exercice?.video_url || null
       })),
-      author_name: seance.author_name
+      author_name: seance.author_name,
+      shared_snapshot: seance.shared_snapshot || null,
+    });
+    setFormDialogOpen(true);
+  };
+
+  const openDraftEditSeanceDialog = (seance: SeanceType) => {
+    // Pre-fill from the refused version stored in shared_snapshot.refused
+    let draft: any = {};
+    if (seance.shared_snapshot) {
+      const s = parseSnapshot(seance.shared_snapshot);
+      draft = s?.refused || {};
+    }
+    const principaux = seance.objectifs_principaux?.length > 0 ? seance.objectifs_principaux : (seance.objectif_principal ? [seance.objectif_principal] : []);
+    const secondaires = seance.objectifs_secondaires?.length > 0 ? seance.objectifs_secondaires : (seance.objectif_secondaire ? [seance.objectif_secondaire] : []);
+    setEditingSeanceDraftMode(true);
+    setEditingSeanceIsValidated(seance.is_validated || false);
+    setEditingSeanceIsRefused(false);
+    setEditingSeance({
+      id: seance.id,
+      pathologies: draft.pathologies?.length ? draft.pathologies : (seance.pathologies?.length ? seance.pathologies : [seance.pathologie]),
+      objectifs: draft.objectifs?.length ? draft.objectifs : getDisplayObjectifs(seance),
+      objectifs_principaux: [...new Set([...principaux, ...secondaires].filter(Boolean))],
+      objectifs_secondaires: [],
+      exercices: (seance.exercices || []).map(ex => ({
+        id: ex.id,
+        exercice_id: ex.exercice_id,
+        name: ex.name || "",
+        description: ex.description || "",
+        repetitions: ex.repetitions,
+        duration_seconds: ex.duration_seconds,
+        series: ex.series || 1,
+        ordre: ex.ordre,
+        video_url: ex.exercice?.video_url || null
+      })),
+      author_name: seance.author_name,
+      shared_snapshot: seance.shared_snapshot || null,
     });
     setFormDialogOpen(true);
   };
@@ -349,6 +403,50 @@ export default function SeanceType() {
     if (!seanceToDelete) return;
     setDeletingSeance(true);
     try {
+      // Preserve refused modification draft as a new independent non-shared record
+      if (seanceToDelete.modification_refused && seanceToDelete.shared_snapshot) {
+        try {
+          const s = parseSnapshot(seanceToDelete.shared_snapshot);
+          const draft = s?.refused;
+          if (draft) {
+            const pathologies: string[] = draft.pathologies?.length ? draft.pathologies : (seanceToDelete.pathologies?.length ? seanceToDelete.pathologies : [seanceToDelete.pathologie].filter(Boolean));
+            const objectifs: string[] = draft.objectifs?.length ? draft.objectifs : [];
+            const newSeance = await pb.collection("seance_types").create({
+              user: seanceToDelete.user_id,
+              nom: draft.nom || pathologies[0] || "",
+              pathologie: pathologies[0] || "",
+              pathologies,
+              objectif_principal: objectifs[0] || "",
+              objectifs_principaux: objectifs,
+              objectifs_secondaires: [],
+              author_name: seanceToDelete.author_name,
+              is_shared: false,
+              is_refused: true,
+              is_copy: false,
+            });
+            if (seanceToDelete.exercices?.length) {
+              for (const ex of seanceToDelete.exercices) {
+                await pb.collection("seance_exercices").create({
+                  seance_type: newSeance.id,
+                  exercice: ex.exercice_id || null,
+                  name: ex.name || null,
+                  description: ex.description || null,
+                  repetitions: ex.repetitions || null,
+                  duration_seconds: ex.duration_seconds || null,
+                  series: ex.series || null,
+                  force_1: ex.force_1 || null,
+                  duration_seconds_2: ex.duration_seconds_2 || null,
+                  force_2: ex.force_2 || null,
+                  comment: ex.comment || null,
+                  ordre: ex.ordre,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error preserving refused draft:", e);
+        }
+      }
       await deleteSeance(seanceToDelete.id);
       setSeanceToDelete(null);
     } finally {
@@ -363,6 +461,7 @@ export default function SeanceType() {
       await requestWithdrawal("seance_types", seanceToDelete.id);
       toast.success("Demande de retrait envoyée à l'administrateur");
       setSeanceToDelete(null);
+      fetchData();
     } catch (error) {
       console.error("Error requesting withdrawal:", error);
       toast.error("Erreur lors de la demande de retrait");
@@ -423,6 +522,51 @@ export default function SeanceType() {
     }
   };
 
+  const handleRequestSeanceRevision = async () => {
+    if (!modifRequestDialogSeance) return;
+    try {
+      await pb.collection("seance_types").update(modifRequestDialogSeance.id, {
+        modification_pending: true,
+        modification_note: modifRequestNote.trim() || null,
+        modification_refused: false,
+      });
+      setModifiedSharedSeanceIds(prev => { const s = new Set(prev); s.delete(modifRequestDialogSeance.id); return s; });
+      toast.success("Demande de révision envoyée à l'administrateur");
+      setModifRequestDialogSeance(null);
+      setModifRequestNote("");
+      fetchData();
+    } catch (error) {
+      console.error("Error requesting revision:", error);
+      toast.error("Erreur lors de la demande de révision");
+    }
+  };
+
+  const handleCancelSeanceRevision = async (seance: SeanceType) => {
+    try {
+      await pb.collection("seance_types").update(seance.id, {
+        modification_pending: false,
+        modification_note: null,
+      });
+      setModifiedSharedSeanceIds(prev => new Set([...prev, seance.id]));
+      toast.success("Demande de révision annulée");
+      fetchData();
+    } catch (error) {
+      console.error("Error cancelling revision:", error);
+      toast.error("Erreur lors de l'annulation");
+    }
+  };
+
+  const handleDismissSeanceModifRefusal = async (seance: SeanceType) => {
+    try {
+      await pb.collection("seance_types").update(seance.id, { modification_refused: false, shared_snapshot: null });
+      setModifiedSharedSeanceIds(prev => { const s = new Set(prev); s.delete(seance.id); return s; });
+      setExpandedVersionHistoryIds(prev => { const s = new Set(prev); s.delete(seance.id); return s; });
+      fetchData();
+    } catch (error) {
+      console.error("Error dismissing refusal:", error);
+    }
+  };
+
   const getDisplayPathologies = (seance: SeanceType) => {
     return seance.pathologies?.length > 0 ? seance.pathologies : [seance.pathologie];
   };
@@ -438,6 +582,12 @@ export default function SeanceType() {
   // Options de filtre dérivées des séances chargées
   const pathoOptions = [...new Set(seances.flatMap((s) => getDisplayPathologies(s)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
   const objectifOptions = [...new Set(seances.flatMap((s) => getDisplayObjectifs(s)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+
+  const parseSnapshot = (raw: string | null | undefined): Record<string, any> | null => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw as Record<string, any>;
+    try { return JSON.parse(raw); } catch { return null; }
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedSeances(prev => {
@@ -595,8 +745,16 @@ export default function SeanceType() {
                   const pathologies = getDisplayPathologies(seance);
                   const objectifs = getDisplayObjectifs(seance);
 
+                  // When a shared validated seance has a pending modification, display those values
+                  const snapshot = parseSnapshot(seance.shared_snapshot);
+                  const pendingMod = (seance.is_shared && seance.is_validated && snapshot?.modification && !seance.modification_refused)
+                    ? snapshot.modification : null;
+                  const displayPathologies: string[] = pendingMod?.pathologies ?? pathologies;
+                  const displayObjectifs: string[] = pendingMod?.objectifs ?? objectifs;
+
                   return (
-                    <Card key={seance.id} className="overflow-hidden">
+                    <Fragment key={seance.id}>
+                    <Card className="overflow-hidden">
                       <CardContent className="p-4">
                         {/* Header - Always visible */}
                         <div className="flex items-center justify-between gap-4 cursor-pointer" onClick={() => toggleExpand(seance.id)}>
@@ -604,11 +762,11 @@ export default function SeanceType() {
                             <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
                               {seance.code}
                             </Badge>
-                            {pathologies.map((p, i) => (
+                            {displayPathologies.map((p, i) => (
                               <Badge key={i} variant="outline" className="text-base font-semibold px-3 py-1 flex-shrink-0">{p}</Badge>
                             ))}
-                            {objectifs.length > 0 && <span className="text-muted-foreground">-</span>}
-                            {objectifs.map((o, i) => (
+                            {displayObjectifs.length > 0 && <span className="text-muted-foreground">-</span>}
+                            {displayObjectifs.map((o, i) => (
                               <Badge key={i} variant="default" className="text-base font-semibold px-3 py-1 flex-shrink-0">{o}</Badge>
                             ))}
                             {seance.is_copy && (
@@ -775,30 +933,76 @@ export default function SeanceType() {
 
                                 {/* Share status */}
                                 {canShare && (
-                                  <div className="flex items-center gap-2">
-                                    {seance.is_refused ? (
-                                      <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
-                                        <X className="w-3 h-3 text-red-500" strokeWidth={3} />
-                                      </div>
-                                    ) : seance.is_shared && seance.is_validated ? null : (
-                                      <Checkbox
-                                        checked={seance.is_shared}
-                                        onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
-                                      />
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      className={`flex items-center gap-2${!seance.is_refused && !(seance.is_shared && seance.is_validated) ? " cursor-pointer select-none" : ""}`}
+                                      onClick={!seance.is_refused && !(seance.is_shared && seance.is_validated) ? () => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false) : undefined}
+                                    >
+                                      {seance.is_refused ? (
+                                        <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                          <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                        </div>
+                                      ) : seance.is_shared && seance.is_validated ? null : (
+                                        <Checkbox
+                                          checked={seance.is_shared}
+                                          onCheckedChange={() => toggleShare(seance.id, seance.is_shared, seance.is_copy || false, seance.is_validated || false)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      )}
+                                      <span className="text-xs flex items-center gap-1">
+                                        {seance.is_shared && seance.is_validated
+                                          ? (seance.withdrawal_requested
+                                            ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                            : seance.withdrawal_refused
+                                            ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                            : seance.modification_pending
+                                            ? <span className="flex items-center gap-1 text-orange-500"><Clock className="w-3 h-3" />En attente de validation</span>
+                                            : <span className="flex items-center gap-1 text-green-600">
+                                                <Check className="w-3 h-3" />Déjà partagé
+                                                {seance.shared_snapshot && !seance.modification_refused && (
+                                                  <button
+                                                    title="Voir la version partagée (sans les modifications en attente)"
+                                                    className="ml-1 text-green-600 hover:text-green-800"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const s = parseSnapshot(seance.shared_snapshot);
+                                                      if (s?.original) setSharedVersionSeance(s.original);
+                                                    }}
+                                                  >
+                                                    <Eye className="w-3 h-3" />
+                                                  </button>
+                                                )}
+                                              </span>)
+                                          : seance.is_refused
+                                          ? "Partage refusé"
+                                          : seance.is_shared && !seance.is_validated
+                                          ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                          : "Partager"}
+                                      </span>
+                                    </div>
+                                    {/* Modification request for already-validated seances */}
+                                    {seance.is_shared && seance.is_validated && !seance.withdrawal_requested && (
+                                      seance.modification_pending ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 px-1 text-xs text-muted-foreground"
+                                          onClick={() => handleCancelSeanceRevision(seance)}
+                                        >
+                                          Annuler la modification soumise
+                                        </Button>
+                                      ) : (modifiedSharedSeanceIds.has(seance.id) || !!seance.shared_snapshot) && !seance.modification_refused ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 px-1 text-xs text-muted-foreground hover:text-primary justify-start"
+                                          onClick={() => { setModifRequestDialogSeance(seance); setModifRequestNote(""); }}
+                                        >
+                                          <RefreshCw className="w-3 h-3 mr-1" />
+                                          Demander la révision
+                                        </Button>
+                                      ) : null
                                     )}
-                                    <span className="text-xs flex items-center gap-1">
-                                      {seance.is_shared && seance.is_validated
-                                        ? (seance.withdrawal_requested
-                                          ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
-                                          : seance.withdrawal_refused
-                                          ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
-                                          : <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>)
-                                        : seance.is_refused
-                                        ? "Partage refusé"
-                                        : seance.is_shared && !seance.is_validated
-                                        ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
-                                        : "Partager"}
-                                    </span>
                                   </div>
                                 )}
 
@@ -842,6 +1046,136 @@ export default function SeanceType() {
                         )}
                       </CardContent>
                     </Card>
+                    {seance.modification_refused && seance.is_shared && (seance.is_validated || seance.withdrawal_requested) && (() => {
+                      // Read refused version from shared_snapshot.refused
+                      let draft: any = null;
+                      if (seance.shared_snapshot) {
+                        const s = parseSnapshot(seance.shared_snapshot);
+                        draft = s?.refused || null;
+                      }
+                      const draftPathologies: string[] = draft?.pathologies?.length ? draft.pathologies : (seance.pathologies?.length ? seance.pathologies : [seance.pathologie].filter(Boolean));
+                      const draftObjectifs: string[] = draft?.objectifs?.length ? draft.objectifs : getDisplayObjectifs(seance);
+                      const draftExercices: any[] = Array.isArray(draft?.exercices) ? draft.exercices : [];
+                      const isDraftExpanded = expandedSeances.has(seance.id + "_draft");
+                      const isHistoryExpanded = expandedVersionHistoryIds.has(seance.id);
+                      return (
+                        <>
+                          {/* Expand/collapse button for version history */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 ml-4 h-7 text-xs gap-1.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-950/60 hover:text-red-800 dark:hover:text-red-300"
+                            onClick={() => setExpandedVersionHistoryIds(prev => {
+                              const s = new Set(prev);
+                              if (s.has(seance.id)) s.delete(seance.id); else s.add(seance.id);
+                              return s;
+                            })}
+                          >
+                            {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            1 version refusée par l'admin
+                          </Button>
+
+                          {/* Full version card — only when expanded */}
+                          {isHistoryExpanded && (
+                            <div className="mt-1 ml-4">
+                              {/* Child card — mirrors main card structure */}
+                              <div className="mb-1">
+                                <Card className="overflow-hidden border-red-200 dark:border-red-800 border-l-4 border-l-red-300 dark:border-l-red-700 bg-red-50 dark:bg-red-950/40">
+                                  <CardContent className="p-4">
+                                    {/* Header row — same layout as main card */}
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div
+                                        className="flex items-center gap-3 flex-1 min-w-0 flex-wrap cursor-pointer"
+                                        onClick={() => setExpandedSeances(prev => {
+                                          const s = new Set(prev);
+                                          if (s.has(seance.id + "_draft")) s.delete(seance.id + "_draft"); else s.add(seance.id + "_draft");
+                                          return s;
+                                        })}
+                                      >
+                                        <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                        {draftPathologies.map((p, i) => (
+                                          <Badge key={i} variant="outline" className="text-base font-semibold px-3 py-1 flex-shrink-0">{p}</Badge>
+                                        ))}
+                                        {draftObjectifs.length > 0 && <span className="text-muted-foreground">-</span>}
+                                        {draftObjectifs.map((o, i) => (
+                                          <Badge key={i} variant="default" className="text-base font-semibold px-3 py-1 flex-shrink-0">{o}</Badge>
+                                        ))}
+                                        <Badge className="text-xs bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/40 dark:text-red-400 flex-shrink-0">Non partagée</Badge>
+                                        <span className="text-xs text-muted-foreground">• {draftExercices.length} exercices</span>
+                                        {isDraftExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                      </div>
+                                      <div className="flex gap-1.5 shrink-0 flex-wrap justify-end items-center">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-sm mr-1">
+                                          <span className="flex items-center gap-1">
+                                            <Heart className="w-4 h-4" />
+                                            {seance.likes_count ?? 0}
+                                          </span>
+                                          <span className="flex items-center gap-1">
+                                            <MessageCircle className="w-4 h-4" />
+                                            {seance.comments_count ?? 0}
+                                          </span>
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 text-xs gap-1"
+                                          onClick={() => openDraftEditSeanceDialog(seance)}
+                                        >
+                                          <Edit className="w-3 h-3" />
+                                          Modifier
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive"
+                                          onClick={(e) => { e.stopPropagation(); setSeanceModifRefusalToDismiss(seance); }}
+                                          title="Supprimer cette version refusée"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    {/* Expandable content — exercices list */}
+                                    {isDraftExpanded && (
+                                      <div className="mt-4 pt-4 border-t space-y-3">
+                                        <p className="text-sm font-semibold">Exercices ({draftExercices.length})</p>
+                                        {draftExercices.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {draftExercices.map((ex: any, i: number) => {
+                                              const exerciceName = ex.name || `Exercice ${i + 1}`;
+                                              return (
+                                                <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-border/50 bg-muted/20">
+                                                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                                  </div>
+                                                  <div className="w-10 h-8 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                                                  </div>
+                                                  <span className="text-sm flex-1 truncate">{exerciceName}</span>
+                                                  <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
+                                                    {ex.series && ex.series > 1 && <span>{ex.series}×</span>}
+                                                    {ex.repetitions && <span>{ex.repetitions} rép.</span>}
+                                                    {ex.duration_seconds && <span>{ex.duration_seconds}s</span>}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-muted-foreground">Aucun exercice</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    </Fragment>
                   );
                 })}
               </div>
@@ -856,12 +1190,144 @@ export default function SeanceType() {
           onOpenChange={(open) => !open && setPreviewExercice(null)}
         />
 
+        {/* Dismiss refused modification confirmation */}
+        <AlertDialog open={!!seanceModifRefusalToDismiss} onOpenChange={(open) => !open && setSeanceModifRefusalToDismiss(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer la version refusée ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                La version refusée de cette séance sera supprimée définitivement. Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => { if (seanceModifRefusalToDismiss) { await handleDismissSeanceModifRefusal(seanceModifRefusalToDismiss); setSeanceModifRefusalToDismiss(null); } }}
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Shared version preview dialog */}
+        <Dialog open={!!sharedVersionSeance} onOpenChange={(open) => { if (!open) setSharedVersionSeance(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-green-600" />
+                Version partagée (sans les modifications en attente)
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-green-700 bg-green-50 dark:bg-green-950/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded px-3 py-2">
+              Cette version est actuellement partagée et visible par les autres utilisateurs. Les modifications en attente ne sont pas incluses.
+            </p>
+            {sharedVersionSeance && (
+              <div className="space-y-3 py-2">
+                {sharedVersionSeance.pathologies?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Pathologies</p>
+                    <div className="flex flex-wrap gap-1">
+                      {sharedVersionSeance.pathologies.map((p: string) => (
+                        <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {sharedVersionSeance.objectifs?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Objectifs</p>
+                    <div className="flex flex-wrap gap-1">
+                      {sharedVersionSeance.objectifs.map((o: string) => (
+                        <Badge key={o} variant="secondary" className="text-xs">{o}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {sharedVersionSeance.exercices?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Exercices ({sharedVersionSeance.exercices.length})</p>
+                    <div className="space-y-1">
+                      {sharedVersionSeance.exercices.map((ex: any, i: number) => (
+                        <div key={i} className="text-sm p-2 rounded border border-border/50 bg-muted/20">
+                          <span className="font-medium">{ex.name || `Exercice ${i + 1}`}</span>
+                          {ex.series && <span className="text-muted-foreground ml-2">{ex.series} série{ex.series > 1 ? "s" : ""}</span>}
+                          {ex.repetitions && <span className="text-muted-foreground"> × {ex.repetitions} rép.</span>}
+                          {ex.description && <p className="text-xs text-muted-foreground mt-0.5">{ex.description}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Modification revision request dialog */}
+        <Dialog open={!!modifRequestDialogSeance} onOpenChange={(open) => { if (!open) { setModifRequestDialogSeance(null); setModifRequestNote(""); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-primary" />
+                Demander la révision de la séance modifiée
+              </DialogTitle>
+              <DialogDescription>
+                Cette séance est déjà partagée. L'administrateur sera notifié pour réviser vos modifications avant de les valider.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Label htmlFor="modifNoteSeance">Décrivez vos modifications (optionnel)</Label>
+              <Textarea
+                id="modifNoteSeance"
+                value={modifRequestNote}
+                onChange={(e) => setModifRequestNote(e.target.value)}
+                placeholder="Ex : J'ai ajouté 2 exercices et modifié les objectifs..."
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setModifRequestDialogSeance(null); setModifRequestNote(""); }}>
+                Annuler
+              </Button>
+              <Button onClick={handleRequestSeanceRevision} className="gradient-primary text-primary-foreground">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Soumettre à l'admin
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Form Dialog */}
         <SeanceFormDialog
           open={formDialogOpen}
           onOpenChange={setFormDialogOpen}
           seance={editingSeance}
-          onSuccess={fetchData}
+          isValidated={editingSeanceIsValidated}
+          isRefused={editingSeanceIsRefused}
+          onSuccess={() => {
+            const seanceId = editingSeance?.id;
+            const wasDraftMode = editingSeanceDraftMode;
+            const currentSnapshot = editingSeance?.shared_snapshot;
+            setEditingSeanceDraftMode(false);
+            setEditingSeanceIsRefused(false);
+            if (editingSeanceIsValidated && seanceId) {
+              setModifiedSharedSeanceIds(prev => new Set([...prev, seanceId]));
+              if (wasDraftMode) {
+                // Form already stored the new {original, modification} snapshot; just clear the refused flag
+                pb.collection("seance_types").update(seanceId, {
+                  modification_refused: false,
+                }).finally(() => fetchData());
+                return;
+              }
+            }
+            if (editingSeanceIsRefused && !editingSeanceIsValidated && seanceId) {
+              pb.collection("seance_types").update(seanceId, { is_refused: false }).finally(() => fetchData());
+              return;
+            }
+            fetchData();
+          }}
         />
 
         {/* Video Player Dialog */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { softDelete, withActive, needsWithdrawalRequest, requestWithdrawal } from "@/lib/corbeille";
 import {
@@ -11,13 +11,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Hourglass, Ban, Check } from "lucide-react";
+import { Loader2, Hourglass, Ban, Check, XCircle, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp, Play, Clock, RotateCcw } from "lucide-react";
+import { ClipboardList, Trash2, Search, Users, User, Shield, Copy, Plus, Edit, Calendar, FileText, X, ChevronDown, ChevronUp, Play, Clock, RotateCcw, RefreshCw } from "lucide-react";
 import { pb } from "@/integrations/pocketbase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -26,6 +26,9 @@ import { MultiSelectFilter, ActiveFilterBadges } from "@/components/filters/Mult
 import { PagePopup } from "@/components/popup/PagePopup";
 import { ExercicePreviewDialog, type ExercicePreview } from "@/components/exercice/ExercicePreviewDialog";
 import { normalizeSearch } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TraitementTest {
   id: string;
@@ -92,6 +95,11 @@ interface TraitementType {
   is_refused?: boolean;
   withdrawal_requested?: boolean;
   withdrawal_refused?: boolean;
+  modification_pending?: boolean;
+  modification_note?: string | null;
+  modification_refused?: boolean;
+  shared_snapshot?: string | null;
+  pending_draft?: string | null;
   original_id: string | null;
   user_id: string;
   created_at: string;
@@ -122,10 +130,19 @@ export default function TraitementType() {
   // Dialog state
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingTraitement, setEditingTraitement] = useState<any>(null);
+  const [editingTraitementIsValidated, setEditingTraitementIsValidated] = useState(false);
+  const [editingTraitementIsRefused, setEditingTraitementIsRefused] = useState(false);
+  const [editingTraitementDraftMode, setEditingTraitementDraftMode] = useState(false);
+  const [modifiedSharedTraitementIds, setModifiedSharedTraitementIds] = useState<Set<string>>(new Set());
+  const [expandedVersionHistoryIds, setExpandedVersionHistoryIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedTraitements, setExpandedTraitements] = useState<Set<string>>(new Set());
   const [expandedSeances, setExpandedSeances] = useState<Set<string>>(new Set());
   const [previewExercice, setPreviewExercice] = useState<ExercicePreview | null>(null);
+  const [modifRequestDialogTraitement, setModifRequestDialogTraitement] = useState<TraitementType | null>(null);
+  const [modifRequestNote, setModifRequestNote] = useState("");
+  const [sharedVersionTraitement, setSharedVersionTraitement] = useState<Record<string, any> | null>(null);
+  const [traitementModifRefusalToDismiss, setTraitementModifRefusalToDismiss] = useState<TraitementType | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -294,10 +311,13 @@ export default function TraitementType() {
 
   const openCreateDialog = () => {
     setEditingTraitement(null);
+    setEditingTraitementIsRefused(false);
     setFormDialogOpen(true);
   };
 
   const openEditDialog = (traitement: TraitementType) => {
+    setEditingTraitementIsValidated(traitement.is_validated || false);
+    setEditingTraitementIsRefused(traitement.is_refused || false);
     setEditingTraitement({
       id: traitement.id,
       pathologie: traitement.pathologie,
@@ -326,7 +346,56 @@ export default function TraitementType() {
           objectifs_principaux: s.seance_types.objectifs_principaux || []
         } : null
       })),
-      author_name: traitement.author_name
+      author_name: traitement.author_name,
+      shared_snapshot: traitement.shared_snapshot || null,
+    });
+    setFormDialogOpen(true);
+  };
+
+  const openDraftEditTraitementDialog = (traitement: TraitementType) => {
+    // Pre-fill from the refused version stored in shared_snapshot.refused
+    let draft: any = {};
+    if (traitement.shared_snapshot) {
+      const s = parseSnapshot(traitement.shared_snapshot);
+      draft = s?.refused || {};
+    }
+    setEditingTraitementDraftMode(true);
+    setEditingTraitementIsValidated(traitement.is_validated || false);
+    setEditingTraitementIsRefused(false);
+    // Use refused snapshot tests/seances if available, otherwise fall back to current DB values (legacy)
+    const draftTests = Array.isArray(draft.tests) ? draft.tests : null;
+    const draftSeances = Array.isArray(draft.seances) ? draft.seances : null;
+    setEditingTraitement({
+      id: traitement.id,
+      pathologie: draft.pathologie || traitement.pathologie,
+      objectifs: draft.objectifs || traitement.objectifs || [],
+      description: draft.description !== undefined ? draft.description : traitement.description,
+      tests: draftTests
+        ? draftTests.map((t: any, i: number) => ({
+            exercice_id: t.exercice_id || '',
+            exercice: t.exercice_id ? { id: t.exercice_id, title: t.title || '', description: null, thumbnail_url: null } : null,
+            ordre: t.ordre ?? i,
+          }))
+        : (traitement.tests || []).map(t => ({
+            id: t.id,
+            exercice_id: t.exercice_id || t.exercices?.id || '',
+            exercice: t.exercices ? { id: t.exercices.id, title: t.exercices.title, description: t.exercices.description, thumbnail_url: t.exercices.thumbnail_url } : null,
+            ordre: t.ordre,
+          })),
+      seances: draftSeances
+        ? draftSeances.map((s: any, i: number) => ({
+            seance_type_id: s.seance_type_id,
+            ordre: s.ordre ?? i,
+            seance: s.seance_type_id ? { id: s.seance_type_id, pathologie: s.pathologie || '', pathologies: s.pathologie ? [s.pathologie] : [], objectif_principal: s.objectif || '', objectifs_principaux: s.objectif ? [s.objectif] : [] } : null,
+          }))
+        : (traitement.seances || []).map(s => ({
+            id: s.id,
+            seance_type_id: s.seance_type_id,
+            ordre: s.ordre,
+            seance: s.seance_types ? { id: s.seance_types.id, pathologie: s.seance_types.pathologie, pathologies: s.seance_types.pathologies || [], objectif_principal: s.seance_types.objectif_principal, objectifs_principaux: s.seance_types.objectifs_principaux || [] } : null,
+          })),
+      author_name: traitement.author_name,
+      shared_snapshot: traitement.shared_snapshot || null,
     });
     setFormDialogOpen(true);
   };
@@ -355,6 +424,51 @@ export default function TraitementType() {
     }
   };
 
+  const handleRequestTraitementRevision = async () => {
+    if (!modifRequestDialogTraitement) return;
+    try {
+      await pb.collection("traitement_types").update(modifRequestDialogTraitement.id, {
+        modification_pending: true,
+        modification_note: modifRequestNote.trim() || null,
+        modification_refused: false,
+      });
+      setModifiedSharedTraitementIds(prev => { const s = new Set(prev); s.delete(modifRequestDialogTraitement.id); return s; });
+      toast.success("Demande de révision envoyée à l'administrateur");
+      setModifRequestDialogTraitement(null);
+      setModifRequestNote("");
+      fetchData();
+    } catch (error) {
+      console.error("Error requesting revision:", error);
+      toast.error("Erreur lors de la demande de révision");
+    }
+  };
+
+  const handleCancelTraitementRevision = async (traitement: TraitementType) => {
+    try {
+      await pb.collection("traitement_types").update(traitement.id, {
+        modification_pending: false,
+        modification_note: null,
+      });
+      setModifiedSharedTraitementIds(prev => new Set([...prev, traitement.id]));
+      toast.success("Demande de révision annulée");
+      fetchData();
+    } catch (error) {
+      console.error("Error cancelling revision:", error);
+      toast.error("Erreur lors de l'annulation");
+    }
+  };
+
+  const handleDismissTraitementModifRefusal = async (traitement: TraitementType) => {
+    try {
+      await pb.collection("traitement_types").update(traitement.id, { modification_refused: false, shared_snapshot: null });
+      setModifiedSharedTraitementIds(prev => { const s = new Set(prev); s.delete(traitement.id); return s; });
+      setExpandedVersionHistoryIds(prev => { const s = new Set(prev); s.delete(traitement.id); return s; });
+      fetchData();
+    } catch (error) {
+      console.error("Error dismissing refusal:", error);
+    }
+  };
+
   const deleteTraitement = async (id: string, isUsedByPatient: boolean) => {
     if (isUsedByPatient) {
       toast.error("Ce traitement est utilisé par un patient et ne peut pas être supprimé");
@@ -377,6 +491,47 @@ export default function TraitementType() {
     if (!traitementToDelete) return;
     setDeletingTraitement(true);
     try {
+      // Preserve refused modification draft as a new independent non-shared record
+      if (traitementToDelete.modification_refused && traitementToDelete.shared_snapshot) {
+        try {
+          const s = parseSnapshot(traitementToDelete.shared_snapshot);
+          const draft = s?.refused;
+          if (draft) {
+            const newTraitement = await pb.collection("traitement_types").create({
+              user: traitementToDelete.user_id,
+              nom: draft.pathologie || traitementToDelete.pathologie,
+              pathologie: draft.pathologie || traitementToDelete.pathologie,
+              objectifs: draft.objectifs || [],
+              description: draft.description ?? null,
+              author_name: traitementToDelete.author_name,
+              is_shared: false,
+              is_refused: true,
+              is_copy: false,
+            });
+            if (Array.isArray(draft.tests)) {
+              for (const test of draft.tests) {
+                await pb.collection("traitement_tests").create({
+                  traitement_type: newTraitement.id,
+                  exercice: test.exercice_id || null,
+                  ordre: test.ordre ?? 0,
+                  description: "",
+                });
+              }
+            }
+            if (Array.isArray(draft.seances)) {
+              for (const seance of draft.seances) {
+                await pb.collection("traitement_seances").create({
+                  traitement_type: newTraitement.id,
+                  seance_type: seance.seance_type_id || null,
+                  ordre: seance.ordre ?? 0,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error preserving refused draft:", e);
+        }
+      }
       await deleteTraitement(traitementToDelete.id, false);
       setTraitementToDelete(null);
     } finally {
@@ -391,6 +546,7 @@ export default function TraitementType() {
       await requestWithdrawal("traitement_types", traitementToDelete.id);
       toast.success("Demande de retrait envoyée à l'administrateur");
       setTraitementToDelete(null);
+      fetchData();
     } catch (error) {
       console.error("Error requesting withdrawal:", error);
       toast.error("Erreur lors de la demande de retrait");
@@ -480,6 +636,12 @@ export default function TraitementType() {
       }
       return next;
     });
+  };
+
+  const parseSnapshot = (raw: string | null | undefined): Record<string, any> | null => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw as Record<string, any>;
+    try { return JSON.parse(raw); } catch { return null; }
   };
 
   const formatDuration = (seconds: number) => {
@@ -631,8 +793,17 @@ export default function TraitementType() {
                   const canShare = isOwner && !traitement.is_copy;
                   const isExpanded = expandedTraitements.has(traitement.id);
 
+                  // When a shared validated traitement has a pending modification, display those values
+                  const snapshot = parseSnapshot(traitement.shared_snapshot);
+                  const pendingMod = (traitement.is_shared && traitement.is_validated && snapshot?.modification && !traitement.modification_refused)
+                    ? snapshot.modification : null;
+                  const displayPathologie = pendingMod?.pathologie ?? traitement.pathologie;
+                  const displayObjectifs: string[] = pendingMod?.objectifs ?? (traitement.objectifs || []);
+                  const displayDescription: string | null = pendingMod?.description ?? traitement.description ?? null;
+
                   return (
-                    <Card key={traitement.id} className="overflow-hidden">
+                    <Fragment key={traitement.id}>
+                    <Card className="overflow-hidden">
                       <CardContent className="p-4">
                         {/* Header - Always visible */}
                         <div
@@ -643,8 +814,8 @@ export default function TraitementType() {
                             <Badge variant="outline" className="font-mono text-xs uppercase px-1.5 py-0.5 bg-muted/50 flex-shrink-0">
                               {traitement.code}
                             </Badge>
-                            <Badge variant="outline" className="text-sm flex-shrink-0">{traitement.pathologie}</Badge>
-                            {(traitement.objectifs || []).map((o, i) => (
+                            <Badge variant="outline" className="text-sm flex-shrink-0">{displayPathologie}</Badge>
+                            {displayObjectifs.map((o, i) => (
                               <Badge key={i} variant="secondary" className="text-xs flex-shrink-0">{o}</Badge>
                             ))}
                             {traitement.is_copy && (
@@ -675,8 +846,8 @@ export default function TraitementType() {
                               {/* Main content */}
                               <div className="flex-1 space-y-3">
                                 {/* Description */}
-                                {traitement.description && (
-                                  <p className="text-sm text-muted-foreground">{traitement.description}</p>
+                                {displayDescription && (
+                                  <p className="text-sm text-muted-foreground">{displayDescription}</p>
                                 )}
 
                                 {/* Tests (Exercices) - Table format like Exercices page */}
@@ -861,30 +1032,76 @@ export default function TraitementType() {
                               <div className="flex flex-col gap-3 lg:w-48">
                                 {/* Share status */}
                                 {canShare && (
-                                  <div className="flex items-center gap-2">
-                                    {traitement.is_refused ? (
-                                      <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
-                                        <X className="w-3 h-3 text-red-500" strokeWidth={3} />
-                                      </div>
-                                    ) : traitement.is_shared && traitement.is_validated ? null : (
-                                      <Checkbox
-                                        checked={traitement.is_shared}
-                                        onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
-                                      />
+                                  <div className="flex flex-col gap-1">
+                                    <div
+                                      className={`flex items-center gap-2${!traitement.is_refused && !(traitement.is_shared && traitement.is_validated) ? " cursor-pointer select-none" : ""}`}
+                                      onClick={!traitement.is_refused && !(traitement.is_shared && traitement.is_validated) ? () => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false) : undefined}
+                                    >
+                                      {traitement.is_refused ? (
+                                        <div className="w-4 h-4 rounded-sm border-2 border-red-500 flex items-center justify-center bg-red-50">
+                                          <X className="w-3 h-3 text-red-500" strokeWidth={3} />
+                                        </div>
+                                      ) : traitement.is_shared && traitement.is_validated ? null : (
+                                        <Checkbox
+                                          checked={traitement.is_shared}
+                                          onCheckedChange={() => toggleShare(traitement.id, traitement.is_shared, traitement.is_copy || false, traitement.is_validated || false)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      )}
+                                      <span className="text-xs flex items-center gap-1">
+                                        {traitement.is_shared && traitement.is_validated
+                                          ? (traitement.withdrawal_requested
+                                            ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
+                                            : traitement.withdrawal_refused
+                                            ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
+                                            : traitement.modification_pending
+                                            ? <span className="flex items-center gap-1 text-orange-500"><Clock className="w-3 h-3" />En attente de validation</span>
+                                            : <span className="flex items-center gap-1 text-green-600">
+                                                <Check className="w-3 h-3" />Déjà partagé
+                                                {traitement.shared_snapshot && !traitement.modification_refused && (
+                                                  <button
+                                                    title="Voir la version partagée (sans les modifications en attente)"
+                                                    className="ml-1 text-green-600 hover:text-green-800"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const s = parseSnapshot(traitement.shared_snapshot);
+                                                      if (s?.original) setSharedVersionTraitement(s.original);
+                                                    }}
+                                                  >
+                                                    <Eye className="w-3 h-3" />
+                                                  </button>
+                                                )}
+                                              </span>)
+                                          : traitement.is_refused
+                                          ? "Partage refusé"
+                                          : traitement.is_shared && !traitement.is_validated
+                                          ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
+                                          : "Partager"}
+                                      </span>
+                                    </div>
+                                    {/* Modification request for already-validated traitements */}
+                                    {traitement.is_shared && traitement.is_validated && !traitement.withdrawal_requested && (
+                                      traitement.modification_pending ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 px-1 text-xs text-muted-foreground"
+                                          onClick={() => handleCancelTraitementRevision(traitement)}
+                                        >
+                                          Annuler la modification soumise
+                                        </Button>
+                                      ) : (modifiedSharedTraitementIds.has(traitement.id) || !!traitement.shared_snapshot) && !traitement.modification_refused ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 px-1 text-xs text-muted-foreground hover:text-primary justify-start"
+                                          onClick={() => { setModifRequestDialogTraitement(traitement); setModifRequestNote(""); }}
+                                        >
+                                          <RefreshCw className="w-3 h-3 mr-1" />
+                                          Demander la révision
+                                        </Button>
+                                      ) : null
                                     )}
-                                    <span className="text-xs flex items-center gap-1">
-                                      {traitement.is_shared && traitement.is_validated
-                                        ? (traitement.withdrawal_requested
-                                          ? <span className="flex items-center gap-1 text-orange-500"><Hourglass className="w-3 h-3" />En attente du retrait par l'admin</span>
-                                          : traitement.withdrawal_refused
-                                          ? <span className="flex items-center gap-1 text-red-500"><Ban className="w-3 h-3" />Retrait refusé par l'admin</span>
-                                          : <span className="flex items-center gap-1 text-green-600"><Check className="w-3 h-3" />Déjà partagé</span>)
-                                        : traitement.is_refused
-                                        ? "Partage refusé"
-                                        : traitement.is_shared && !traitement.is_validated
-                                        ? <><Clock className="w-3 h-3 text-orange-500" />En attente de validation</>
-                                        : "Partager"}
-                                    </span>
                                   </div>
                                 )}
 
@@ -933,6 +1150,153 @@ export default function TraitementType() {
                         )}
                       </CardContent>
                     </Card>
+                    {traitement.modification_refused && traitement.is_shared && (traitement.is_validated || traitement.withdrawal_requested) && (() => {
+                      // Read refused version from shared_snapshot.refused
+                      let draft: any = null;
+                      if (traitement.shared_snapshot) {
+                        const s = parseSnapshot(traitement.shared_snapshot);
+                        draft = s?.refused || null;
+                      }
+                      const draftPathologie: string = draft?.pathologie || traitement.pathologie;
+                      const draftObjectifs: string[] = draft?.objectifs || traitement.objectifs || [];
+                      const draftDescription: string | null = draft?.description ?? traitement.description ?? null;
+                      const isHistoryExpanded = expandedVersionHistoryIds.has(traitement.id);
+                      return (
+                        <>
+                          {/* Expand/collapse button for version history */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 ml-4 h-7 text-xs gap-1.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-950/60 hover:text-red-800 dark:hover:text-red-300"
+                            onClick={() => setExpandedVersionHistoryIds(prev => {
+                              const s = new Set(prev);
+                              if (s.has(traitement.id)) s.delete(traitement.id); else s.add(traitement.id);
+                              return s;
+                            })}
+                          >
+                            {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            1 version refusée par l'admin
+                          </Button>
+
+                          {/* Full version card — only when expanded */}
+                          {isHistoryExpanded && (
+                            <div className="mt-1 ml-4">
+                              {/* Child card — mirrors main card structure */}
+                              <div className="mb-1">
+                                <Card className="overflow-hidden border-red-200 dark:border-red-800 border-l-4 border-l-red-300 dark:border-l-red-700 bg-red-50 dark:bg-red-950/40 cursor-pointer" onClick={() => openDraftEditTraitementDialog(traitement)}>
+                                  <CardContent className="p-4">
+                                    {/* Header row — same layout as main card */}
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                                        <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                        <Badge variant="outline" className="text-sm flex-shrink-0">{draftPathologie}</Badge>
+                                        {draftObjectifs.map((o, i) => (
+                                          <Badge key={i} variant="secondary" className="text-xs flex-shrink-0">{o}</Badge>
+                                        ))}
+                                        <Badge className="text-xs bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/40 dark:text-red-400 flex-shrink-0">Non partagée</Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                          • {draft?.tests?.length ?? 0} tests • {draft?.seances?.length ?? 0} séances
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-1.5 shrink-0 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 w-7 p-0"
+                                          onClick={() => openDraftEditTraitementDialog(traitement)}
+                                        >
+                                          <Edit className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive"
+                                          onClick={(e) => { e.stopPropagation(); setTraitementModifRefusalToDismiss(traitement); }}
+                                          title="Supprimer cette version refusée"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    {/* Content — always visible when history panel is open */}
+                                    <div className="mt-4 pt-4 border-t space-y-4">
+                                      {(
+                                        <div className="flex flex-col lg:flex-row gap-4">
+                                          <div className="flex-1 space-y-3">
+                                            {draftDescription && (
+                                              <p className="text-sm text-muted-foreground">{draftDescription}</p>
+                                            )}
+                                            {/* Tests */}
+                                            {(() => {
+                                              const draftTests: any[] = draft?.tests || [];
+                                              return (
+                                                <div className="space-y-2">
+                                                  <p className="text-sm font-semibold">Tests ({draftTests.length})</p>
+                                                  {draftTests.length > 0 ? (
+                                                    <div className="border rounded-lg overflow-hidden">
+                                                      <table className="w-full">
+                                                        <thead className="bg-muted/50">
+                                                          <tr className="text-left text-xs text-muted-foreground">
+                                                            <th className="p-2">Titre</th>
+                                                          </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-border">
+                                                          {draftTests.map((test: any, j: number) => (
+                                                            <tr key={j}>
+                                                              <td className="p-2"><p className="font-medium text-sm">{test.title || `Test ${j + 1}`}</p></td>
+                                                            </tr>
+                                                          ))}
+                                                        </tbody>
+                                                      </table>
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-xs text-muted-foreground">Aucun test</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })()}
+                                            {/* Séances */}
+                                            {(() => {
+                                              const draftSeances: any[] = draft?.seances || [];
+                                              return (
+                                                <div className="space-y-2">
+                                                  <p className="text-sm font-semibold">Séances ({draftSeances.length})</p>
+                                                  {draftSeances.length > 0 ? (
+                                                    <div className="space-y-1">
+                                                      {draftSeances.map((seance: any, i: number) => (
+                                                        <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-border/50 bg-muted/20">
+                                                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                            <span className="text-xs font-bold text-primary">{i + 1}</span>
+                                                          </div>
+                                                          <Calendar className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                                          <span className="text-sm flex-1">
+                                                            {seance.pathologie && seance.objectif
+                                                              ? `${seance.pathologie} - ${seance.objectif}`
+                                                              : seance.pathologie || seance.objectif || "Séance"}
+                                                          </span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-xs text-muted-foreground">Aucune séance</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })()}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    </Fragment>
                   );
                 })}
               </div>
@@ -945,7 +1309,38 @@ export default function TraitementType() {
           open={formDialogOpen}
           onOpenChange={setFormDialogOpen}
           traitement={editingTraitement}
-          onSuccess={fetchData}
+          isValidated={editingTraitementIsValidated}
+          isRefused={editingTraitementIsRefused}
+          onSuccess={(saved) => {
+            const traitementId = editingTraitement?.id;
+            const wasDraftMode = editingTraitementDraftMode;
+            const currentSnapshot = editingTraitement?.shared_snapshot;
+            setEditingTraitementDraftMode(false);
+            setEditingTraitementIsRefused(false);
+            if (editingTraitementIsValidated && traitementId) {
+              setModifiedSharedTraitementIds(prev => new Set([...prev, traitementId]));
+              if (wasDraftMode) {
+                // Form already stored the new {original, modification} snapshot; just clear the refused flag
+                pb.collection("traitement_types").update(traitementId, {
+                  modification_refused: false,
+                }).finally(() => fetchData());
+                return;
+              }
+            }
+            if (editingTraitementIsRefused && !editingTraitementIsValidated && traitementId) {
+              pb.collection("traitement_types").update(traitementId, { is_refused: false }).finally(() => fetchData());
+              return;
+            }
+            // Optimistic update + background refresh
+            if (saved && traitementId) {
+              setTraitements(prev => prev.map(t =>
+                t.id === traitementId
+                  ? { ...t, description: saved.description, pathologie: saved.pathologie, objectifs: saved.objectifs, is_refused: false, is_shared: false }
+                  : t
+              ));
+            }
+            fetchData();
+          }}
           isHiddenFromList={false}
         />
 
@@ -955,6 +1350,127 @@ export default function TraitementType() {
           open={!!previewExercice}
           onOpenChange={(open) => !open && setPreviewExercice(null)}
         />
+
+        {/* Dismiss refused modification confirmation */}
+        <AlertDialog open={!!traitementModifRefusalToDismiss} onOpenChange={(open) => !open && setTraitementModifRefusalToDismiss(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer la version refusée ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                La version refusée de ce traitement sera supprimée définitivement. Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => { if (traitementModifRefusalToDismiss) { await handleDismissTraitementModifRefusal(traitementModifRefusalToDismiss); setTraitementModifRefusalToDismiss(null); } }}
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Shared version preview dialog */}
+        <Dialog open={!!sharedVersionTraitement} onOpenChange={(open) => { if (!open) setSharedVersionTraitement(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-green-600" />
+                Version partagée (sans les modifications en attente)
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-green-700 bg-green-50 dark:bg-green-950/30 dark:text-green-400 border border-green-200 dark:border-green-800 rounded px-3 py-2">
+              Cette version est actuellement partagée et visible par les autres utilisateurs. Les modifications en attente ne sont pas incluses.
+            </p>
+            {sharedVersionTraitement && (
+              <div className="space-y-3 py-2">
+                {sharedVersionTraitement.pathologie && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Pathologie</p>
+                    <Badge variant="outline" className="text-xs">{sharedVersionTraitement.pathologie}</Badge>
+                  </div>
+                )}
+                {sharedVersionTraitement.objectifs?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Objectifs</p>
+                    <div className="flex flex-wrap gap-1">
+                      {sharedVersionTraitement.objectifs.map((o: string) => (
+                        <Badge key={o} variant="secondary" className="text-xs">{o}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {sharedVersionTraitement.description && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Description</p>
+                    <p className="text-sm">{sharedVersionTraitement.description}</p>
+                  </div>
+                )}
+                {sharedVersionTraitement.seances?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Séances ({sharedVersionTraitement.seances.length})</p>
+                    <div className="space-y-1">
+                      {sharedVersionTraitement.seances.map((s: any, i: number) => (
+                        <div key={i} className="text-sm p-2 rounded border border-border/50 bg-muted/20">
+                          {s.pathologie && <span className="font-medium">{s.pathologie}</span>}
+                          {s.objectif && <span className="text-muted-foreground ml-2">— {s.objectif}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {sharedVersionTraitement.tests?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Tests ({sharedVersionTraitement.tests.length})</p>
+                    <div className="space-y-1">
+                      {sharedVersionTraitement.tests.map((t: any, i: number) => (
+                        <div key={i} className="text-sm p-2 rounded border border-border/50 bg-muted/20">
+                          {t.title || `Test ${i + 1}`}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Modification revision request dialog */}
+        <Dialog open={!!modifRequestDialogTraitement} onOpenChange={(open) => { if (!open) { setModifRequestDialogTraitement(null); setModifRequestNote(""); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-primary" />
+                Demander la révision du traitement modifié
+              </DialogTitle>
+              <DialogDescription>
+                Ce traitement est déjà partagé. L'administrateur sera notifié pour réviser vos modifications avant de les valider.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Label htmlFor="modifNoteTraitement">Décrivez vos modifications (optionnel)</Label>
+              <Textarea
+                id="modifNoteTraitement"
+                value={modifRequestNote}
+                onChange={(e) => setModifRequestNote(e.target.value)}
+                placeholder="Ex : J'ai modifié la description et ajouté une séance..."
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setModifRequestDialogTraitement(null); setModifRequestNote(""); }}>
+                Annuler
+              </Button>
+              <Button onClick={handleRequestTraitementRevision} className="gradient-primary text-primary-foreground">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Soumettre à l'admin
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog open={!!traitementToDelete} onOpenChange={(open) => !open && !deletingTraitement && setTraitementToDelete(null)}>
           <AlertDialogContent>

@@ -14,36 +14,44 @@ export function usePendingAdminCount() {
 
     const fetchCount = async () => {
       try {
-        const [allExercices, consultedExercices, allTraitements, allSeances, corbeilleCount] = await Promise.all([
-          pb.collection("exercices").getFullList({ filter: 'is_copy = false', fields: 'id' }),
-          pb.collection("exercice_consultations").getFullList({
-            filter: `user = "${user.id}" && is_consulted = true`,
-            fields: 'exercice',
+        const [
+          pendingExercices, pendingTraitements, pendingSeances,
+          modifExercices, modifTraitements, modifSeances,
+          corbeilleCount,
+        ] = await Promise.all([
+          pb.collection("exercices").getFullList({
+            filter: 'is_copy = false && (status = "pending" || status = "withdrawal_requested")',
+            fields: 'id',
           }),
-          pb.collection("traitement_types").getFullList({ filter: 'is_copy = false', fields: 'id' }),
-          pb.collection("seance_types").getFullList({ filter: 'is_copy = false', fields: 'id' }),
-          // Total de l'onglet Corbeille : demandes de retrait + éléments soft-supprimés.
+          pb.collection("traitement_types").getFullList({
+            filter: 'is_copy = false && is_shared = true && is_validated = false && is_refused = false',
+            fields: 'id',
+          }),
+          pb.collection("seance_types").getFullList({
+            filter: 'is_copy = false && is_shared = true && is_validated = false && is_refused = false',
+            fields: 'id',
+          }),
+          pb.collection("exercices").getFullList({
+            filter: 'is_copy = false && modification_pending = true',
+            fields: 'id',
+          }).catch(() => [] as any[]),
+          pb.collection("traitement_types").getFullList({
+            filter: 'is_copy = false && modification_pending = true',
+            fields: 'id',
+          }).catch(() => [] as any[]),
+          pb.collection("seance_types").getFullList({
+            filter: 'is_copy = false && modification_pending = true',
+            fields: 'id',
+          }).catch(() => [] as any[]),
           fetchCorbeilleTotal(),
         ]);
 
         if (!cancelled) {
-          const consultedExerciceIds = new Set(consultedExercices.map((c: any) => c.exercice));
-          const unconsultedExercices = allExercices.filter((e: any) => !consultedExerciceIds.has(e.id)).length;
-
-          const getLocalSet = (key: string): Set<string> => {
-            try {
-              const stored = localStorage.getItem(key);
-              return stored ? new Set(JSON.parse(stored)) : new Set();
-            } catch { return new Set(); }
-          };
-
-          const consultedTraitementIds = getLocalSet(`admin_consulted_traitements_${user.id}`);
-          const unconsultedTraitements = allTraitements.filter((t: any) => !consultedTraitementIds.has(t.id)).length;
-
-          const consultedSeanceIds = getLocalSet(`admin_consulted_seances_${user.id}`);
-          const unconsultedSeances = allSeances.filter((s: any) => !consultedSeanceIds.has(s.id)).length;
-
-          setCount(unconsultedExercices + unconsultedTraitements + unconsultedSeances + corbeilleCount);
+          setCount(
+            pendingExercices.length + pendingTraitements.length + pendingSeances.length +
+            modifExercices.length + modifTraitements.length + modifSeances.length +
+            corbeilleCount
+          );
         }
       } catch {
         // silently ignore — navbar badge is non-critical
