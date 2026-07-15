@@ -8,11 +8,16 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { pb } from "@/integrations/pocketbase/client";
-import { Loader2, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, Lock, User, ArrowLeft, Eye, EyeOff, Check, X } from "lucide-react";
 import { z } from "zod";
 
+const PASSWORD_MIN_LENGTH = 8; // aligné sur la règle PocketBase (collection users)
+
 const emailSchema = z.string().email("Email invalide").max(255, "Email trop long");
-const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères").max(100, "Mot de passe trop long");
+const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères`)
+  .max(100, "Mot de passe trop long");
 const pseudoSchema = z
   .string()
   .min(3, "Le pseudo doit contenir au moins 3 caractères")
@@ -47,9 +52,12 @@ export default function Auth() {
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) newErrors.email = emailResult.error.errors[0].message;
 
-    if (mode !== "forgot-password") {
+    if (mode === "signup") {
+      // Règles complètes uniquement à l'inscription (les anciens comptes peuvent avoir un mot de passe plus court)
       const passwordResult = passwordSchema.safeParse(password);
       if (!passwordResult.success) newErrors.password = passwordResult.error.errors[0].message;
+    } else if (mode === "login" && !password) {
+      newErrors.password = "Veuillez saisir votre mot de passe";
     }
 
     if (mode === "signup") {
@@ -106,6 +114,10 @@ export default function Auth() {
           if (data?.pseudo) {
             setErrors(prev => ({ ...prev, pseudo: "Ce pseudo est déjà pris" }));
             toast({ title: "Pseudo indisponible", description: "Ce pseudo est déjà pris", variant: "destructive" });
+          } else if (data?.password) {
+            const msg = `Mot de passe refusé : au moins ${PASSWORD_MIN_LENGTH} caractères requis`;
+            setErrors(prev => ({ ...prev, password: msg }));
+            toast({ title: "Mot de passe invalide", description: msg, variant: "destructive" });
           } else {
             toast({ title: "Erreur", description: (error as any)?.data?.message || error.message, variant: "destructive" });
           }
@@ -206,6 +218,18 @@ export default function Auth() {
                     </button>
                   </div>
                   {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                  {mode === "signup" && (
+                    <ul className="text-xs space-y-1" aria-live="polite">
+                      {[
+                        { label: `Au moins ${PASSWORD_MIN_LENGTH} caractères`, ok: password.length >= PASSWORD_MIN_LENGTH },
+                      ].map(({ label, ok }) => (
+                        <li key={label} className={`flex items-center gap-1.5 ${ok ? "text-green-600" : "text-muted-foreground"}`}>
+                          {ok ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
 

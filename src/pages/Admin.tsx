@@ -120,6 +120,7 @@ interface ExerciceType {
   user_id: string;
   created_at: string;
   video_url?: string | null;
+  video_id?: string | null;
   thumbnail_url?: string | null;
   pathologie_tags?: string[] | null;
   rejection_reason?: string | null;
