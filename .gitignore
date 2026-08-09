@@ -27,3 +27,5 @@ config.cfg
 
 # Capacitor Android
 android/
+
+.claude/settings.json
