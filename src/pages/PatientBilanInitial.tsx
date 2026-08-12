@@ -13,6 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 import { parseJsonField, toIsoDate } from "@/lib/utils";
 import { ArrowLeft, Loader2, Save, ClipboardList, User, Activity, Eye, Stethoscope, MessageSquare, Printer, Plus, Trash2, BookOpen } from "lucide-react";
 import { DatePickerInline } from "@/components/patient/DatePickerInline";
+import {
+  PainStructuredEntriesEditor,
+  createEmptyPainEntry,
+  type PainStructuredEntry,
+} from "@/components/bilan/PainStructuredFields";
 
 interface BilanEntry {
   id: string;
@@ -54,7 +59,10 @@ interface BilanData {
   
   // Bilan douleurs - tableau dynamique
   douleurs_entries: BilanEntry[];
-  
+
+  // Bilan douleurs - vue structurée (exemple chantier 1, coexiste avec douleurs_entries)
+  douleurs_structured_entries: PainStructuredEntry[];
+
   // Bilan morphodynamique - tableau dynamique
   morphodynamique_entries: BilanEntry[];
   
@@ -116,6 +124,7 @@ const defaultBilan: BilanData = {
   projets_attentes: "",
   histoire_patient: "",
   douleurs_entries: [{ id: generateId(), zone: "", observation: "" }],
+  douleurs_structured_entries: [createEmptyPainEntry()],
   morphodynamique_entries: [{ id: generateId(), zone: "", observation: "" }],
   morphostatique_entries: [{ id: generateId(), zone: "", observation: "" }],
   cutaneo_cicatrice_couleur: "",
@@ -333,6 +342,10 @@ export default function PatientBilanInitial() {
       ...prev,
       [field]: prev[field].filter(entry => entry.id !== id)
     }));
+  };
+
+  const handlePainEntriesChange = (entries: PainStructuredEntry[]) => {
+    setBilan(prev => ({ ...prev, douleurs_structured_entries: entries }));
   };
 
   const handlePrint = () => {
@@ -778,58 +791,10 @@ export default function PatientBilanInitial() {
               </CardTitle>
             </CardHeader>
             <CardContent className="print:p-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-1/3">Zone / Critère</TableHead>
-                    <TableHead>Observation</TableHead>
-                    <TableHead className="w-12 print:hidden"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bilan.douleurs_entries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        <Input
-                          placeholder="Ex: Épaule droite, EVA..."
-                          value={entry.zone}
-                          onChange={(e) => handleEntryChange("douleurs_entries", entry.id, "zone", e.target.value)}
-                          className="border-0 p-0 h-auto focus-visible:ring-0"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          placeholder="Ex: 6/10, douleur au mouvement..."
-                          value={entry.observation}
-                          onChange={(e) => handleEntryChange("douleurs_entries", entry.id, "observation", e.target.value)}
-                          className="border-0 p-0 h-auto focus-visible:ring-0"
-                        />
-                      </TableCell>
-                      <TableCell className="print:hidden">
-                        {bilan.douleurs_entries.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => removeEntry("douleurs_entries", entry.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 print:hidden"
-                onClick={() => addEntry("douleurs_entries")}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter une entrée
-              </Button>
+              <PainStructuredEntriesEditor
+                entries={bilan.douleurs_structured_entries}
+                onChange={handlePainEntriesChange}
+              />
             </CardContent>
           </Card>
 

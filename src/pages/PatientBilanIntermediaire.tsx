@@ -7,17 +7,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, ClipboardList, Loader2, User } from "lucide-react";
+import { ArrowLeft, Save, ClipboardList, Loader2, User, Activity } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { pb } from "@/integrations/pocketbase/client";
 import { parseJsonField } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  PainStructuredEntriesEditor,
+  createEmptyPainEntry,
+  type PainStructuredEntry,
+} from "@/components/bilan/PainStructuredFields";
 
 interface BilanData {
   objectif_intermediaire: string;
+  // Champs historiques (texte libre) — conservés pour ne pas perdre les bilans
+  // existants, mais remplacés à l'affichage par douleur_structured_entries (EVA).
   douleur_localisation: string;
   douleur_intensite: string;
   douleur_type: string;
+  douleur_structured_entries: PainStructuredEntry[];
   amplitude_articulaire: string;
   force_musculaire: string;
   tests_specifiques: string;
@@ -48,6 +56,7 @@ export default function PatientBilanIntermediaire() {
     douleur_localisation: "",
     douleur_intensite: "",
     douleur_type: "",
+    douleur_structured_entries: [createEmptyPainEntry()],
     amplitude_articulaire: "",
     force_musculaire: "",
     tests_specifiques: "",
@@ -101,6 +110,10 @@ export default function PatientBilanIntermediaire() {
                 douleur_localisation: s(parsed.douleur_localisation),
                 douleur_intensite: s(parsed.douleur_intensite),
                 douleur_type: s(parsed.douleur_type),
+                douleur_structured_entries:
+                  Array.isArray(parsed.douleur_structured_entries) && parsed.douleur_structured_entries.length > 0
+                    ? parsed.douleur_structured_entries
+                    : [createEmptyPainEntry()],
                 amplitude_articulaire: s(parsed.amplitude_articulaire),
                 force_musculaire: s(parsed.force_musculaire),
                 tests_specifiques: s(parsed.tests_specifiques),
@@ -196,6 +209,20 @@ export default function PatientBilanIntermediaire() {
     setBilan(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePainEntriesChange = (entries: PainStructuredEntry[]) => {
+    setBilan(prev => ({ ...prev, douleur_structured_entries: entries }));
+  };
+
+  // Auto-save pour la vue structurée : les taps EVA appellent onChange puis onCommit dans
+  // le même tick (pas de blur naturel sur un bouton), donc on relit l'état via l'updater
+  // fonctionnel pour être sûr de persister la valeur qui vient d'être posée, pas l'ancienne.
+  const commitPainEntries = () => {
+    setBilan(prev => {
+      void persistBilan(prev, bilanDate);
+      return prev;
+    });
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -272,40 +299,26 @@ export default function PatientBilanIntermediaire() {
           {/* Évaluation de la douleur */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Évaluation de la douleur</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Évaluation de la douleur
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <PainStructuredEntriesEditor
+                entries={bilan.douleur_structured_entries}
+                onChange={handlePainEntriesChange}
+                onCommit={commitPainEntries}
+              />
               <div>
-                <Label>Localisation</Label>
+                <Label>Type de douleur</Label>
                 <Input
-                  placeholder="Ex: Épaule droite, lombaires..."
-                  value={bilan.douleur_localisation}
-                  onChange={(e) => handleChange("douleur_localisation", e.target.value)}
+                  placeholder="Ex: Mécanique, inflammatoire, mixte..."
+                  value={bilan.douleur_type}
+                  onChange={(e) => handleChange("douleur_type", e.target.value)}
                   onBlur={handleAutoSave}
                   className="mt-1"
                 />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Intensité (EVA 0-10)</Label>
-                  <Input
-                    placeholder="Ex: 6/10"
-                    value={bilan.douleur_intensite}
-                    onChange={(e) => handleChange("douleur_intensite", e.target.value)}
-                    onBlur={handleAutoSave}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Type de douleur</Label>
-                  <Input
-                    placeholder="Ex: Mécanique, inflammatoire, mixte..."
-                    value={bilan.douleur_type}
-                    onChange={(e) => handleChange("douleur_type", e.target.value)}
-                    onBlur={handleAutoSave}
-                    className="mt-1"
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>
