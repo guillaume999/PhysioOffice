@@ -21,7 +21,7 @@ export function MobileBottomNav() {
   const isActive = (path: string) => location.pathname === path;
 
   const mainNavItems = [
-    { icon: Home, label: "Accueil", href: "/" },
+    { icon: Home, label: "Accueil", href: "/accueil" },
     { icon: Users, label: "Patients", href: "/patients" },
     { icon: Calendar, label: "Séance", href: "/seance-type" },
     { icon: Dumbbell, label: "Exercices", href: "/exercices" },

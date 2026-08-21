@@ -41,7 +41,7 @@ export default function Auth() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/";
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/patients";
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
@@ -254,7 +254,7 @@ export default function Auth() {
                     const payload = btoa(JSON.stringify({ id: fakeUser.id, type: "authRecord", collectionId: fakeUser.collectionId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }));
                     pb.authStore.save(`${header}.${payload}.devsignature`, fakeUser as any);
                     toast({ title: "Connexion simulée", description: "Session de dev créée localement." });
-                    navigate("/");
+                    navigate("/patients");
                   }}
                 >
                   Connexion simulée (dev)
